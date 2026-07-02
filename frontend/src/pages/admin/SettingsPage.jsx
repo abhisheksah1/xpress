@@ -14,6 +14,7 @@ import {
   AdminCredentialsSection,
   SmtpSection,
   CustomerAuthSection,
+  ProductPageSection,
 } from '../../components/admin/settings/sections.jsx';
 
 const TABS = [
@@ -25,6 +26,7 @@ const TABS = [
   { id: 'payment', label: 'Payment Gateways', icon: '💳' },
   { id: 'plugins', label: 'Plugins Config', icon: '🔌' },
   { id: 'branding', label: 'Branding & Layout', icon: '🎨' },
+  { id: 'productpage', label: 'Product Page', icon: '📦' },
   { id: 'compliance', label: 'Compliance & Footer', icon: '🏢' },
   { id: 'timeslots', label: 'Delivery Time Slots', icon: '🕒' },
   { id: 'admin', label: 'Admin Credentials', icon: '🔒' },
@@ -34,14 +36,14 @@ const TABS = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('registry');
-  const { values, set, loading } = useStoreSettings();
+  const { values, set, loading, load, setValues } = useStoreSettings();
 
   if (loading) {
     return <div className="text-center py-20 text-gray-400">Loading settings...</div>;
   }
 
   const renderSection = () => {
-    const props = { values, set };
+    const props = { values, set, reload: load, setValues };
     switch (activeTab) {
       case 'registry': return <StoreRegistrySection {...props} />;
       case 'maintenance': return <MaintenanceSection {...props} />;
@@ -51,6 +53,7 @@ export default function SettingsPage() {
       case 'payment': return <PaymentGatewaysSection {...props} />;
       case 'plugins': return <PluginsSection {...props} />;
       case 'branding': return <BrandingSection {...props} />;
+      case 'productpage': return <ProductPageSection {...props} />;
       case 'compliance': return <ComplianceSection {...props} />;
       case 'timeslots': return <TimeSlotsSection {...props} />;
       case 'admin': return <AdminCredentialsSection />;

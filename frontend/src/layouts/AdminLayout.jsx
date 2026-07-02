@@ -1,4 +1,6 @@
 import { Outlet, Link, NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { adminApi } from '../api/admin.js';
 import { useAuthStore } from '../store/authStore.js';
 
 const navItems = [
@@ -8,11 +10,28 @@ const navItems = [
   { to: '/admin/navbar', label: 'Navigation' },
   { to: '/admin/blog', label: 'Blog' },
   { to: '/admin/orders', label: 'Orders' },
+  { to: '/admin/leads', label: 'Lead orders', badge: 'leads' },  { to: '/admin/coupons', label: 'Coupons' },
+  { to: '/admin/reminders', label: 'Reminders' },
+  { to: '/admin/delivery', label: 'Delivery' },
   { to: '/admin/settings', label: 'Settings' },
 ];
 
 export default function AdminLayout() {
   const { user, logout } = useAuthStore();
+  const [leadCount, setLeadCount] = useState(0);
+
+  const refreshLeadCount = () => {
+    adminApi.getLeadOrderCount()
+      .then((res) => setLeadCount(res.data.data?.count || 0))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    refreshLeadCount();
+    const onFocus = () => refreshLeadCount();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -40,7 +59,14 @@ export default function AdminLayout() {
                 }`
               }
             >
-              {item.label}
+              <span className="flex items-center justify-between gap-2">
+                <span>{item.label}</span>
+                {item.badge === 'leads' && leadCount > 0 && (
+                  <span className="text-[10px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
+                    {leadCount > 99 ? '99+' : leadCount}
+                  </span>
+                )}
+              </span>
             </NavLink>
           ))}
         </nav>

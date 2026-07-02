@@ -11,6 +11,7 @@ import RegisterPage from './pages/store/RegisterPage';
 import CartPage from './pages/store/CartPage';
 import CheckoutPage from './pages/store/CheckoutPage';
 import OrderHistoryPage from './pages/store/OrderHistoryPage';
+import TrackOrderPage from './pages/store/TrackOrderPage';
 import BlogPage from './pages/store/BlogPage';
 import BlogPostPage from './pages/store/BlogPostPage';
 import AdminDashboard from './pages/admin/DashboardPage';
@@ -20,7 +21,12 @@ import ContentPage from './pages/admin/ContentPage';
 import NavbarPage from './pages/admin/NavbarPage';
 import BlogAdminPage from './pages/admin/BlogAdminPage';
 import AdminOrders from './pages/admin/OrdersPage';
+import LeadOrdersPage from './pages/admin/LeadOrdersPage';
 import AdminSettings from './pages/admin/SettingsPage';
+import DeliveryGroupsPage from './pages/admin/DeliveryGroupsPage';
+import CouponsPage from './pages/admin/CouponsPage';
+import AdminRemindersPage from './pages/admin/RemindersPage';
+import RemindersPage from './pages/store/RemindersPage';
 
 export default function App() {
   return (
@@ -37,6 +43,8 @@ export default function App() {
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="orders" element={<OrderHistoryPage />} />
+        <Route path="track" element={<TrackOrderPage />} />
+        <Route path="reminders" element={<RemindersPage />} />
         <Route path="blog" element={<BlogPage />} />
         <Route path="blog/:slug" element={<BlogPostPage />} />
       </Route>
@@ -57,6 +65,10 @@ export default function App() {
         <Route path="navbar" element={<NavbarPage />} />
         <Route path="blog" element={<BlogAdminPage />} />
         <Route path="orders" element={<AdminOrders />} />
+        <Route path="leads" element={<LeadOrdersPage />} />
+        <Route path="coupons" element={<CouponsPage />} />
+        <Route path="reminders" element={<AdminRemindersPage />} />
+        <Route path="delivery" element={<DeliveryGroupsPage />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>

@@ -2,17 +2,19 @@ import crypto from 'crypto';
 import config from '../../config/index.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-export const initiatePayment = async (order) => {
-  if (!config.payments.esewa.merchantCode) {
+export const initiatePayment = async (order, creds) => {
+  const merchantCode = creds?.merchantId || creds?.merchantCode || config.payments.esewa.merchantCode;
+  const secretKey = creds?.secretKey || config.payments.esewa.secretKey;
+  if (!merchantCode) {
     throw new ApiError(503, 'eSewa is not configured');
   }
 
   const transactionUuid = `${order.orderNumber}-${Date.now()}`;
   const amount = order.total.toFixed(2);
 
-  const signatureData = `total_amount=${amount},transaction_uuid=${transactionUuid},product_code=${config.payments.esewa.merchantCode}`;
+  const signatureData = `total_amount=${amount},transaction_uuid=${transactionUuid},product_code=${merchantCode}`;
   const signature = crypto
-    .createHmac('sha256', config.payments.esewa.secretKey)
+    .createHmac('sha256', secretKey)
     .update(signatureData)
     .digest('base64');
 
@@ -21,7 +23,7 @@ export const initiatePayment = async (order) => {
     tax_amount: '0',
     total_amount: amount,
     transaction_uuid: transactionUuid,
-    product_code: config.payments.esewa.merchantCode,
+    product_code: merchantCode,
     product_service_charge: '0',
     product_delivery_charge: order.shippingFee.toFixed(2),
     success_url: `${config.clientUrl}/checkout/esewa/success`,
@@ -32,7 +34,7 @@ export const initiatePayment = async (order) => {
   };
 };
 
-export const verifyPayment = async (productCode, totalAmount, transactionUuid) => {
+export const verifyPayment = async (productCode, totalAmount, transactionUuid, creds) => {
   const url = `${config.payments.esewa.verifyUrl}?product_code=${productCode}&total_amount=${totalAmount}&transaction_uuid=${transactionUuid}`;
   const response = await fetch(url);
   const data = await response.json();

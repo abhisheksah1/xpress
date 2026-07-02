@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import config from '../config/index.js';
-import { User, Navbar, DeliveryZone, CMSPage } from '../models/index.js';
+import { User, Navbar, DeliveryLocation, DeliveryGroup, CMSPage } from '../models/index.js';
 import { ROLES } from '../config/constants.js';
 import { seedDefaultSettings } from '../services/settings.service.js';
 
@@ -171,19 +171,76 @@ const seedStaticPages = async () => {
   }
 };
 
-const seedDeliveryZones = async () => {
-  const count = await DeliveryZone.countDocuments();
-  if (count > 0) return;
+const seedDelivery = async () => {
+  const locCount = await DeliveryLocation.countDocuments();
+  if (locCount > 0) return;
 
-  const zones = [
-    { name: 'Kathmandu Valley', province: 'Bagmati Pradesh', districts: ['Kathmandu', 'Lalitpur', 'Bhaktapur'], deliveryFee: 100, estimatedDays: { min: 1, max: 2 } },
-    { name: 'Pokhara', province: 'Gandaki Pradesh', districts: ['Kaski'], deliveryFee: 200, estimatedDays: { min: 2, max: 4 } },
-    { name: 'Biratnagar', province: 'Province 1', districts: ['Morang'], deliveryFee: 250, estimatedDays: { min: 3, max: 5 } },
-    { name: 'Rest of Nepal', province: 'All', districts: [], deliveryFee: 350, estimatedDays: { min: 3, max: 7 } },
+  const locationRows = [
+    { name: 'Kathmandu Valley', deliveryFee: 100, sortOrder: 1 },
+    { name: 'Pokhara (Lakeside & Bazar)', deliveryFee: 200, sortOrder: 2 },
+    { name: 'Biratnagar', deliveryFee: 250, sortOrder: 3 },
+    { name: 'Bharatpur', deliveryFee: 250, sortOrder: 4 },
+    { name: 'Bhairahawa', deliveryFee: 275, sortOrder: 5 },
+    { name: 'Nepalgunj', deliveryFee: 300, sortOrder: 6 },
+    { name: 'Dharan', deliveryFee: 300, sortOrder: 7 },
+    { name: 'Butwal', deliveryFee: 300, sortOrder: 8 },
+    { name: 'Hetauda', deliveryFee: 275, sortOrder: 9 },
+    { name: 'Dhangadhi', deliveryFee: 300, sortOrder: 10 },
+    { name: 'Outside the valley area', deliveryFee: 450, sortOrder: 11 },
+    { name: 'Other Districts and cities', deliveryFee: 500, sortOrder: 12 },
   ];
 
-  await DeliveryZone.insertMany(zones);
-  console.log('Default delivery zones seeded');
+  const locations = await DeliveryLocation.insertMany(locationRows);
+  const byName = Object.fromEntries(locations.map((l) => [l.name, l._id]));
+
+  const groups = [
+    {
+      name: 'Kathmandu Valley',
+      code: 'grp_ktm',
+      coverageLocations: [
+        byName['Kathmandu Valley'],
+      ],
+      deliveryMethod: 'local_arrangement',
+      estimatedDeliveryLabel: 'Minimum 4 Hours',
+      estimatedHours: 4,
+      estimatedDays: { min: 0, max: 1 },
+      cutoffTime: '16:00',
+      sortOrder: 1,
+    },
+    {
+      name: 'Major Cities',
+      code: 'grp_major',
+      coverageLocations: [
+        byName['Pokhara (Lakeside & Bazar)'],
+        byName.Bharatpur,
+        byName.Biratnagar,
+        byName.Butwal,
+        byName.Nepalgunj,
+        byName.Dharan,
+        byName.Hetauda,
+        byName.Dhangadhi,
+        byName.Bhairahawa,
+      ].filter(Boolean),
+      deliveryMethod: 'local_arrangement',
+      estimatedDeliveryLabel: 'Next Day Delivery',
+      estimatedDays: { min: 1, max: 1 },
+      cutoffTime: '16:00',
+      sortOrder: 2,
+    },
+    {
+      name: 'Tarai Area',
+      code: 'grp_tarai',
+      coverageLocations: [byName['Outside the valley area'], byName['Other Districts and cities']].filter(Boolean),
+      deliveryMethod: 'courier_local',
+      estimatedDeliveryLabel: '1-2 Days',
+      estimatedDays: { min: 1, max: 2 },
+      cutoffTime: '16:00',
+      sortOrder: 3,
+    },
+  ];
+
+  await DeliveryGroup.insertMany(groups);
+  console.log('Default delivery locations and groups seeded');
 };
 
 const runSeed = async () => {
@@ -195,7 +252,7 @@ const runSeed = async () => {
     await seedFooterNavbar();
     await seedHomePage();
     await seedStaticPages();
-    await seedDeliveryZones();
+    await seedDelivery();
     console.log('Seed completed successfully');
   } catch (error) {
     console.error('Seed failed:', error.message);
@@ -216,5 +273,5 @@ export default async function seedOnStartup() {
   await seedFooterNavbar();
   await seedHomePage();
   await seedStaticPages();
-  await seedDeliveryZones();
+  await seedDelivery();
 }

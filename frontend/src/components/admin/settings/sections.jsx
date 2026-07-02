@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../../api/admin.js';
 import { Field, SectionCard, Toggle, saveSection } from './shared.jsx';
+import PaymentGatewaysSetup from '../PaymentGatewaysSetup.jsx';
 
 const REGISTRY_KEYS = [
   'registry_company_name',
@@ -137,14 +138,21 @@ export function MaintenanceSection({ values, set }) {
   );
 }
 
-export function MultiCurrenciesSection({ values, set }) {
+export function MultiCurrenciesSection({ values, set, setValues }) {
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const data = values.multi_currencies || { currencies: [] };
   const currencies = data.currencies || [];
+  const lastSync = values.currency_nrb_last_sync || {};
 
   const updateCurrency = (i, field, val) => {
     const next = [...currencies];
-    next[i] = { ...next[i], [field]: val };
+    const patch = { [field]: val };
+    if (field === 'rate' || field === 'nprPerUnit') {
+      patch.manualOverride = true;
+      patch.source = 'manual';
+    }
+    next[i] = { ...next[i], ...patch };
     if (field === 'isDefault' && val) {
       next.forEach((c, j) => { next[j] = { ...next[j], isDefault: j === i }; });
     }
@@ -154,7 +162,16 @@ export function MultiCurrenciesSection({ values, set }) {
   const addCurrency = () => {
     set('multi_currencies', {
       ...data,
-      currencies: [...currencies, { code: '', name: '', symbol: '', rate: 1, enabled: false, isDefault: false }],
+      currencies: [...currencies, {
+        code: '',
+        name: '',
+        symbol: '',
+        rate: 1,
+        enabled: false,
+        isDefault: false,
+        manualOverride: true,
+        source: 'manual',
+      }],
     });
   };
 
@@ -162,22 +179,156 @@ export function MultiCurrenciesSection({ values, set }) {
     set('multi_currencies', { ...data, currencies: currencies.filter((_, j) => j !== i) });
   };
 
-  const handleSave = () => saveSection(['multi_currencies', 'auto_convert_prices'], values, setSaving);
+  const handleSave = () => saveSection(
+    ['multi_currencies', 'auto_convert_prices', 'currency_nrb_auto_sync'],
+    values,
+    setSaving
+  );
+
+  const handleSyncNrb = async () => {
+    setSyncing(true);
+    try {
+      const { data: res } = await adminApi.syncNrbRates();
+      const result = res.data;
+      if (setValues) {
+        setValues((prev) => ({
+          ...prev,
+          multi_currencies: { ...prev.multi_currencies, currencies: result.currencies },
+          currency_nrb_last_sync: {
+            at: result.at,
+            date: result.date,
+            publishedOn: result.publishedOn,
+            modifiedOn: result.modifiedOn,
+            updated: result.updated,
+            message: result.message,
+            error: false,
+          },
+        }));
+      } else {
+        set('multi_currencies', { ...data, currencies: result.currencies });
+        set('currency_nrb_last_sync', {
+          at: result.at,
+          date: result.date,
+          publishedOn: result.publishedOn,
+          modifiedOn: result.modifiedOn,
+          updated: result.updated,
+          message: result.message,
+        });
+      }
+      toast.success(result.message || 'Rates synced from NRB');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'NRB sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const formatSyncTime = (iso) => {
+    if (!iso) return 'Never';
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
+  };
 
   return (
-    <SectionCard title="Multi-Currencies" description="Configure supported currencies and exchange rates." onSave={handleSave} saving={saving}>
+    <SectionCard
+      title="Multi-Currencies"
+      description="Configure supported currencies. Rates can be synced from Nepal Rastra Bank (NRB) or set manually."
+      onSave={handleSave}
+      saving={saving}
+    >
+      <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-blue-900">NRB Official FOREX Rates</p>
+            <p className="text-xs text-blue-700 mt-1">
+              Source:{' '}
+              <a
+                href="https://www.nrb.org.np/api-docs-v1/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                Nepal Rastra Bank API
+              </a>
+              {' '}— auto-refreshes every hour when enabled.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSyncNrb}
+            disabled={syncing}
+            className="btn-primary text-sm whitespace-nowrap"
+          >
+            {syncing ? 'Syncing...' : 'Sync Now from NRB'}
+          </button>
+        </div>
+        <div className="text-xs text-blue-800 grid sm:grid-cols-2 gap-1">
+          <span>Last sync: {formatSyncTime(lastSync.at)}</span>
+          <span>NRB date: {lastSync.date || '—'}</span>
+          <span>Updated currencies: {lastSync.updated ?? 0}</span>
+          <span className={lastSync.error ? 'text-red-600' : ''}>{lastSync.message || 'Not synced yet'}</span>
+        </div>
+        <Toggle
+          label="Auto-sync from NRB every 1 hour"
+          hint="When enabled, rates update automatically in the background. Locked (manual) currencies are skipped."
+          checked={values.currency_nrb_auto_sync !== false}
+          onChange={(v) => set('currency_nrb_auto_sync', v)}
+        />
+      </div>
+
       <Toggle label="Auto-convert product prices" checked={values.auto_convert_prices} onChange={(v) => set('auto_convert_prices', v)} />
+
+      <p className="text-xs text-gray-500">
+        Rate = foreign units per 1 NPR. NPR per unit is shown for reference. Lock a currency to keep a manual rate during NRB sync.
+      </p>
+
       <div className="space-y-3">
         {currencies.map((c, i) => (
-          <div key={i} className="grid grid-cols-2 md:grid-cols-6 gap-2 p-3 border border-gray-100 rounded-lg items-end">
-            <Field label="Code"><input className="input-field text-sm" value={c.code} onChange={(e) => updateCurrency(i, 'code', e.target.value.toUpperCase())} /></Field>
-            <Field label="Name"><input className="input-field text-sm" value={c.name} onChange={(e) => updateCurrency(i, 'name', e.target.value)} /></Field>
-            <Field label="Symbol"><input className="input-field text-sm" value={c.symbol} onChange={(e) => updateCurrency(i, 'symbol', e.target.value)} /></Field>
-            <Field label="Rate"><input type="number" step="0.0001" className="input-field text-sm" value={c.rate} onChange={(e) => updateCurrency(i, 'rate', Number(e.target.value))} /></Field>
-            <Toggle label="Enabled" checked={c.enabled} onChange={(v) => updateCurrency(i, 'enabled', v)} />
-            <div className="flex gap-2">
-              <Toggle label="Default" checked={c.isDefault} onChange={(v) => updateCurrency(i, 'isDefault', v)} />
-              <button type="button" onClick={() => removeCurrency(i)} className="text-red-500 text-xs">Remove</button>
+          <div key={i} className="p-3 border border-gray-100 rounded-lg space-y-2">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+              <Field label="Code">
+                <input className="input-field text-sm" value={c.code} onChange={(e) => updateCurrency(i, 'code', e.target.value.toUpperCase())} />
+              </Field>
+              <Field label="Name">
+                <input className="input-field text-sm" value={c.name} onChange={(e) => updateCurrency(i, 'name', e.target.value)} />
+              </Field>
+              <Field label="Symbol">
+                <input className="input-field text-sm" value={c.symbol} onChange={(e) => updateCurrency(i, 'symbol', e.target.value)} />
+              </Field>
+              <Field label="Rate (per NPR)" hint={c.nprPerUnit ? `≈ ${c.nprPerUnit} NPR per ${c.code}` : undefined}>
+                <input
+                  type="number"
+                  step="0.00000001"
+                  className="input-field text-sm"
+                  value={c.rate}
+                  onChange={(e) => updateCurrency(i, 'rate', Number(e.target.value))}
+                  disabled={c.code === 'NPR'}
+                />
+              </Field>
+              <Toggle label="Enabled" checked={c.enabled} onChange={(v) => updateCurrency(i, 'enabled', v)} />
+              <div className="flex flex-col gap-2">
+                <Toggle label="Default" checked={c.isDefault} onChange={(v) => updateCurrency(i, 'isDefault', v)} />
+                {c.code !== 'NPR' && (
+                  <Toggle
+                    label="Lock rate (manual)"
+                    checked={!!c.manualOverride}
+                    onChange={(v) => updateCurrency(i, 'manualOverride', v)}
+                  />
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
+              <span>
+                Source: {c.source || 'manual'}
+                {c.syncedAt ? ` · synced ${formatSyncTime(c.syncedAt)}` : ''}
+                {c.buyRate ? ` · NRB buy ${c.buyRate}` : ''}
+              </span>
+              {c.code !== 'NPR' && (
+                <button type="button" onClick={() => removeCurrency(i)} className="text-red-500">Remove</button>
+              )}
             </div>
           </div>
         ))}
@@ -191,21 +342,42 @@ export function ServiceAddonsSection({ values, set }) {
   const [saving, setSaving] = useState(false);
   const addons = values.service_addons || [];
 
+  const INPUT_TYPE_OPTIONS = [
+    { value: 'none', label: 'None (no extra info)' },
+    { value: 'text', label: 'Collect text' },
+    { value: 'photo', label: 'Collect photo' },
+    { value: 'both', label: 'Collect text & photo' },
+  ];
+
   const update = (i, field, val) => {
     const next = [...addons];
     next[i] = { ...next[i], [field]: val };
     set('service_addons', next);
   };
 
-  const add = () => set('service_addons', [...addons, { id: `addon_${Date.now()}`, name: '', price: 0, description: '', enabled: true }]);
+  const add = () => set('service_addons', [...addons, {
+    id: `addon_${Date.now()}`,
+    name: '',
+    price: 0,
+    description: '',
+    enabled: true,
+    inputType: 'none',
+  }]);
   const remove = (i) => set('service_addons', addons.filter((_, j) => j !== i));
 
   return (
-    <SectionCard title="Service Add-ons" description="Optional extras customers can add at checkout." onSave={() => saveSection(['service_addons'], values, setSaving)} saving={saving}>
+    <SectionCard title="Service Add-ons" description="Optional extras customers can add at checkout. Choose whether to collect text, photo, or both per add-on." onSave={() => saveSection(['service_addons'], values, setSaving)} saving={saving}>
       {addons.map((a, i) => (
-        <div key={a.id || i} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 border border-gray-100 rounded-lg">
+        <div key={a.id || i} className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 border border-gray-100 rounded-lg">
           <Field label="Name"><input className="input-field text-sm" value={a.name} onChange={(e) => update(i, 'name', e.target.value)} /></Field>
           <Field label="Price (NPR)"><input type="number" className="input-field text-sm" value={a.price} onChange={(e) => update(i, 'price', Number(e.target.value))} /></Field>
+          <Field label="Customer input">
+            <select className="input-field text-sm" value={a.inputType || 'none'} onChange={(e) => update(i, 'inputType', e.target.value)}>
+              {INPUT_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </Field>
           <Field label="Description"><input className="input-field text-sm" value={a.description} onChange={(e) => update(i, 'description', e.target.value)} /></Field>
           <Toggle label="Enabled" checked={a.enabled} onChange={(v) => update(i, 'enabled', v)} />
           <button type="button" onClick={() => remove(i)} className="text-red-500 text-sm self-end">Remove</button>
@@ -218,39 +390,12 @@ export function ServiceAddonsSection({ values, set }) {
 
 export function DeliveryPricingSection({ values, set }) {
   const [saving, setSaving] = useState(false);
-  const [zones, setZones] = useState([]);
-  const [zoneForm, setZoneForm] = useState({ name: '', province: '', deliveryFee: 100, freeShippingThreshold: 0, isActive: true });
-
-  const loadZones = async () => {
-    const { data } = await adminApi.getDeliveryZones();
-    setZones(data.data);
-  };
-
-  useEffect(() => { loadZones(); }, []);
 
   const saveFees = () => saveSection(['default_delivery_fee', 'free_shipping_threshold', 'same_day_fee', 'handling_fee'], values, setSaving);
 
-  const addZone = async () => {
-    await adminApi.createDeliveryZone({ ...zoneForm, districts: [], estimatedDays: { min: 1, max: 3 } });
-    setZoneForm({ name: '', province: '', deliveryFee: 100, freeShippingThreshold: 0, isActive: true });
-    loadZones();
-    toast.success('Zone added');
-  };
-
-  const updateZone = async (id, data) => {
-    await adminApi.updateDeliveryZone(id, data);
-    loadZones();
-  };
-
-  const deleteZone = async (id) => {
-    if (!confirm('Delete this delivery zone?')) return;
-    await adminApi.deleteDeliveryZone(id);
-    loadZones();
-  };
-
   return (
     <div className="space-y-6">
-      <SectionCard title="Delivery Fees" description="Global delivery pricing rules." onSave={saveFees} saving={saving}>
+      <SectionCard title="Delivery Fees" description="Global delivery pricing rules applied at checkout." onSave={saveFees} saving={saving}>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Default Delivery Fee (NPR)"><input type="number" className="input-field" value={values.default_delivery_fee ?? ''} onChange={(e) => set('default_delivery_fee', Number(e.target.value))} /></Field>
           <Field label="Free Shipping Above (NPR)"><input type="number" className="input-field" value={values.free_shipping_threshold ?? ''} onChange={(e) => set('free_shipping_threshold', Number(e.target.value))} /></Field>
@@ -258,46 +403,22 @@ export function DeliveryPricingSection({ values, set }) {
           <Field label="Handling Fee (NPR)"><input type="number" className="input-field" value={values.handling_fee ?? ''} onChange={(e) => set('handling_fee', Number(e.target.value))} /></Field>
         </div>
       </SectionCard>
-      <SectionCard title="Delivery Zones" description="Region-based delivery fees and availability.">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <input className="input-field text-sm" placeholder="Zone name" value={zoneForm.name} onChange={(e) => setZoneForm((f) => ({ ...f, name: e.target.value }))} />
-          <input className="input-field text-sm" placeholder="Province" value={zoneForm.province} onChange={(e) => setZoneForm((f) => ({ ...f, province: e.target.value }))} />
-          <input type="number" className="input-field text-sm" placeholder="Fee" value={zoneForm.deliveryFee} onChange={(e) => setZoneForm((f) => ({ ...f, deliveryFee: Number(e.target.value) }))} />
-          <button type="button" onClick={addZone} className="btn-secondary text-sm">+ Add Zone</button>
-        </div>
-        {zones.map((z) => (
-          <div key={z._id} className="flex flex-wrap items-center gap-3 p-3 border border-gray-100 rounded-lg mb-2">
-            <span className="font-medium text-sm flex-1">{z.name} — {z.province}</span>
-            <input type="number" className="input-field w-24 text-sm" value={z.deliveryFee} onChange={(e) => updateZone(z._id, { deliveryFee: Number(e.target.value) })} />
-            <Toggle label="Active" checked={z.isActive} onChange={(v) => updateZone(z._id, { isActive: v })} />
-            <button type="button" onClick={() => deleteZone(z._id)} className="text-red-500 text-xs">Delete</button>
-          </div>
-        ))}
+      <SectionCard title="Delivery Groups & Locations" description="Configure delivery areas, location fees, and delivery times per group.">
+        <p className="text-sm text-gray-600">
+          Delivery groups (e.g. Kathmandu Valley) contain multiple locations, each with optional fee overrides.
+          Products and categories can be restricted to specific groups with same-day and custom delivery day rules.
+        </p>
+        <a href="/admin/delivery" className="btn-primary inline-block text-sm mt-2">Open Delivery Groups Manager</a>
       </SectionCard>
     </div>
   );
 }
 
 export function PaymentGatewaysSection({ values, set }) {
-  const [saving, setSaving] = useState(false);
-  const keys = ['cod_enabled', 'khalti_enabled', 'esewa_enabled', 'fonepay_enabled', 'card_enabled', 'payment_test_mode', 'khalti_public_key', 'esewa_merchant_code', 'fonepay_merchant_code'];
-
   return (
-    <SectionCard title="Payment Gateways" description="Enable payment methods and configure public keys. Secret keys stay in .env." onSave={() => saveSection(keys, values, setSaving)} saving={saving}>
-      <div className="grid md:grid-cols-2 gap-4">
-        <Toggle label="Cash on Delivery" checked={values.cod_enabled} onChange={(v) => set('cod_enabled', v)} />
-        <Toggle label="Khalti" checked={values.khalti_enabled} onChange={(v) => set('khalti_enabled', v)} />
-        <Toggle label="eSewa" checked={values.esewa_enabled} onChange={(v) => set('esewa_enabled', v)} />
-        <Toggle label="Fonepay" checked={values.fonepay_enabled} onChange={(v) => set('fonepay_enabled', v)} />
-        <Toggle label="Card / Stripe" checked={values.card_enabled} onChange={(v) => set('card_enabled', v)} />
-        <Toggle label="Test / Sandbox Mode" checked={values.payment_test_mode} onChange={(v) => set('payment_test_mode', v)} />
-      </div>
-      <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
-        <Field label="Khalti Public Key"><input className="input-field text-sm" value={values.khalti_public_key || ''} onChange={(e) => set('khalti_public_key', e.target.value)} /></Field>
-        <Field label="eSewa Merchant Code"><input className="input-field text-sm" value={values.esewa_merchant_code || ''} onChange={(e) => set('esewa_merchant_code', e.target.value)} /></Field>
-        <Field label="Fonepay Merchant Code"><input className="input-field text-sm" value={values.fonepay_merchant_code || ''} onChange={(e) => set('fonepay_merchant_code', e.target.value)} /></Field>
-      </div>
-    </SectionCard>
+    <div className="card">
+      <PaymentGatewaysSetup values={values} set={set} />
+    </div>
   );
 }
 
@@ -389,31 +510,17 @@ export function ComplianceSection({ values, set }) {
   );
 }
 
-export function TimeSlotsSection({ values, set }) {
-  const [saving, setSaving] = useState(false);
-  const slots = values.delivery_time_slots || [];
-
-  const update = (i, field, val) => {
-    const next = [...slots];
-    next[i] = { ...next[i], [field]: val };
-    set('delivery_time_slots', next);
-  };
-
-  const add = () => set('delivery_time_slots', [...slots, { id: `slot_${Date.now()}`, label: '', start: '09:00', end: '12:00', enabled: true, maxOrders: 50 }]);
-
+export function TimeSlotsSection() {
   return (
-    <SectionCard title="Delivery Time Slots" description="Let customers pick preferred delivery windows." onSave={() => saveSection(['delivery_time_slots', 'timeslots_enabled'], values, setSaving)} saving={saving}>
-      <Toggle label="Enable time slot selection at checkout" checked={values.timeslots_enabled} onChange={(v) => set('timeslots_enabled', v)} />
-      {slots.map((s, i) => (
-        <div key={s.id || i} className="grid grid-cols-2 md:grid-cols-5 gap-2 p-3 border border-gray-100 rounded-lg">
-          <Field label="Label"><input className="input-field text-sm" value={s.label} onChange={(e) => update(i, 'label', e.target.value)} /></Field>
-          <Field label="Start"><input type="time" className="input-field text-sm" value={s.start} onChange={(e) => update(i, 'start', e.target.value)} /></Field>
-          <Field label="End"><input type="time" className="input-field text-sm" value={s.end} onChange={(e) => update(i, 'end', e.target.value)} /></Field>
-          <Field label="Max Orders"><input type="number" className="input-field text-sm" value={s.maxOrders} onChange={(e) => update(i, 'maxOrders', Number(e.target.value))} /></Field>
-          <Toggle label="Enabled" checked={s.enabled} onChange={(v) => update(i, 'enabled', v)} />
-        </div>
-      ))}
-      <button type="button" onClick={add} className="btn-secondary text-sm">+ Add Time Slot</button>
+    <SectionCard title="Delivery Time Slots" description="Time slots are configured per delivery location (not globally).">
+      <p className="text-sm text-gray-600">
+        To choose which cities allow time slot selection (e.g. Kathmandu, Pokhara) and set an additional fee per slot,
+        open the Delivery Setup page and edit each location.
+      </p>
+      <a href="/admin/delivery" className="btn-primary inline-block text-sm mt-3">Open Delivery Setup</a>
+      <p className="text-xs text-gray-400 mt-3">
+        Customers see slot fees at checkout. If no slot is chosen, only the base delivery fee applies.
+      </p>
     </SectionCard>
   );
 }
@@ -546,6 +653,106 @@ export function CustomerAuthSection({ values, set }) {
         <Field label="Min Password Length"><input type="number" className="input-field" value={values.min_password_length ?? 8} onChange={(e) => set('min_password_length', Number(e.target.value))} /></Field>
         <Field label="Session Timeout (min)"><input type="number" className="input-field" value={values.session_timeout_minutes ?? 10080} onChange={(e) => set('session_timeout_minutes', Number(e.target.value))} /></Field>
         <Field label="Max Login Attempts"><input type="number" className="input-field" value={values.login_attempts_max ?? 5} onChange={(e) => set('login_attempts_max', Number(e.target.value))} /></Field>
+      </div>
+    </SectionCard>
+  );
+}
+
+const PRODUCT_PAGE_KEYS = [
+  'product_page_alert_message',
+  'product_page_short_terms',
+  'product_delivery_schedule_disclaimer',
+  'product_delivery_location_tier_label',
+  'product_whatsapp_help_enabled',
+  'product_whatsapp_help_title',
+  'product_whatsapp_help_description',
+  'product_whatsapp_help_button_text',
+];
+
+export function ProductPageSection({ values, set }) {
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <SectionCard
+      title="Product Page Content"
+      description="Alert messages, short terms, delivery schedule note, and WhatsApp help shown on every product page. Delivery rows come from Admin → Delivery groups."
+      onSave={() => saveSection(PRODUCT_PAGE_KEYS, values, setSaving)}
+      saving={saving}
+    >
+      <Field
+        label="Concise alert message"
+        hint="Shown at the top of every product page (e.g. cut-off reminders)."
+      >
+        <textarea
+          className="input-field"
+          rows={2}
+          value={values.product_page_alert_message || ''}
+          onChange={(e) => set('product_page_alert_message', e.target.value)}
+          placeholder="Orders placed after cut-off are scheduled for the next cycle."
+        />
+      </Field>
+
+      <Field
+        label="Short terms & conditions"
+        hint="Brief terms block displayed on all product pages."
+      >
+        <textarea
+          className="input-field"
+          rows={4}
+          value={values.product_page_short_terms || ''}
+          onChange={(e) => set('product_page_short_terms', e.target.value)}
+        />
+      </Field>
+
+      <Field
+        label="Delivery schedule footer note"
+        hint="Small print below the yellow delivery table on product pages."
+      >
+        <textarea
+          className="input-field"
+          rows={2}
+          value={values.product_delivery_schedule_disclaimer || ''}
+          onChange={(e) => set('product_delivery_schedule_disclaimer', e.target.value)}
+        />
+      </Field>
+
+      <Field label="Delivery table badge label">
+        <input
+          className="input-field max-w-xs"
+          value={values.product_delivery_location_tier_label || 'Location Tier'}
+          onChange={(e) => set('product_delivery_location_tier_label', e.target.value)}
+        />
+      </Field>
+
+      <div className="border-t border-gray-100 pt-4 space-y-4">
+        <Toggle
+          label="Show WhatsApp help banner on product pages"
+          checked={values.product_whatsapp_help_enabled}
+          onChange={(v) => set('product_whatsapp_help_enabled', v)}
+          hint="Uses Helpdesk WhatsApp from Store Registry or Plugins config."
+        />
+        <Field label="WhatsApp help title">
+          <input
+            className="input-field"
+            value={values.product_whatsapp_help_title || ''}
+            onChange={(e) => set('product_whatsapp_help_title', e.target.value)}
+          />
+        </Field>
+        <Field label="WhatsApp help description">
+          <textarea
+            className="input-field"
+            rows={2}
+            value={values.product_whatsapp_help_description || ''}
+            onChange={(e) => set('product_whatsapp_help_description', e.target.value)}
+          />
+        </Field>
+        <Field label="WhatsApp button text">
+          <input
+            className="input-field max-w-xs"
+            value={values.product_whatsapp_help_button_text || 'WhatsApp Chat'}
+            onChange={(e) => set('product_whatsapp_help_button_text', e.target.value)}
+          />
+        </Field>
       </div>
     </SectionCard>
   );

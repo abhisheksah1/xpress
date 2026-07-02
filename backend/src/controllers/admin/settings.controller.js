@@ -1,5 +1,6 @@
 import * as settingsService from '../../services/settings.service.js';
 import * as emailService from '../../services/email.service.js';
+import * as forexService from '../../services/forex.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
@@ -31,4 +32,9 @@ export const testSmtp = asyncHandler(async (req, res) => {
   if (!email) throw new ApiError(400, 'Test email address required');
   await emailService.sendTestEmail(email);
   res.json(new ApiResponse(200, null, 'Test email sent'));
+});
+
+export const syncNrbRates = asyncHandler(async (req, res) => {
+  const result = await forexService.syncNrbRatesToSettings(req.user._id);
+  res.json(new ApiResponse(200, result, result.message));
 });

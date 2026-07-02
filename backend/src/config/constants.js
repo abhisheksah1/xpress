@@ -26,8 +26,11 @@ export const PAYMENT_STATUS = {
 export const PAYMENT_METHODS = {
   KHALTI: 'khalti',
   ESEWA: 'esewa',
+  IMEPAY: 'imepay',
   FONEPAY: 'fonepay',
   CARD: 'card',
+  HBL: 'hbl',
+  MANUAL_BANK: 'manual_bank',
   COD: 'cod',
 };
 
@@ -64,4 +67,6 @@ export const STAFF_PERMISSIONS = [
   'cms:read',
   'cms:write',
   'settings:read',
+  'reminders:read',
+  'reminders:write',
 ];

@@ -19,6 +19,23 @@ export default function CmsPageView({ pageType }) {
       .finally(() => setLoading(false));
   }, [pageType, routeSlug]);
 
+  useEffect(() => {
+    if (!page) return;
+    const title = page.metaTitle || page.title;
+    if (title) document.title = title;
+
+    const desc = page.metaDescription;
+    if (desc) {
+      let meta = document.querySelector('meta[name="description"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'description');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', desc);
+    }
+  }, [page]);
+
   if (loading) return <div className="py-20 text-center text-gray-400">Loading...</div>;
   if (!page) return <div className="py-20 text-center text-gray-400">Page not found. <Link to="/" className="text-primary-600">Go home</Link></div>;
 

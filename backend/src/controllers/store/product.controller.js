@@ -8,7 +8,9 @@ export const getProducts = asyncHandler(async (req, res) => {
 });
 
 export const getProduct = asyncHandler(async (req, res) => {
-  const product = await productService.getProductBySlug(req.params.slug);
+  const product = await productService.getProductBySlug(req.params.slug, {
+    deliveryGroup: req.query.deliveryGroup,
+  });
   res.json(new ApiResponse(200, product));
 });
 

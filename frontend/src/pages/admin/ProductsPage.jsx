@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
+import { CategoryDeliveryRulesEditor } from '../../components/admin/DeliveryGroupRulesEditor.jsx';
 import StockAdjustModal from '../../components/admin/StockAdjustModal.jsx';
 
 const formatPrice = (n) => `Rs. ${Number(n).toLocaleString('en-NP')}`;
@@ -25,6 +26,12 @@ function CategoriesTab({ categories, onRefresh }) {
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(null);
   const [editName, setEditName] = useState('');
+  const [deliveryCategory, setDeliveryCategory] = useState(null);
+  const [deliveryGroups, setDeliveryGroups] = useState([]);
+
+  useEffect(() => {
+    adminApi.getDeliveryGroups().then(({ data }) => setDeliveryGroups(data.data));
+  }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -61,6 +68,13 @@ function CategoriesTab({ categories, onRefresh }) {
     }
   };
 
+  const saveCategoryDelivery = async (payload) => {
+    await adminApi.updateCategory(deliveryCategory._id, payload);
+    toast.success('Category delivery rules saved');
+    setDeliveryCategory(null);
+    onRefresh();
+  };
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleCreate} className="card flex gap-3 items-end">
@@ -77,6 +91,7 @@ function CategoriesTab({ categories, onRefresh }) {
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Name</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Slug</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Status</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Delivery</th>
               <th className="text-right px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Actions</th>
             </tr>
           </thead>
@@ -96,7 +111,13 @@ function CategoriesTab({ categories, onRefresh }) {
                     {cat.isActive ? 'ACTIVE' : 'INACTIVE'}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  <span className="text-xs text-gray-500">
+                    {cat.deliveryScope === 'selected' ? 'Restricted groups' : 'All groups'}
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-right space-x-2">
+                  <button onClick={() => setDeliveryCategory(cat)} className="text-primary-600 text-xs font-medium">Delivery</button>
                   {editing === cat._id ? (
                     <>
                       <button onClick={() => handleUpdate(cat._id)} className="text-primary-600 text-xs font-medium">Save</button>
@@ -117,6 +138,22 @@ function CategoriesTab({ categories, onRefresh }) {
           </tbody>
         </table>
       </div>
+
+      {deliveryCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Delivery rules — {deliveryCategory.name}</h3>
+              <button type="button" onClick={() => setDeliveryCategory(null)} className="text-gray-400">✕</button>
+            </div>
+            <CategoryDeliveryRulesEditor
+              groups={deliveryGroups}
+              category={deliveryCategory}
+              onSave={saveCategoryDelivery}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -23,8 +23,6 @@ export default function HomePage() {
     });
   }, []);
 
-  const currency = settings.currency_symbol || 'Rs.';
-
   return (
     <div>
       {homePage ? (
@@ -61,7 +59,7 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {featured.map((p) => (
-              <ProductCard key={p._id} product={p} currency={currency} />
+              <ProductCard key={p._id} product={p} />
             ))}
           </div>
         </section>

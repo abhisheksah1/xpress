@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
-import { useStore } from '../../context/StoreContext.jsx';
 import ProductCard from '../../components/store/ProductCard.jsx';
 
 export default function ShopPage() {
-  const { settings } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -39,8 +37,6 @@ export default function ShopPage() {
     next.delete('page');
     setSearchParams(next);
   };
-
-  const currency = settings.currency_symbol || 'Rs.';
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -84,7 +80,7 @@ export default function ShopPage() {
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {products.map((p) => (
-                  <ProductCard key={p._id} product={p} currency={currency} />
+                  <ProductCard key={p._id} product={p} />
                 ))}
               </div>
               {pagination.pages > 1 && (

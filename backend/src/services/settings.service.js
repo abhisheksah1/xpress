@@ -1,5 +1,7 @@
 import { Settings } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
+import { syncLegacyPaymentFlags } from './paymentGateway.service.js';
+import { getDefaultPaymentGateways } from '../config/paymentGatewayDefaults.js';
 
 const DEFAULT_SETTINGS = [
   // Store Registry Identities
@@ -43,12 +45,19 @@ const DEFAULT_SETTINGS = [
       defaultCode: 'NPR',
       currencies: [
         { code: 'NPR', name: 'Nepalese Rupee', symbol: 'Rs.', rate: 1, enabled: true, isDefault: true },
-        { code: 'USD', name: 'US Dollar', symbol: '$', rate: 0.0075, enabled: false, isDefault: false },
-        { code: 'INR', name: 'Indian Rupee', symbol: '₹', rate: 0.625, enabled: false, isDefault: false },
+        { code: 'USD', name: 'US Dollar', symbol: '$', rate: 0.0075, nprPerUnit: 133.33, enabled: false, isDefault: false, manualOverride: false, source: 'manual' },
+        { code: 'INR', name: 'Indian Rupee', symbol: '₹', rate: 0.625, nprPerUnit: 1.6, enabled: false, isDefault: false, manualOverride: false, source: 'manual' },
       ],
     },
   },
   { key: 'auto_convert_prices', value: false, group: 'currency', label: 'Auto-convert product prices' },
+  { key: 'currency_nrb_auto_sync', value: true, group: 'currency', label: 'Auto-sync rates from NRB every hour' },
+  {
+    key: 'currency_nrb_last_sync',
+    group: 'currency',
+    label: 'NRB Last Sync Metadata',
+    value: { at: null, message: 'Not synced yet', updated: 0 },
+  },
 
   // Service Add-ons
   {
@@ -56,9 +65,9 @@ const DEFAULT_SETTINGS = [
     group: 'addons',
     label: 'Service Add-ons',
     value: [
-      { id: 'gift_wrap', name: 'Premium Gift Wrapping', price: 150, description: 'Elegant wrap with ribbon', enabled: true },
-      { id: 'express', name: 'Express Delivery', price: 300, description: 'Same-day in Kathmandu Valley', enabled: true },
-      { id: 'personalized_card', name: 'Personalized Greeting Card', price: 75, description: 'Custom printed message card', enabled: true },
+      { id: 'gift_wrap', name: 'Premium Gift Wrapping', price: 150, description: 'Elegant wrap with ribbon', enabled: true, inputType: 'none' },
+      { id: 'express', name: 'Express Delivery', price: 300, description: 'Same-day in Kathmandu Valley', enabled: true, inputType: 'none' },
+      { id: 'personalized_card', name: 'Personalized Greeting Card', price: 75, description: 'Custom printed message card', enabled: true, inputType: 'text' },
     ],
   },
 
@@ -81,7 +90,14 @@ const DEFAULT_SETTINGS = [
   },
   { key: 'timeslots_enabled', value: true, group: 'timeslots', label: 'Enable delivery time slot selection' },
 
-  // Payment Gateways
+  // Payment Gateways (integrated setup)
+  {
+    key: 'payment_gateways',
+    group: 'payment',
+    label: 'Integrated Payment Gateways',
+    value: null,
+  },
+  // Legacy payment flags (kept in sync automatically)
   { key: 'cod_enabled', value: true, group: 'payment', label: 'Cash on Delivery (COD)' },
   { key: 'khalti_enabled', value: true, group: 'payment', label: 'Khalti' },
   { key: 'esewa_enabled', value: true, group: 'payment', label: 'eSewa' },
@@ -135,6 +151,41 @@ const DEFAULT_SETTINGS = [
   { key: 'footer_copyright', value: '© KoseliXpress. All rights reserved.', group: 'compliance', label: 'Footer Copyright Text' },
   { key: 'footer_disclaimer', value: '', group: 'compliance', label: 'Footer Disclaimer' },
 
+  // Product page (all products)
+  {
+    key: 'product_page_alert_message',
+    value: 'Orders placed after the cut-off time are scheduled for the next fulfillment cycle.',
+    group: 'product_page',
+    label: 'Concise alert message (all products)',
+  },
+  {
+    key: 'product_page_short_terms',
+    value: 'By placing an order you agree to our delivery timelines, substitution policy for seasonal items, and standard gift-handling terms. Perishable items are fulfilled with fresh stock only.',
+    group: 'product_page',
+    label: 'Short terms & conditions (all products)',
+  },
+  {
+    key: 'product_delivery_schedule_disclaimer',
+    value: '* Orders submitted beyond the cut-off times are queued and dispatched on the subsequent fulfillment cycle. All speeds verified by carriers.',
+    group: 'product_page',
+    label: 'Delivery schedule footer note',
+  },
+  { key: 'product_whatsapp_help_enabled', value: true, group: 'product_page', label: 'Show WhatsApp help on product pages' },
+  {
+    key: 'product_whatsapp_help_title',
+    value: 'WhatsApp Emergency Help & Customization',
+    group: 'product_page',
+    label: 'WhatsApp help title',
+  },
+  {
+    key: 'product_whatsapp_help_description',
+    value: 'Require immediate updates, custom note adjustments, or fast delivery coordination? Chat with our team instantly!',
+    group: 'product_page',
+    label: 'WhatsApp help description',
+  },
+  { key: 'product_whatsapp_help_button_text', value: 'WhatsApp Chat', group: 'product_page', label: 'WhatsApp button text' },
+  { key: 'product_delivery_location_tier_label', value: 'Location Tier', group: 'product_page', label: 'Delivery table badge label' },
+
   // SMTP & Email Templates
   { key: 'smtp_host', value: '', group: 'email', label: 'SMTP Host' },
   { key: 'smtp_port', value: 587, group: 'email', label: 'SMTP Port' },
@@ -158,6 +209,11 @@ const DEFAULT_SETTINGS = [
       password_reset: {
         subject: 'Reset Your Password',
         body: 'Hi {{customer_name}},\n\nUse this link to reset your password: {{reset_link}}\n\nIf you did not request this, ignore this email.',
+      },
+      reminder: {
+        subject: 'Reminder: {{title}} on {{occasion_date}}',
+        body:
+          'Hi {{customer_name}},\n\nThis is a reminder for {{title}} ({{relation}}) on {{occasion_date}}.\nDelivery location note: {{delivery_location}}\n\nYou can place your order anytime from our store.\n\n{{custom_message}}',
       },
     },
   },
@@ -212,6 +268,10 @@ export const getPublicSettings = async () => {
     return acc;
   }, {});
 
+  if (!result.payment_gateways) {
+    result.payment_gateways = getDefaultPaymentGateways();
+  }
+
   // Sync branding colors to legacy keys for storefront
   if (result.primary_color) {
     result.primary_color = result.primary_color || result.primary_color_legacy;
@@ -244,6 +304,9 @@ export const bulkUpdateSettings = async (settings, userId) => {
       }
     }
     if (setting) results.push(setting);
+    if (key === 'payment_gateways' && value) {
+      await syncLegacyPaymentFlags(value);
+    }
   }
   return results;
 };

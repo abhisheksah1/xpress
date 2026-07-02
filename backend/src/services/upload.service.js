@@ -1,13 +1,39 @@
+import fs from 'fs/promises';
+import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import { cloudinary, isCloudinaryConfigured } from '../config/cloudinary.js';
 import config from '../config/index.js';
 import { ApiError } from '../utils/ApiError.js';
 
-export const uploadFromBuffer = async (fileBuffer, options = {}) => {
-  if (!isCloudinaryConfigured) {
-    throw new ApiError(503, 'Cloudinary is not configured. Set CLOUDINARY_* env variables.');
-  }
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const LOCAL_UPLOAD_DIR = path.join(__dirname, '../../uploads');
 
-  return new Promise((resolve, reject) => {
+const PLACEHOLDER_VALUES = new Set(['your_cloud_name', 'your_api_key', 'your_api_secret']);
+
+const hasValidCloudinaryConfig = () =>
+  isCloudinaryConfigured &&
+  !PLACEHOLDER_VALUES.has(config.cloudinary.cloudName) &&
+  !PLACEHOLDER_VALUES.has(config.cloudinary.apiKey) &&
+  !PLACEHOLDER_VALUES.has(config.cloudinary.apiSecret);
+
+const saveLocally = async (fileBuffer, originalName = 'image.jpg') => {
+  await fs.mkdir(LOCAL_UPLOAD_DIR, { recursive: true });
+  const ext = path.extname(originalName) || '.jpg';
+  const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext.toLowerCase()) ? ext : '.jpg';
+  const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${safeExt}`;
+  await fs.writeFile(path.join(LOCAL_UPLOAD_DIR, filename), fileBuffer);
+  return {
+    url: `/api/${config.apiVersion}/uploads/${filename}`,
+    publicId: `local/${filename}`,
+    width: null,
+    height: null,
+    format: safeExt.replace('.', ''),
+  };
+};
+
+const uploadToCloudinary = (fileBuffer, options = {}) =>
+  new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: options.folder || config.cloudinary.folder,
@@ -27,10 +53,27 @@ export const uploadFromBuffer = async (fileBuffer, options = {}) => {
     );
     uploadStream.end(fileBuffer);
   });
+
+export const uploadFromBuffer = async (fileBuffer, options = {}) => {
+  const filename = options.filename || options.public_id || 'image.jpg';
+
+  if (!hasValidCloudinaryConfig()) {
+    return saveLocally(fileBuffer, filename);
+  }
+
+  try {
+    return await uploadToCloudinary(fileBuffer, options);
+  } catch (err) {
+    if (config.env === 'development') {
+      console.warn('Cloudinary upload failed, saving locally:', err.message);
+      return saveLocally(fileBuffer, filename);
+    }
+    throw err;
+  }
 };
 
 export const uploadFromUrl = async (imageUrl, options = {}) => {
-  if (!isCloudinaryConfigured) {
+  if (!hasValidCloudinaryConfig()) {
     return validateExternalUrl(imageUrl);
   }
 
@@ -50,7 +93,17 @@ export const uploadFromUrl = async (imageUrl, options = {}) => {
 };
 
 export const deleteImage = async (publicId) => {
-  if (!isCloudinaryConfigured || !publicId) return;
+  if (!publicId) return;
+  if (publicId.startsWith('local/')) {
+    const filename = publicId.replace(/^local\//, '');
+    try {
+      await fs.unlink(path.join(LOCAL_UPLOAD_DIR, filename));
+    } catch {
+      /* ignore missing local files */
+    }
+    return;
+  }
+  if (!hasValidCloudinaryConfig()) return;
   await cloudinary.uploader.destroy(publicId);
 };
 
@@ -68,7 +121,10 @@ const validateExternalUrl = (url) => {
 
 export const addImageToEntity = async ({ file, url, alt }) => {
   if (file) {
-    const uploaded = await uploadFromBuffer(file.buffer, { public_id: file.originalname?.split('.')[0] });
+    const uploaded = await uploadFromBuffer(file.buffer, {
+      public_id: file.originalname?.split('.')[0],
+      filename: file.originalname,
+    });
     return { url: uploaded.url, publicId: uploaded.publicId, alt: alt || '' };
   }
   if (url) {

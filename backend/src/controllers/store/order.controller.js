@@ -1,15 +1,17 @@
 import * as orderService from '../../services/order.service.js';
 import * as paymentService from '../../services/payment.service.js';
+import * as deliveryService from '../../services/delivery.service.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { PAYMENT_METHODS } from '../../config/constants.js';
 
 export const createOrder = asyncHandler(async (req, res) => {
+  const body = req.validated.body;
   const orderData = {
-    ...req.validated.body,
+    ...body,
     userId: req.user?._id,
-    guestEmail: req.validated.body.guestEmail || req.validated.body.shippingAddress?.email,
-    guestPhone: req.validated.body.guestPhone || req.validated.body.shippingAddress?.phone,
+    guestEmail: body.guestEmail || body.sender?.email || body.shippingAddress?.email,
+    guestPhone: body.guestPhone || (body.sender ? `${body.sender.countryCode || ''}${body.sender.phone}` : body.shippingAddress?.phone),
   };
 
   const order = await orderService.createOrder(orderData);
@@ -44,7 +46,12 @@ export const trackOrder = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, order));
 });
 
+export const getDeliveryLocations = asyncHandler(async (req, res) => {
+  const locations = await deliveryService.getDeliveryLocations();
+  res.json(new ApiResponse(200, locations));
+});
+
 export const getDeliveryZones = asyncHandler(async (req, res) => {
-  const zones = await orderService.getDeliveryZones();
-  res.json(new ApiResponse(200, zones));
+  const groups = await deliveryService.getDeliveryGroups();
+  res.json(new ApiResponse(200, groups));
 });

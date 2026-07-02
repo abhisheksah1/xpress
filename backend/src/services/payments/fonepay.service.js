@@ -2,8 +2,10 @@ import crypto from 'crypto';
 import config from '../../config/index.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-export const initiatePayment = async (order) => {
-  if (!config.payments.fonepay.merchantCode) {
+export const initiatePayment = async (order, creds) => {
+  const merchantCode = creds?.merchantId || config.payments.fonepay.merchantCode;
+  const secretKey = creds?.secretKey || config.payments.fonepay.secretKey;
+  if (!merchantCode) {
     throw new ApiError(503, 'Fonepay is not configured');
   }
 
@@ -11,14 +13,14 @@ export const initiatePayment = async (order) => {
   const amount = order.total.toFixed(2);
   const date = new Date().toISOString().split('T')[0];
 
-  const dataToSign = `${config.payments.fonepay.merchantCode},${prn},${amount},${date}`;
+  const dataToSign = `${merchantCode},${prn},${amount},${date}`;
   const dv = crypto
-    .createHmac('sha512', config.payments.fonepay.secretKey)
+    .createHmac('sha512', secretKey)
     .update(dataToSign)
     .digest('hex');
 
   return {
-    merchantCode: config.payments.fonepay.merchantCode,
+    merchantCode,
     prn,
     amount,
     date,

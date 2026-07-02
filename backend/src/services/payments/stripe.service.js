@@ -2,21 +2,19 @@ import Stripe from 'stripe';
 import config from '../../config/index.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-let stripe = null;
-
-const getStripe = () => {
-  if (!config.payments.stripe.secretKey) {
-    throw new ApiError(503, 'Stripe (card payments) is not configured');
+const getStripe = (secretKey) => {
+  const key = secretKey || config.payments.stripe.secretKey;
+  if (!key) {
+    throw new ApiError(503, 'Card payments are not configured');
   }
-  if (!stripe) stripe = new Stripe(config.payments.stripe.secretKey);
-  return stripe;
+  return new Stripe(key);
 };
 
-export const createPaymentIntent = async (order) => {
-  const client = getStripe();
+export const createPaymentIntent = async (order, creds) => {
+  const client = getStripe(creds?.secretKey);
   const paymentIntent = await client.paymentIntents.create({
     amount: Math.round(order.total * 100),
-    currency: config.payments.stripe.currency,
+    currency: config.payments.stripe.currency || 'usd',
     metadata: { orderId: order._id.toString(), orderNumber: order.orderNumber },
     automatic_payment_methods: { enabled: true },
   });
@@ -27,8 +25,8 @@ export const createPaymentIntent = async (order) => {
   };
 };
 
-export const verifyPaymentIntent = async (paymentIntentId) => {
-  const client = getStripe();
+export const verifyPaymentIntent = async (paymentIntentId, creds) => {
+  const client = getStripe(creds?.secretKey);
   const paymentIntent = await client.paymentIntents.retrieve(paymentIntentId);
 
   if (paymentIntent.status !== 'succeeded') {
@@ -40,6 +38,9 @@ export const verifyPaymentIntent = async (paymentIntentId) => {
     gatewayResponse: paymentIntent,
   };
 };
+
+export const initiatePayment = createPaymentIntent;
+export const verifyPayment = verifyPaymentIntent;
 
 export const handleWebhook = (rawBody, signature) => {
   const client = getStripe();

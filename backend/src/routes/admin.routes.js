@@ -14,12 +14,23 @@ import { authenticate } from '../middlewares/auth.middleware.js';
 import { isStaff, isAdmin, isSuperAdmin, hasPermission } from '../middlewares/role.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
 import { uploadSingle } from '../middlewares/upload.middleware.js';
+import * as deliveryController from '../controllers/admin/delivery.controller.js';
+import * as couponController from '../controllers/admin/coupon.controller.js';
+import * as reminderController from '../controllers/admin/reminder.controller.js';
 import {
   createProductSchema,
   bulkPriceSchema,
   createStaffSchema,
   createBlogSchema,
+  deliveryGroupSchema,
+  deliveryLocationSchema,
   updateSettingsSchema,
+  createCouponSchema,
+  updateCouponSchema,
+  updateOrderStatusSchema,
+  updateOrderPaymentSchema,
+  confirmLeadOrderSchema,
+  cancelLeadOrderSchema,
 } from '../validators/index.js';
 
 const router = Router();
@@ -53,15 +64,45 @@ router.get('/inventory/low-stock', hasPermission('inventory:read'), inventoryCon
 router.post('/inventory/adjust', hasPermission('inventory:write'), inventoryController.adjustStock);
 
 // Orders
+router.get('/orders/leads/count', hasPermission('orders:read'), orderController.getLeadOrderCount);
 router.get('/orders', hasPermission('orders:read'), orderController.getOrders);
 router.get('/orders/:id', hasPermission('orders:read'), orderController.getOrder);
-router.patch('/orders/:id/status', hasPermission('orders:write'), orderController.updateStatus);
+router.post('/orders/:id/confirm', hasPermission('orders:write'), validate(confirmLeadOrderSchema), orderController.confirmLead);
+router.post('/orders/:id/cancel-lead', hasPermission('orders:write'), validate(cancelLeadOrderSchema), orderController.cancelLead);
+router.patch('/orders/:id/status', hasPermission('orders:write'), validate(updateOrderStatusSchema), orderController.updateStatus);
+router.patch('/orders/:id/payment', hasPermission('orders:write'), validate(updateOrderPaymentSchema), orderController.updatePayment);
 
-// Delivery Zones
-router.get('/delivery-zones', orderController.getDeliveryZones);
-router.post('/delivery-zones', isAdmin, orderController.createDeliveryZone);
-router.patch('/delivery-zones/:id', isAdmin, orderController.updateDeliveryZone);
-router.delete('/delivery-zones/:id', isAdmin, orderController.deleteDeliveryZone);
+// Coupons
+router.get('/coupons', isAdmin, couponController.getCoupons);
+router.get('/coupons/report', isAdmin, couponController.getCouponUsageReport);
+router.post('/coupons', isAdmin, validate(createCouponSchema), couponController.createCoupon);
+router.get('/coupons/:id', isAdmin, couponController.getCoupon);
+router.patch('/coupons/:id', isAdmin, validate(updateCouponSchema), couponController.updateCoupon);
+router.delete('/coupons/:id', isAdmin, couponController.deleteCoupon);
+
+// Reminders
+router.get('/reminders', isAdmin, reminderController.getReminders);
+router.post('/reminders/:id/send', isAdmin, reminderController.sendReminder);
+
+// Delivery Locations
+router.get('/delivery-locations', deliveryController.getDeliveryLocations);
+router.post('/delivery-locations', isAdmin, validate(deliveryLocationSchema), deliveryController.createDeliveryLocation);
+router.patch('/delivery-locations/:id', isAdmin, validate(deliveryLocationSchema), deliveryController.updateDeliveryLocation);
+router.delete('/delivery-locations/:id', isAdmin, deliveryController.deleteDeliveryLocation);
+
+// Delivery Groups
+router.get('/delivery-groups', deliveryController.getDeliveryGroups);
+router.get('/delivery-groups/:id', deliveryController.getDeliveryGroup);
+router.get('/delivery-groups/:id/products', deliveryController.getGroupProducts);
+router.post('/delivery-groups', isAdmin, validate(deliveryGroupSchema), deliveryController.createDeliveryGroup);
+router.patch('/delivery-groups/:id', isAdmin, validate(deliveryGroupSchema), deliveryController.updateDeliveryGroup);
+router.delete('/delivery-groups/:id', isAdmin, deliveryController.deleteDeliveryGroup);
+
+// Legacy delivery zone routes (alias to groups)
+router.get('/delivery-zones', deliveryController.getDeliveryZones);
+router.post('/delivery-zones', isAdmin, validate(deliveryGroupSchema), deliveryController.createDeliveryZone);
+router.patch('/delivery-zones/:id', isAdmin, validate(deliveryGroupSchema), deliveryController.updateDeliveryZone);
+router.delete('/delivery-zones/:id', isAdmin, deliveryController.deleteDeliveryZone);
 
 // Users
 router.get('/users', hasPermission('users:read'), userController.getUsers);
@@ -105,6 +146,7 @@ router.post('/settings', isAdmin, settingsController.createSetting);
 router.patch('/settings/bulk', isAdmin, validate(updateSettingsSchema), settingsController.bulkUpdate);
 router.patch('/settings/:key', isAdmin, settingsController.updateSetting);
 router.post('/settings/test-smtp', isAdmin, settingsController.testSmtp);
+router.post('/settings/sync-nrb-rates', isAdmin, settingsController.syncNrbRates);
 
 // Upload
 router.post('/upload', uploadSingle('image'), uploadController.uploadImage);

@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
+import DeliveryGroupRulesEditor from '../../components/admin/DeliveryGroupRulesEditor.jsx';
+import ComboItemsEditor from '../../components/admin/ComboItemsEditor.jsx';
 import { auditSeo, generateSeoFields, generateSkuPreview, slugify } from '../../utils/seoAuditor.js';
+import {
+  ADMIN_PERSONALIZATION_OPTIONS,
+  defaultPersonalizationFields,
+  normalizePersonalizationFields,
+} from '../../utils/personalization.js';
 
 const BRANDS = ['Koseli Artisans', 'Koseli Premium', 'Local Partners', 'Imported Selection'];
 const STATUS_OPTIONS = [
@@ -30,11 +37,13 @@ const defaultForm = () => ({
   brand: BRANDS[0],
   status: 'published',
   deliveryZoneIds: [],
+  deliveryScope: 'inherit',
+  deliveryGroupRules: [],
   description: '',
   longDescription: '',
   additionalNote: '',
   imageUrlInput: '',
-  personalizationFields: { customCakeMessage: false, giftMessage: true, imagePrint: false },
+  personalizationFields: defaultPersonalizationFields(),
   allowBackorder: false,
   barcode: '',
   weight: '',
@@ -42,6 +51,7 @@ const defaultForm = () => ({
   skuVariant: '',
   standardSize: '',
   isHamper: false,
+  comboItems: [],
   optionCategories: [],
   metaTitle: '',
   metaDescription: '',
@@ -98,14 +108,25 @@ export default function ProductFormPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [comboStockPreview, setComboStockPreview] = useState(null);
   const [newOptionName, setNewOptionName] = useState('');
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
-  const setPersonalization = (key, val) =>
-    setForm((f) => ({ ...f, personalizationFields: { ...f.personalizationFields, [key]: val } }));
+  const setPersonalization = (key, patch) =>
+    setForm((f) => {
+      const current = f.personalizationFields[key] || { enabled: false, required: false };
+      const next = typeof patch === 'boolean'
+        ? { enabled: patch, required: patch ? current.required : false }
+        : { ...current, ...patch };
+      if (!next.enabled) next.required = false;
+      return {
+        ...f,
+        personalizationFields: { ...f.personalizationFields, [key]: next },
+      };
+    });
 
   useEffect(() => {
-    Promise.all([adminApi.getCategories(), adminApi.getDeliveryZones()]).then(([catRes, zoneRes]) => {
+    Promise.all([adminApi.getCategories(), adminApi.getDeliveryGroups()]).then(([catRes, zoneRes]) => {
       setCategories(catRes.data.data);
       setDeliveryZones(zoneRes.data.data);
     });
@@ -136,15 +157,18 @@ export default function ProductFormPage() {
           brand: p.brand || BRANDS[0],
           status: p.isActive ? 'published' : 'draft',
           deliveryZoneIds: (p.deliveryZones || []).map((z) => z._id || z),
+          deliveryScope: p.deliveryScope || 'inherit',
+          deliveryGroupRules: (p.deliveryGroupRules || []).map((r) => ({
+            group: r.group?._id || r.group,
+            available: r.available,
+            sameDay: r.sameDay,
+            estimatedDays: r.estimatedDays || { min: '', max: '' },
+          })),
           description: p.description || '',
           longDescription: p.longDescription || '',
           additionalNote: p.additionalNote || '',
           imageUrlInput: '',
-          personalizationFields: {
-            customCakeMessage: p.personalizationFields?.customCakeMessage ?? false,
-            giftMessage: p.personalizationFields?.giftMessage ?? true,
-            imagePrint: p.personalizationFields?.imagePrint ?? false,
-          },
+          personalizationFields: normalizePersonalizationFields(p.personalizationFields),
           allowBackorder: p.allowBackorder ?? false,
           barcode: p.barcode || '',
           weight: p.weight ?? '',
@@ -152,6 +176,12 @@ export default function ProductFormPage() {
           skuVariant: p.skuVariant || '',
           standardSize: p.standardSize || '',
           isHamper: p.isHamper ?? false,
+          comboItems: (p.comboItems || []).map((item, index) => ({
+            product: item.product?._id || item.product,
+            productData: item.product?._id ? item.product : undefined,
+            quantity: item.quantity || 1,
+            sortOrder: item.sortOrder ?? index,
+          })),
           optionCategories: p.optionCategories || [],
           metaTitle: p.metaTitle || '',
           metaDescription: p.metaDescription || '',
@@ -182,14 +212,22 @@ export default function ProductFormPage() {
     }));
   };
 
-  const toggleZone = (zoneId) => {
-    setForm((f) => ({
-      ...f,
-      deliveryZoneIds: f.deliveryZoneIds.includes(zoneId)
-        ? f.deliveryZoneIds.filter((z) => z !== zoneId)
-        : [...f.deliveryZoneIds, zoneId],
-    }));
-  };
+  const buildDeliveryGroupRules = () =>
+    form.deliveryGroupRules
+      .filter((r) =>
+        form.deliveryScope === 'selected'
+          ? r.available
+          : r.sameDay || r.estimatedDays?.min != null || r.estimatedDays?.max != null
+      )
+      .map((r) => ({
+        group: r.group,
+        available: form.deliveryScope === 'selected' ? !!r.available : true,
+        sameDay: !!r.sameDay,
+        estimatedDays: {
+          min: r.estimatedDays?.min === '' || r.estimatedDays?.min == null ? undefined : Number(r.estimatedDays.min),
+          max: r.estimatedDays?.max === '' || r.estimatedDays?.max == null ? undefined : Number(r.estimatedDays.max),
+        },
+      }));
 
   const addImagesFromUrls = async (urlString) => {
     const urls = urlString.split(',').map((u) => u.trim()).filter(Boolean);
@@ -312,11 +350,22 @@ export default function ProductFormPage() {
       costPrice: form.costPrice ? Number(form.costPrice) : undefined,
       stock: Number(form.stock),
       lowStockThreshold: Number(form.lowStockThreshold),
-      deliveryZones: form.deliveryZoneIds,
+      deliveryZones: form.deliveryScope === 'selected'
+        ? form.deliveryGroupRules.filter((r) => r.available).map((r) => r.group)
+        : form.deliveryZoneIds,
+      deliveryScope: form.deliveryScope,
+      deliveryGroupRules: buildDeliveryGroupRules(),
       images: sortedImages,
-      personalizationFields: form.personalizationFields,
+      personalizationFields: normalizePersonalizationFields(form.personalizationFields),
       allowBackorder: form.allowBackorder,
       isHamper: form.isHamper,
+      comboItems: form.isHamper
+        ? form.comboItems.map((item, index) => ({
+            product: item.product,
+            quantity: item.quantity || 1,
+            sortOrder: item.sortOrder ?? index,
+          }))
+        : [],
       barcode: form.barcode || undefined,
       weight: form.weight ? Number(form.weight) : undefined,
       productGroup: form.productGroup || undefined,
@@ -324,8 +373,8 @@ export default function ProductFormPage() {
       standardSize: form.standardSize || undefined,
       optionCategories: form.optionCategories,
       isActive: statusOpt.isActive,
-      isGiftWrappable: form.personalizationFields.giftMessage,
-      giftMessageEnabled: form.personalizationFields.giftMessage,
+      isGiftWrappable: form.personalizationFields.giftMessage?.enabled,
+      giftMessageEnabled: form.personalizationFields.giftMessage?.enabled,
       metaTitle: form.metaTitle || undefined,
       metaDescription: form.metaDescription || undefined,
       metaKeywords: form.metaKeywords ? form.metaKeywords.split(',').map((k) => k.trim()).filter(Boolean) : [],
@@ -341,6 +390,10 @@ export default function ProductFormPage() {
     if (!form.name.trim()) return toast.error('Product title is required');
     if (!form.categoryIds.length) return toast.error('Select at least one category');
     if (!form.price && form.price !== 0) return toast.error('Original price is required');
+
+    if (form.isHamper && !form.comboItems.length) {
+      return toast.error('Add at least one product to this combo');
+    }
 
     setSaving(true);
     try {
@@ -418,8 +471,18 @@ export default function ProductFormPage() {
                 <input type="number" min="0" className="input-field" value={form.costPrice} onChange={(e) => set('costPrice', e.target.value)} />
               </div>
               <div>
-                <FieldLabel>Remaining Stock</FieldLabel>
-                <input type="number" min="0" className="input-field" value={form.stock} onChange={(e) => set('stock', e.target.value)} />
+                <FieldLabel>
+                  {form.isHamper ? 'Combo Stock (auto-calculated)' : 'Remaining Stock'}
+                </FieldLabel>
+                <input
+                  type="number"
+                  min="0"
+                  className="input-field"
+                  value={form.isHamper ? (comboStockPreview ?? form.stock) : form.stock}
+                  onChange={(e) => set('stock', e.target.value)}
+                  readOnly={form.isHamper}
+                  disabled={form.isHamper}
+                />
               </div>
               <div>
                 <FieldLabel>Low Stock Warning</FieldLabel>
@@ -462,23 +525,21 @@ export default function ProductFormPage() {
 
           <section className="card space-y-4">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Delivery Availability</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {deliveryZones.map((zone) => (
-                <button
-                  key={zone._id}
-                  type="button"
-                  onClick={() => toggleZone(zone._id)}
-                  className={`p-3 rounded-lg border text-left text-sm transition-colors ${
-                    form.deliveryZoneIds.includes(zone._id)
-                      ? 'border-primary-500 bg-primary-50 text-primary-800'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="font-medium block">{zone.name}</span>
-                  <span className="text-xs text-gray-500">{zone.province}</span>
-                </button>
-              ))}
-            </div>
+            <p className="text-xs text-gray-500">
+              Control which delivery groups can receive this product, same-day options, and custom delivery times.
+              <Link to="/admin/delivery" className="text-primary-600 ml-1">Manage delivery groups</Link>
+            </p>
+            {deliveryZones.length === 0 ? (
+              <p className="text-sm text-amber-600">No delivery groups configured yet.</p>
+            ) : (
+              <DeliveryGroupRulesEditor
+                groups={deliveryZones}
+                scope={form.deliveryScope}
+                onScopeChange={(v) => set('deliveryScope', v)}
+                rules={form.deliveryGroupRules}
+                onRulesChange={(rules) => set('deliveryGroupRules', rules)}
+              />
+            )}
           </section>
 
           <section className="card space-y-4">
@@ -587,18 +648,41 @@ export default function ProductFormPage() {
         <div className="space-y-6">
           <section className="card space-y-3">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Personalization &amp; Stock</h2>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={form.personalizationFields.customCakeMessage} onChange={(e) => setPersonalization('customCakeMessage', e.target.checked)} className="mt-0.5" />
-              <span>Collect custom cake message from customer</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={form.personalizationFields.giftMessage} onChange={(e) => setPersonalization('giftMessage', e.target.checked)} className="mt-0.5" />
-              <span>Collect gift message from customer</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={form.personalizationFields.imagePrint} onChange={(e) => setPersonalization('imagePrint', e.target.checked)} className="mt-0.5" />
-              <span>Collect image for print/customization</span>
-            </label>
+            <p className="text-xs text-gray-500">
+              Show fields on the product page. Mark mandatory only when the customer must fill them before ordering.
+            </p>
+            {ADMIN_PERSONALIZATION_OPTIONS.map(({ key, label, description }) => {
+              const field = form.personalizationFields[key] || { enabled: false, required: false };
+              return (
+                <div key={key} className="rounded-lg border border-gray-100 p-3 space-y-2">
+                  <label className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={field.enabled}
+                      onChange={(e) => setPersonalization(key, { enabled: e.target.checked })}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium text-gray-800">{label}</span>
+                      <span className="block text-xs text-gray-400">{description}</span>
+                    </span>
+                  </label>
+                  {field.enabled && (
+                    <label className="flex items-center gap-2 text-xs text-gray-600 ml-6 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) => setPersonalization(key, { required: e.target.checked })}
+                      />
+                      <span>
+                        Mandatory
+                        <span className="text-gray-400"> — customer cannot add to basket without this</span>
+                      </span>
+                    </label>
+                  )}
+                </div>
+              );
+            })}
             <label className="flex items-start gap-2 text-sm border-t border-gray-100 pt-3">
               <input type="checkbox" checked={form.allowBackorder} onChange={(e) => set('allowBackorder', e.target.checked)} className="mt-0.5" />
               <span>
@@ -678,9 +762,30 @@ export default function ProductFormPage() {
               </div>
             ))}
             <label className="flex items-center gap-2 text-sm border-t border-gray-100 pt-3">
-              <input type="checkbox" checked={form.isHamper} onChange={(e) => set('isHamper', e.target.checked)} />
-              Is this a Gift Hamper (Combo)?
+              <input
+                type="checkbox"
+                checked={form.isHamper}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  set('isHamper', checked);
+                  if (!checked) {
+                    set('comboItems', []);
+                  }
+                }}
+              />
+              Is this a Gift Hamper / Combo Product?
             </label>
+
+            {form.isHamper && (
+              <ComboItemsEditor
+                productId={id}
+                comboItems={form.comboItems}
+                images={images}
+                onChange={(items) => set('comboItems', items)}
+                onImagesChange={setImages}
+                onStockPreview={setComboStockPreview}
+              />
+            )}
           </section>
 
           <section className="card space-y-3">

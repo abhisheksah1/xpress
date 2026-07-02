@@ -1,6 +1,7 @@
 import { Outlet, Link } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
 import { useStore } from '../context/StoreContext';
+import NavbarCurrencySelect from '../components/store/NavbarCurrencySelect.jsx';
 
 function NavLink({ item }) {
   const isExternal = item.link?.startsWith('http');
@@ -62,7 +63,8 @@ export default function StoreLayout() {
                 </>
               )}
             </nav>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <NavbarCurrencySelect />
               <Link to="/orders" className="text-sm text-gray-600 hover:text-primary-600 hidden sm:block">My Orders</Link>
               <Link to="/login" className="text-sm text-gray-600 hover:text-primary-600">Login</Link>
               <Link to="/cart" className="relative btn-primary text-sm">

@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import { generateSlug, generateSKU } from '../utils/helpers.js';
+import { deliveryGroupRuleSchema } from './schemas/deliveryGroupRule.schema.js';
+import { comboItemSchema } from './schemas/comboItem.schema.js';
 
 const imageSchema = new mongoose.Schema(
   {
@@ -55,16 +57,33 @@ const productSchema = new mongoose.Schema(
     lowStockThreshold: { type: Number, default: 5 },
     variants: [variantSchema],
     optionCategories: [optionCategorySchema],
-    deliveryZones: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryZone' }],
+    deliveryZones: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryGroup' }],
+    deliveryGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryGroup' }],
+    deliveryScope: {
+      type: String,
+      enum: ['inherit', 'all', 'selected'],
+      default: 'inherit',
+    },
+    deliveryGroupRules: [deliveryGroupRuleSchema],
     isGiftWrappable: { type: Boolean, default: true },
     giftMessageEnabled: { type: Boolean, default: true },
     personalizationFields: {
-      customCakeMessage: { type: Boolean, default: false },
-      giftMessage: { type: Boolean, default: false },
-      imagePrint: { type: Boolean, default: false },
+      customCakeMessage: {
+        enabled: { type: Boolean, default: false },
+        required: { type: Boolean, default: false },
+      },
+      giftMessage: {
+        enabled: { type: Boolean, default: false },
+        required: { type: Boolean, default: false },
+      },
+      imagePrint: {
+        enabled: { type: Boolean, default: false },
+        required: { type: Boolean, default: false },
+      },
     },
     allowBackorder: { type: Boolean, default: false },
     isHamper: { type: Boolean, default: false },
+    comboItems: [comboItemSchema],
     barcode: { type: String, trim: true },
     productGroup: { type: String, trim: true },
     skuVariant: { type: String, trim: true },

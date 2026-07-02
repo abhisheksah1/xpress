@@ -1,9 +1,13 @@
 import { Product, InventoryLog } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
+import * as comboService from './combo.service.js';
 
 export const adjustStock = async ({ productId, variantId, type, quantity, reason, reference, userId }) => {
   const product = await Product.findById(productId);
   if (!product) throw new ApiError(404, 'Product not found');
+  if (product.isHamper && product.comboItems?.length && !variantId) {
+    throw new ApiError(400, 'Combo stock is calculated from component products. Adjust component inventory instead.');
+  }
 
   let previousStock;
   let newStock;
@@ -21,6 +25,10 @@ export const adjustStock = async ({ productId, variantId, type, quantity, reason
   }
 
   await product.save();
+
+  if (!variantId) {
+    await comboService.syncComboProductsContaining([productId]);
+  }
 
   const log = await InventoryLog.create({
     product: productId,
