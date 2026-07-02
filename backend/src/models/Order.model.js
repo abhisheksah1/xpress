@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '../config/constants.js';
 import { generateOrderNumber } from '../utils/helpers.js';
+import Settings from './Settings.model.js';
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -87,8 +88,17 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-orderSchema.pre('save', function (next) {
-  if (!this.orderNumber) this.orderNumber = generateOrderNumber();
+orderSchema.pre('save', async function (next) {
+  if (!this.orderNumber) {
+    let prefix = 'KO-';
+    try {
+      const setting = await Settings.findOne({ key: 'registry_invoice_prefix' });
+      if (setting?.value) prefix = String(setting.value);
+    } catch {
+      /* use default prefix */
+    }
+    this.orderNumber = generateOrderNumber(prefix);
+  }
   next();
 });
 

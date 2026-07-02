@@ -18,6 +18,12 @@ export const getPageBySlug = async (slug) => {
   return page;
 };
 
+export const getPageByType = async (pageType) => {
+  const page = await CMSPage.findOne({ pageType, isPublished: true });
+  if (!page) throw new ApiError(404, 'Page not found');
+  return page;
+};
+
 export const getPageById = async (id) => {
   const page = await CMSPage.findById(id);
   if (!page) throw new ApiError(404, 'Page not found');

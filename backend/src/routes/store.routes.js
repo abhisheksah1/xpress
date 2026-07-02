@@ -7,8 +7,17 @@ import * as settingsController from '../controllers/store/settings.controller.js
 import { authenticate, optionalAuth } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
 import { createOrderSchema } from '../validators/index.js';
+import { maintenanceGate } from '../middlewares/maintenance.middleware.js';
 
 const router = Router();
+
+// Maintenance mode: allow browsing, block checkout/actions
+router.use(
+  maintenanceGate({
+    allowPaths: ['/settings', '/navbar', '/pages', '/products', '/categories', '/blogs', '/delivery-zones'],
+    allowMethods: ['GET', 'HEAD', 'OPTIONS'],
+  })
+);
 
 // Storefront config
 router.get('/settings', settingsController.getSettings);
@@ -33,6 +42,7 @@ router.get('/blogs/:slug', blogController.getBlog);
 
 // CMS Pages
 router.get('/pages', cmsController.getPages);
+router.get('/pages/type/:pageType', cmsController.getPageByType);
 router.get('/pages/:slug', cmsController.getPage);
 
 export default router;

@@ -1,8 +1,9 @@
 import { Navbar } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 
-export const getNavbars = async (location) => {
-  const filter = { isActive: true };
+export const getNavbars = async (location, { includeInactive = false } = {}) => {
+  const filter = {};
+  if (!includeInactive) filter.isActive = true;
   if (location) filter.location = location;
   return Navbar.find(filter).sort({ name: 1 });
 };

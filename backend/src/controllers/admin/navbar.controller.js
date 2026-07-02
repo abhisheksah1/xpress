@@ -8,7 +8,7 @@ export const createNavbar = asyncHandler(async (req, res) => {
 });
 
 export const getNavbars = asyncHandler(async (req, res) => {
-  const navbars = await navbarService.getNavbars(req.query.location);
+  const navbars = await navbarService.getNavbars(req.query.location, { includeInactive: true });
   res.json(new ApiResponse(200, navbars));
 });
 

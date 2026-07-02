@@ -1,13 +1,24 @@
 import { Outlet, Link, NavLink } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore.js';
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', end: true },
-  { to: '/admin/products', label: 'Products' },
+  { to: '/admin/products', label: 'Catalog' },
+  { to: '/admin/content', label: 'Content' },
+  { to: '/admin/navbar', label: 'Navigation' },
+  { to: '/admin/blog', label: 'Blog' },
   { to: '/admin/orders', label: 'Orders' },
   { to: '/admin/settings', label: 'Settings' },
 ];
 
 export default function AdminLayout() {
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
+  };
+
   return (
     <div className="min-h-screen flex">
       <aside className="w-64 bg-gray-900 text-white flex flex-col">
@@ -33,8 +44,10 @@ export default function AdminLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t border-gray-800">
-          <Link to="/" className="text-sm text-gray-400 hover:text-white">View Storefront</Link>
+        <div className="p-4 border-t border-gray-800 space-y-2">
+          {user && <p className="text-xs text-gray-400 truncate">{user.email}</p>}
+          <Link to="/" className="block text-sm text-gray-400 hover:text-white">View Storefront</Link>
+          <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-white">Logout</button>
         </div>
       </aside>
       <div className="flex-1 flex flex-col">

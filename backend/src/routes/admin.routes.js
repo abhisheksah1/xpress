@@ -30,8 +30,12 @@ router.use(authenticate, isStaff);
 router.get('/dashboard', dashboardController.getDashboard);
 
 // Products
+router.get('/products/stats', hasPermission('products:read'), productController.getCatalogStats);
+router.get('/products/export', hasPermission('products:read'), productController.exportProducts);
+router.post('/products/import', hasPermission('products:write'), productController.importProducts);
 router.get('/products', hasPermission('products:read'), productController.getProducts);
 router.post('/products', hasPermission('products:write'), validate(createProductSchema), productController.createProduct);
+router.post('/products/:id/clone', hasPermission('products:write'), productController.cloneProduct);
 router.get('/products/:id', hasPermission('products:read'), productController.getProduct);
 router.patch('/products/:id', hasPermission('products:write'), productController.updateProduct);
 router.delete('/products/:id', hasPermission('products:write'), productController.deleteProduct);
@@ -100,6 +104,7 @@ router.get('/settings', hasPermission('settings:read'), settingsController.getSe
 router.post('/settings', isAdmin, settingsController.createSetting);
 router.patch('/settings/bulk', isAdmin, validate(updateSettingsSchema), settingsController.bulkUpdate);
 router.patch('/settings/:key', isAdmin, settingsController.updateSetting);
+router.post('/settings/test-smtp', isAdmin, settingsController.testSmtp);
 
 // Upload
 router.post('/upload', uploadSingle('image'), uploadController.uploadImage);

@@ -6,7 +6,10 @@ const settingsSchema = new mongoose.Schema(
     value: { type: mongoose.Schema.Types.Mixed, required: true },
     group: {
       type: String,
-      enum: ['general', 'store', 'payment', 'shipping', 'email', 'seo', 'social', 'appearance'],
+      enum: [
+        'general', 'store', 'payment', 'shipping', 'email', 'seo', 'social', 'appearance',
+        'currency', 'addons', 'plugins', 'branding', 'compliance', 'timeslots', 'auth', 'registry',
+      ],
       default: 'general',
     },
     label: { type: String },

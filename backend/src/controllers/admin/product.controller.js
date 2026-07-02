@@ -51,3 +51,45 @@ export const deleteCategory = asyncHandler(async (req, res) => {
   await productService.deleteCategory(req.params.id);
   res.json(new ApiResponse(200, null, 'Category deleted'));
 });
+
+export const getCatalogStats = asyncHandler(async (req, res) => {
+  const stats = await productService.getCatalogStats();
+  res.json(new ApiResponse(200, stats));
+});
+
+export const cloneProduct = asyncHandler(async (req, res) => {
+  const product = await productService.cloneProduct(req.params.id, req.user._id);
+  res.status(201).json(new ApiResponse(201, product, 'Product cloned'));
+});
+
+export const importProducts = asyncHandler(async (req, res) => {
+  const result = await productService.importProducts(req.body.products, req.user._id);
+  res.json(new ApiResponse(200, result, 'Import completed'));
+});
+
+export const exportProducts = asyncHandler(async (req, res) => {
+  const { products } = await productService.getProducts({ page: 1, limit: 10000 });
+  const headers = ['name', 'sku', 'category', 'price', 'stock', 'isActive', 'description', 'tags'];
+  const rows = products.map((p) => [
+    p.name,
+    p.sku,
+    p.category?.name || '',
+    p.price,
+    p.stock,
+    p.isActive,
+    (p.description || '').replace(/\n/g, ' '),
+    (p.tags || []).join('|'),
+  ]);
+  const csv = [headers.join(','), ...rows.map((r) => r.map(escapeCsv).join(','))].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="products-export.csv"');
+  res.send(csv);
+});
+
+const escapeCsv = (val) => {
+  const str = String(val ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};

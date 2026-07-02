@@ -15,6 +15,14 @@ const generateTokens = (userId) => {
 };
 
 export const register = async ({ name, email, phone, password }) => {
+  const { getSettingByKey } = await import('./settings.service.js');
+  try {
+    const regSetting = await getSettingByKey('registration_enabled');
+    if (regSetting.value === false) throw new ApiError(403, 'Registration is currently disabled');
+  } catch (err) {
+    if (err.statusCode === 403) throw err;
+  }
+
   const existing = await User.findOne({ email });
   if (existing) throw new ApiError(409, 'Email already registered');
 

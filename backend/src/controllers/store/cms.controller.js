@@ -7,6 +7,11 @@ export const getPage = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, page));
 });
 
+export const getPageByType = asyncHandler(async (req, res) => {
+  const page = await cmsService.getPageByType(req.params.pageType);
+  res.json(new ApiResponse(200, page));
+});
+
 export const getPages = asyncHandler(async (req, res) => {
   const pages = await cmsService.getPages({ ...req.query, isPublished: true });
   res.json(new ApiResponse(200, pages));

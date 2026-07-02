@@ -15,6 +15,8 @@ export const getProducts = async ({
   isFeatured,
   minPrice,
   maxPrice,
+  stockStatus,
+  composition,
   sort = '-createdAt',
 }) => {
   const filter = {};
@@ -25,6 +27,20 @@ export const getProducts = async ({
     filter.price = {};
     if (minPrice) filter.price.$gte = Number(minPrice);
     if (maxPrice) filter.price.$lte = Number(maxPrice);
+  }
+  if (stockStatus === 'in_stock') filter.stock = { $gt: 0 };
+  if (stockStatus === 'out_of_stock') filter.stock = { $lte: 0 };
+  if (stockStatus === 'low_stock') {
+    filter.$expr = { $lte: ['$stock', '$lowStockThreshold'] };
+    filter.stock = { $gt: 0 };
+  }
+  if (composition === 'hamper') {
+    filter.$or = [{ isHamper: true }, { 'variants.0': { $exists: true } }, { tags: 'hamper' }];
+  }
+  if (composition === 'individual') {
+    filter.isHamper = { $ne: true };
+    filter.variants = { $size: 0 };
+    filter.tags = { $ne: 'hamper' };
   }
   if (search) filter.$text = { $search: search };
 
@@ -48,7 +64,10 @@ export const getProductBySlug = async (slug) => {
 };
 
 export const getProductById = async (id) => {
-  const product = await Product.findById(id).populate('category', 'name slug');
+  const product = await Product.findById(id)
+    .populate('category', 'name slug')
+    .populate('categories', 'name slug')
+    .populate('deliveryZones', 'name province');
   if (!product) throw new ApiError(404, 'Product not found');
   return product;
 };
@@ -110,4 +129,61 @@ export const deleteCategory = async (id) => {
   if (count > 0) throw new ApiError(400, 'Cannot delete category with products');
   const category = await Category.findByIdAndDelete(id);
   if (!category) throw new ApiError(404, 'Category not found');
+};
+
+export const getCatalogStats = async () => {
+  const [total, inStock, outOfStock, inactive] = await Promise.all([
+    Product.countDocuments(),
+    Product.countDocuments({ stock: { $gt: 0 }, isActive: true }),
+    Product.countDocuments({ stock: { $lte: 0 }, isActive: true }),
+    Product.countDocuments({ isActive: false }),
+  ]);
+  return { total, inStock, outOfStock, inactive, orderableOverrides: 0 };
+};
+
+export const cloneProduct = async (id, userId) => {
+  const original = await Product.findById(id).lean();
+  if (!original) throw new ApiError(404, 'Product not found');
+
+  const { _id, createdAt, updatedAt, slug, sku, ...rest } = original;
+  return Product.create({
+    ...rest,
+    name: `${rest.name} (Copy)`,
+    isActive: false,
+    createdBy: userId,
+    updatedBy: userId,
+  });
+};
+
+export const importProducts = async (items, userId) => {
+  if (!items?.length) throw new ApiError(400, 'No products to import');
+
+  const results = { created: 0, failed: [] };
+  for (const [index, item] of items.entries()) {
+    try {
+      const category = await Category.findOne({
+        $or: [{ _id: item.category }, { name: new RegExp(`^${item.categoryName}$`, 'i') }],
+      });
+      if (!category) throw new Error(`Category not found: ${item.categoryName || item.category}`);
+
+      await Product.create({
+        name: item.name,
+        sku: item.sku || undefined,
+        description: item.description,
+        shortDescription: item.shortDescription,
+        category: category._id,
+        price: Number(item.price),
+        compareAtPrice: item.compareAtPrice ? Number(item.compareAtPrice) : undefined,
+        stock: item.stock !== undefined ? Number(item.stock) : 0,
+        isActive: item.isActive !== 'false' && item.isActive !== false,
+        tags: item.tags ? String(item.tags).split('|').map((t) => t.trim()) : [],
+        createdBy: userId,
+        updatedBy: userId,
+      });
+      results.created += 1;
+    } catch (err) {
+      results.failed.push({ row: index + 1, name: item.name, error: err.message });
+    }
+  }
+  return results;
 };

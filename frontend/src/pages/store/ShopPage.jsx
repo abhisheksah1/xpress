@@ -1,8 +1,113 @@
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { storeApi } from '../../api/store.js';
+import { useStore } from '../../context/StoreContext.jsx';
+import ProductCard from '../../components/store/ProductCard.jsx';
+
 export default function ShopPage() {
+  const { settings } = useStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, pages: 1 });
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+
+  const category = searchParams.get('category') || '';
+  const page = Number(searchParams.get('page') || 1);
+
+  useEffect(() => {
+    storeApi.getCategories().then((res) => setCategories(res.data.data));
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = { page, limit: 20 };
+    if (category) params.category = category;
+    if (search) params.search = search;
+    storeApi.getProducts(params).then((res) => {
+      setProducts(res.data.data.products);
+      setPagination(res.data.data.pagination);
+    }).finally(() => setLoading(false));
+  }, [category, page, search]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const next = new URLSearchParams(searchParams);
+    if (search) next.set('search', search);
+    else next.delete('search');
+    next.delete('page');
+    setSearchParams(next);
+  };
+
+  const currency = settings.currency_symbol || 'Rs.';
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Shop Gifts</h1>
-      <p className="text-gray-500">Products will load from the API once connected.</p>
+
+      <div className="flex flex-col md:flex-row gap-8">
+        <aside className="md:w-48 flex-shrink-0">
+          <p className="text-xs font-semibold text-gray-400 uppercase mb-3">Categories</p>
+          <button
+            onClick={() => setSearchParams({})}
+            className={`block w-full text-left text-sm py-1.5 ${!category ? 'text-primary-600 font-medium' : 'text-gray-600'}`}
+          >
+            All Products
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat._id}
+              onClick={() => setSearchParams({ category: cat._id })}
+              className={`block w-full text-left text-sm py-1.5 ${category === cat._id ? 'text-primary-600 font-medium' : 'text-gray-600'}`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </aside>
+
+        <div className="flex-1">
+          <form onSubmit={handleSearch} className="mb-6">
+            <input
+              className="input-field max-w-md"
+              placeholder="Search gifts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </form>
+
+          {loading ? (
+            <p className="text-gray-400">Loading products...</p>
+          ) : products.length === 0 ? (
+            <p className="text-gray-400">No products found.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {products.map((p) => (
+                  <ProductCard key={p._id} product={p} currency={currency} />
+                ))}
+              </div>
+              {pagination.pages > 1 && (
+                <div className="flex gap-2 mt-8 justify-center">
+                  {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        const next = new URLSearchParams(searchParams);
+                        next.set('page', String(p));
+                        setSearchParams(next);
+                      }}
+                      className={`px-3 py-1 rounded text-sm ${p === page ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
