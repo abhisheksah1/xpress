@@ -15,3 +15,11 @@ export const sendReminder = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, result, 'Reminder sent'));
 });
 
+export const whatsAppReminder = asyncHandler(async (req, res) => {
+  const result = await reminderService.adminWhatsAppReminder(
+    { reminderId: req.params.id, message: req.body.message },
+    req.user
+  );
+  res.json(new ApiResponse(200, result, 'WhatsApp link ready'));
+});
+

@@ -59,6 +59,16 @@ const buildTrackingUrl = (order) => {
   return `${window.location.origin}/track?${params.toString()}`;
 };
 
+const formatPreferredDelivery = (order) => {
+  if (!order.preferredDeliveryDate) return null;
+  const date = new Date(order.preferredDeliveryDate);
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    date: date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
+    slot: order.timeSlot?.label || null,
+  };
+};
+
 function OrderImage({ src, alt, size = 'md' }) {
   const sizes = { sm: 'w-16 h-16', md: 'w-24 h-24', lg: 'w-32 h-32' };
   const resolved = resolveMediaUrl(src);
@@ -531,6 +541,7 @@ export default function OrdersPage({ mode = 'orders' }) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [detailId, setDetailId] = useState(null);
+  const [deliverySort, setDeliverySort] = useState(null);
 
   const params = useMemo(() => {
     const p = { page, limit: 25 };
@@ -541,8 +552,21 @@ export default function OrdersPage({ mode = 'orders' }) {
     }
     if (status) p.status = status;
     if (search.trim()) p.search = search.trim();
+    if (deliverySort) {
+      p.sortBy = 'preferredDeliveryDate';
+      p.sortOrder = deliverySort;
+    }
     return p;
-  }, [page, status, search, isLeads]);
+  }, [page, status, search, isLeads, deliverySort]);
+
+  const toggleDeliverySort = () => {
+    setDeliverySort((prev) => {
+      if (prev === null) return 'asc';
+      if (prev === 'asc') return 'desc';
+      return null;
+    });
+    setPage(1);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -609,13 +633,26 @@ export default function OrdersPage({ mode = 'orders' }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[1020px]">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold">Order</th>
                 <th className="text-left px-4 py-3 font-semibold">Customer</th>
                 <th className="text-left px-4 py-3 font-semibold">Contact</th>
                 <th className="text-left px-4 py-3 font-semibold">Location</th>
+                <th className="text-left px-4 py-3 font-semibold">
+                  <button
+                    type="button"
+                    onClick={toggleDeliverySort}
+                    className={`inline-flex items-center gap-1 hover:text-gray-800 ${deliverySort ? 'text-primary-700' : ''}`}
+                    title="Sort by preferred delivery date"
+                  >
+                    Preferred delivery
+                    {deliverySort === 'asc' && <span aria-hidden>↑</span>}
+                    {deliverySort === 'desc' && <span aria-hidden>↓</span>}
+                    {!deliverySort && <span className="text-gray-300 font-normal" aria-hidden>↕</span>}
+                  </button>
+                </th>
                 <th className="text-left px-4 py-3 font-semibold">Total</th>
                 <th className="text-left px-4 py-3 font-semibold">Payment</th>
                 <th className="text-left px-4 py-3 font-semibold">Status</th>
@@ -625,12 +662,13 @@ export default function OrdersPage({ mode = 'orders' }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">{isLeads ? 'Loading lead orders...' : 'Loading orders...'}</td></tr>
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">{isLeads ? 'Loading lead orders...' : 'Loading orders...'}</td></tr>
               ) : !orders.length ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">{isLeads ? 'No lead orders.' : 'No orders found.'}</td></tr>
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">{isLeads ? 'No lead orders.' : 'No orders found.'}</td></tr>
               ) : (
                 orders.map((order) => {
                   const contact = contactLabel(order);
+                  const preferred = formatPreferredDelivery(order);
                   return (
                     <tr key={order._id} className="hover:bg-gray-50 align-top">
                       <td className="px-4 py-3">
@@ -652,6 +690,16 @@ export default function OrdersPage({ mode = 'orders' }) {
                         <div>{contact.phone}</div>
                       </td>
                       <td className="px-4 py-3 text-gray-600">{order.deliveryLocation?.name || order.shippingAddress?.district || '—'}</td>
+                      <td className="px-4 py-3 text-xs whitespace-nowrap">
+                        {preferred ? (
+                          <div>
+                            <p className="font-semibold text-gray-900">{preferred.date}</p>
+                            {preferred.slot && <p className="text-gray-500 mt-0.5">{preferred.slot}</p>}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-semibold">Rs. {Number(order.total || 0).toLocaleString('en-NP')}</td>
                       <td className="px-4 py-3 text-xs capitalize">{order.payment?.method}<br /><span className="text-gray-500">{order.payment?.status}</span></td>
                       <td className="px-4 py-3">

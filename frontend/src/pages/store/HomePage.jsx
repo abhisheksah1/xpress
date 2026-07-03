@@ -1,69 +1,46 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
-import { useStore } from '../../context/StoreContext.jsx';
 import CmsBlockRenderer from '../../components/store/CmsBlockRenderer.jsx';
-import ProductCard from '../../components/store/ProductCard.jsx';
 
 export default function HomePage() {
-  const { settings } = useStore();
+  const location = useLocation();
   const [homePage, setHomePage] = useState(null);
-  const [featured, setFeatured] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([
-      storeApi.getPageByType('home').catch(() => null),
-      storeApi.getProducts({ isFeatured: true, limit: 8 }),
-      storeApi.getCategories(),
-    ]).then(([pageRes, productsRes, catsRes]) => {
-      if (pageRes) setHomePage(pageRes.data.data);
-      setFeatured(productsRes.data.data.products || []);
-      setCategories(catsRes.data.data || []);
-    });
+  const loadHome = useCallback(() => {
+    setLoading(true);
+    storeApi.getPageByType('home')
+      .then((res) => setHomePage(res.data.data))
+      .catch(() => setHomePage(null))
+      .finally(() => setLoading(false));
   }, []);
 
-  return (
-    <div>
-      {homePage ? (
-        <CmsBlockRenderer blocks={homePage.blocks} />
-      ) : (
-        <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white py-24 text-center">
-          <h1 className="text-4xl font-bold">{settings.store_name || 'KoseliXpress'}</h1>
-          <p className="mt-4 text-primary-100">{settings.store_tagline || 'Gifts Delivered Across Nepal'}</p>
-        </section>
-      )}
+  useEffect(() => {
+    loadHome();
+  }, [location.pathname, loadHome]);
 
-      {categories.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 py-16">
-          <h2 className="text-2xl font-bold text-center mb-8">Shop by Category</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {categories.map((cat) => (
-              <Link
-                key={cat._id}
-                to={`/shop?category=${cat._id}`}
-                className="card text-center py-6 hover:border-primary-300 transition-colors"
-              >
-                <span className="font-medium text-sm">{cat.name}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+  useEffect(() => {
+    const onRefresh = () => loadHome();
+    window.addEventListener('store:home-refresh', onRefresh);
+    return () => window.removeEventListener('store:home-refresh', onRefresh);
+  }, [loadHome]);
 
-      {featured.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 py-16 bg-gray-50">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold">Featured Gifts</h2>
-            <Link to="/shop" className="text-primary-600 text-sm font-medium hover:underline">View all</Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {featured.map((p) => (
-              <ProductCard key={p._id} product={p} />
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
+  if (loading) {
+    return <div className="py-20 text-center text-gray-400">Loading...</div>;
+  }
+
+  if (!homePage?.blocks?.length) {
+    return (
+      <div className="cms-page py-16 sm:py-24 text-center text-gray-400 px-4 sm:px-6 max-w-lg mx-auto">
+        <p className="text-lg font-medium text-gray-500">Homepage content is not configured yet.</p>
+        <p className="text-sm mt-2">
+          In Admin → Content Manager, create a page with type <strong className="text-gray-600">home</strong> and add content blocks,
+          or click <strong className="text-gray-600">Create default homepage</strong>.
+        </p>
+      </div>
+    );
+  }
+
+  return <CmsBlockRenderer blocks={homePage.blocks} />;
 }

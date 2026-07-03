@@ -3,8 +3,8 @@ import { storeApi } from '../api/store.js';
 import {
   convertFromNpr,
   formatMoney,
+  getCheckoutDisplayCurrencies,
   getDefaultCurrency,
-  getEnabledCurrencies,
 } from '../utils/currency.js';
 
 const DISPLAY_CURRENCY_KEY = 'koseli-display-currency';
@@ -31,7 +31,7 @@ export function StoreProvider({ children }) {
     return localStorage.getItem(DISPLAY_CURRENCY_KEY) || 'NPR';
   });
 
-  const currencies = useMemo(() => getEnabledCurrencies(settings), [settings]);
+  const currencies = useMemo(() => getCheckoutDisplayCurrencies(settings), [settings]);
 
   const displayCurrency = useMemo(
     () => currencies.find((c) => c.code === displayCurrencyCode) || getDefaultCurrency(settings),
@@ -84,6 +84,9 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     refresh();
+    const onFocus = () => refresh();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   return (

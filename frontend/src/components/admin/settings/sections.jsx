@@ -167,7 +167,7 @@ export function MultiCurrenciesSection({ values, set, setValues }) {
         name: '',
         symbol: '',
         rate: 1,
-        enabled: false,
+        enabled: true,
         isDefault: false,
         manualOverride: true,
         source: 'manual',

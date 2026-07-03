@@ -3,11 +3,23 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/client.js';
 import { useStore } from '../../context/StoreContext.jsx';
+import {
+  COUNTRY_CODES,
+  DEFAULT_COUNTRY_CODE,
+  validatePhoneForCountry,
+  phoneMaxLength,
+} from '../../utils/countryCodes.js';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { settings } = useStore();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    countryCode: DEFAULT_COUNTRY_CODE,
+    phone: '',
+    password: '',
+  });
   const [loading, setLoading] = useState(false);
 
   if (settings.registration_enabled === false) {
@@ -29,6 +41,9 @@ export default function RegisterPage() {
     if (form.password.length < minLen) {
       return toast.error(`Password must be at least ${minLen} characters`);
     }
+    const phoneErr = validatePhoneForCountry(form.phone, form.countryCode);
+    if (phoneErr) return toast.error(phoneErr);
+
     setLoading(true);
     try {
       const { data } = await api.post('/auth/register', form);
@@ -56,8 +71,30 @@ export default function RegisterPage() {
             <input type="email" className="input-field" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Phone</label>
-            <input type="tel" className="input-field" placeholder="98XXXXXXXX" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+            <label className="block text-sm font-medium mb-1">Contact number</label>
+            <div className="flex gap-2">
+              <select
+                className="input-field w-40 shrink-0 text-sm"
+                value={form.countryCode}
+                onChange={(e) => setForm((f) => ({ ...f, countryCode: e.target.value, phone: '' }))}
+              >
+                {COUNTRY_CODES.map((c) => (
+                  <option key={`${c.code}-${c.country}`} value={c.code}>{c.label}</option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                className="input-field flex-1"
+                required
+                placeholder={form.countryCode === DEFAULT_COUNTRY_CODE ? '98XXXXXXXX' : 'Contact number'}
+                maxLength={phoneMaxLength(form.countryCode)}
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({
+                  ...f,
+                  phone: e.target.value.replace(/\D/g, '').slice(0, phoneMaxLength(f.countryCode)),
+                }))}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Password (min {minLen} chars)</label>

@@ -28,6 +28,7 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    countryCode: { type: String, trim: true, default: '+977' },
     phone: { type: String, trim: true },
     password: { type: String, required: true, select: false },
     role: {

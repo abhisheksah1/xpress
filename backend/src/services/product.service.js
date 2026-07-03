@@ -115,7 +115,7 @@ export const getProducts = async ({
 export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
   const product = await Product.findOne({ slug, isActive: true })
     .populate('category', 'name slug deliveryScope deliveryGroupRules')
-    .populate('comboItems.product', 'name slug price images stock');
+    .populate('comboItems.product', 'name slug price images stock shortDescription description');
   if (!product) throw new ApiError(404, 'Product not found');
 
   const groups = await deliveryService.getDeliveryGroups();
@@ -173,12 +173,40 @@ export const bulkUpdatePrices = async ({ productIds, type, value }) => {
   return { updated: results.length, products: results };
 };
 
-export const getCategories = async (isActive) => {
+export const getCategories = async (isActive, options = {}) => {
   const filter = {};
   if (isActive !== undefined) filter.isActive = isActive;
-  return Category.find(filter)
+
+  const categories = await Category.find(filter)
     .populate('deliveryGroupRules.group', 'name province')
-    .sort({ sortOrder: 1, name: 1 });
+    .sort({ sortOrder: 1, name: 1 })
+    .lean();
+
+  if (!options.withProductCount) return categories;
+
+  const counts = await Product.aggregate([
+    { $match: { isActive: true } },
+    {
+      $project: {
+        cats: {
+          $setUnion: [
+            [{ $ifNull: ['$category', null] }],
+            { $ifNull: ['$categories', []] },
+          ],
+        },
+      },
+    },
+    { $unwind: '$cats' },
+    { $match: { cats: { $ne: null } } },
+    { $group: { _id: '$cats', productCount: { $sum: 1 } } },
+  ]);
+
+  const countMap = Object.fromEntries(counts.map((c) => [String(c._id), c.productCount]));
+
+  return categories.map((c) => ({
+    ...c,
+    productCount: countMap[String(c._id)] || 0,
+  }));
 };
 
 export const createCategory = async (data) => Category.create(data);

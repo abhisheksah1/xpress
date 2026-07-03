@@ -11,6 +11,7 @@ export const getAllUsers = async ({ page = 1, limit = 20, role, search, isActive
       { name: { $regex: search, $options: 'i' } },
       { email: { $regex: search, $options: 'i' } },
       { phone: { $regex: search, $options: 'i' } },
+      { countryCode: { $regex: search, $options: 'i' } },
     ];
   }
 

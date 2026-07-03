@@ -77,6 +77,10 @@ const config = {
     maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 5,
     allowedImageTypes: (process.env.ALLOWED_IMAGE_TYPES || 'image/jpeg,image/png,image/webp,image/gif').split(','),
   },
+
+  google: {
+    placesApiKey: process.env.GOOGLE_PLACES_API_KEY || '',
+  },
 };
 
 export default config;

@@ -5,7 +5,7 @@ export const storeApi = {
   getNavbar: (location) => api.get('/store/navbar', { params: location ? { location } : {} }),
   getProducts: (params) => api.get('/store/products', { params }),
   getProduct: (slug) => api.get(`/store/products/${slug}`),
-  getCategories: () => api.get('/store/categories'),
+  getCategories: (params) => api.get('/store/categories', { params }),
   getBlogs: (params) => api.get('/store/blogs', { params }),
   getBlog: (slug) => api.get(`/store/blogs/${slug}`),
   getPages: (params) => api.get('/store/pages', { params }),
@@ -25,8 +25,6 @@ export const storeApi = {
   uploadPersonalizationImage: (file) => {
     const form = new FormData();
     form.append('image', file);
-    return api.post('/store/upload/personalization', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post('/store/upload/personalization', form);
   },
 };

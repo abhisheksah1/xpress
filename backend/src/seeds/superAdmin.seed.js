@@ -2,7 +2,10 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import config from '../config/index.js';
 import { User, Navbar, DeliveryLocation, DeliveryGroup, CMSPage } from '../models/index.js';
-import { ROLES } from '../config/constants.js';
+import { ROLES, CMS_PAGE_TYPES } from '../config/constants.js';
+import { DEFAULT_HOME_PAGE } from '../config/defaultHomePage.js';
+import { DEFAULT_FOOTER_LAYOUT, DEFAULT_FOOTER_OPTIONS, resolveFooterOptions } from '../config/defaultFooterContent.js';
+import { DEFAULT_BRAND_LOGO } from '../config/brandLogo.js';
 import { seedDefaultSettings } from '../services/settings.service.js';
 
 dotenv.config();
@@ -29,146 +32,95 @@ const seedSuperAdmin = async () => {
 
 const seedNavbar = async () => {
   const existing = await Navbar.findOne({ location: 'header' });
-  if (existing) return;
+  if (existing) {
+    if (!existing.logo?.url) {
+      existing.logo = DEFAULT_BRAND_LOGO;
+      await existing.save();
+      console.log('Header logo backfilled on existing navbar');
+    }
+    return;
+  }
 
   await Navbar.create({
     name: 'Main Header',
     location: 'header',
+    logo: DEFAULT_BRAND_LOGO,
+    announcement: {
+      enabled: true,
+      text: 'Same-Day Flowers & Cake Delivery Available all major cities in Nepal — Order by 4:00 PM NST',
+      backgroundColor: '#22c55e',
+      textColor: '#ffffff',
+    },
+    headerOptions: {
+      showSearch: true,
+      showCart: true,
+      showCurrency: true,
+      showLogin: true,
+      showReminders: true,
+      showLogo: true,
+      searchPlaceholder: 'Search gifts & flowers...',
+    },
+    menuBar: {
+      enabled: true,
+      backgroundColor: '#f3f4f6',
+    },
     items: [
-      { label: 'Home', link: '/', sortOrder: 0 },
-      { label: 'Shop', link: '/shop', sortOrder: 1 },
-      { label: 'Gifts', link: '/gifts', sortOrder: 2 },
-      { label: 'Blog', link: '/blog', sortOrder: 3 },
-      { label: 'About', link: '/about', sortOrder: 4 },
-      { label: 'Contact', link: '/contact', sortOrder: 5 },
+      { label: 'Shrawan Gifts', link: '/shop', type: 'dropdown', children: [], sortOrder: 0, isActive: true },
+      { label: 'Gift By Recipient', link: '/shop', type: 'dropdown', children: [], sortOrder: 1, isActive: true },
+      { label: 'Birthday Gifts', link: '/shop?search=birthday', type: 'link', sortOrder: 2, isActive: true },
+      { label: 'Cake Delivery', link: '/shop?search=cake', type: 'link', sortOrder: 3, isActive: true },
+      { label: 'Occasion Gifts', link: '/shop', type: 'dropdown', children: [], sortOrder: 4, isActive: true },
+      { label: 'Combos', link: '/shop?search=combo', type: 'link', sortOrder: 5, isActive: true },
+      { label: 'Flowers & Fruits', link: '/shop?search=flowers', type: 'link', sortOrder: 6, isActive: true },
+      { label: 'SPECIAL GIFTS', link: '/shop?search=special', type: 'link', sortOrder: 7, isActive: true },
     ],
   });
 };
 
 const seedFooterNavbar = async () => {
   const existing = await Navbar.findOne({ location: 'footer' });
-  if (existing) return;
+  if (existing) {
+    let changed = false;
+    if (!existing.footerLayout?.linkColumns?.length) {
+      existing.footerLayout = DEFAULT_FOOTER_LAYOUT;
+      changed = true;
+    }
+    const nextFooterOptions = resolveFooterOptions(existing.footerOptions || {});
+    if (JSON.stringify(existing.footerOptions || {}) !== JSON.stringify(nextFooterOptions)) {
+      existing.footerOptions = nextFooterOptions;
+      changed = true;
+    }
+    if (!existing.logo?.url) {
+      existing.logo = DEFAULT_BRAND_LOGO;
+      changed = true;
+    }
+    if (changed) {
+      await existing.save();
+      console.log('Footer layout/logo backfilled on existing navbar');
+    }
+    return;
+  }
 
   await Navbar.create({
     name: 'Footer Links',
     location: 'footer',
-    items: [
-      { label: 'About Us', link: '/about', sortOrder: 0 },
-      { label: 'Contact', link: '/contact', sortOrder: 1 },
-      { label: 'FAQ', link: '/p/faq', sortOrder: 2 },
-      { label: 'Blog', link: '/blog', sortOrder: 3 },
-      { label: 'Shop', link: '/shop', sortOrder: 4 },
-    ],
+    logo: DEFAULT_BRAND_LOGO,
+    footerOptions: DEFAULT_FOOTER_OPTIONS,
+    footerLayout: DEFAULT_FOOTER_LAYOUT,
+    items: [],
   });
 };
 
 const seedHomePage = async () => {
-  const existing = await CMSPage.findOne({ pageType: 'home' });
+  const existing = await CMSPage.findOne({ pageType: CMS_PAGE_TYPES.HOME });
   if (existing) return;
 
-  await CMSPage.create({
-    title: 'Home',
-    slug: 'home',
-    pageType: 'home',
-    isPublished: true,
-    metaTitle: 'KoseliXpress - Gift Portal Nepal',
-    metaDescription: 'Send gifts across Nepal with same-day delivery in major cities.',
-    blocks: [
-      {
-        type: 'hero',
-        title: 'Send Love Across Nepal',
-        content: 'Curated gifts delivered to every corner of Nepal. Perfect for birthdays, festivals, and special moments.',
-        buttonText: 'Shop Gifts',
-        buttonLink: '/shop',
-        sortOrder: 0,
-        isActive: true,
-      },
-      {
-        type: 'text',
-        title: 'Why KoseliXpress?',
-        sortOrder: 1,
-        isActive: true,
-        settings: {
-          layout: 'features',
-          features: [
-            { title: 'Nationwide Delivery', desc: 'We deliver gifts across all 7 provinces of Nepal.' },
-            { title: 'Gift Wrapping', desc: 'Beautiful gift wrapping with personalized messages.' },
-            { title: 'Secure Payments', desc: 'Pay via Khalti, eSewa, Fonepay, or card.' },
-          ],
-        },
-      },
-      {
-        type: 'cta',
-        title: 'Same-Day Delivery Available',
-        content: 'Order before 2 PM in Kathmandu Valley for same-day gift delivery.',
-        buttonText: 'Browse Collections',
-        buttonLink: '/shop',
-        sortOrder: 2,
-        isActive: true,
-      },
-    ],
-  });
-  console.log('Home CMS page seeded');
+  await CMSPage.create(DEFAULT_HOME_PAGE);
+  console.log('Default homepage seeded');
 };
 
 const seedStaticPages = async () => {
-  const pages = [
-    {
-      title: 'About Us',
-      slug: 'about',
-      pageType: 'about',
-      blocks: [
-        {
-          type: 'text',
-          title: 'About KoseliXpress',
-          content: 'KoseliXpress is Nepal\'s trusted online gift portal. We help you send love across cities with curated gifts, cakes, flowers, and hampers — delivered with care.',
-          sortOrder: 0,
-          isActive: true,
-        },
-      ],
-    },
-    {
-      title: 'Contact Us',
-      slug: 'contact',
-      pageType: 'contact',
-      blocks: [
-        {
-          type: 'text',
-          title: 'Get in Touch',
-          content: 'Email: info@koselixpress.com\nPhone: 9800000000\nAddress: Kathmandu, Nepal',
-          sortOrder: 0,
-          isActive: true,
-        },
-      ],
-    },
-    {
-      title: 'FAQ',
-      slug: 'faq',
-      pageType: 'faq',
-      blocks: [
-        {
-          type: 'faq',
-          title: 'Frequently Asked Questions',
-          sortOrder: 0,
-          isActive: true,
-          settings: {
-            items: [
-              { q: 'Do you deliver nationwide?', a: 'Yes, we deliver across all provinces in Nepal.' },
-              { q: 'Can I add a gift message?', a: 'Yes, you can add a personalized message at checkout.' },
-              { q: 'What payment methods do you accept?', a: 'Khalti, eSewa, Fonepay, card, and cash on delivery.' },
-            ],
-          },
-        },
-      ],
-    },
-  ];
-
-  for (const page of pages) {
-    const exists = await CMSPage.findOne({ slug: page.slug });
-    if (!exists) {
-      await CMSPage.create({ ...page, isPublished: true });
-    }
-  }
+  // CMS pages are created by admin — no prebuilt static pages.
 };
 
 const seedDelivery = async () => {

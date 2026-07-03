@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useCartStore } from '../../store/cartStore.js';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
-import { convertFromNpr, formatMoney, getEnabledCurrencies } from '../../utils/currency.js';
+import { convertFromNpr, formatMoney, getCheckoutDisplayCurrencies } from '../../utils/currency.js';
 import {
   COUNTRY_CODES,
   DEFAULT_COUNTRY_CODE,
@@ -56,7 +56,7 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
 
   const enabledCurrencies = useMemo(
-    () => (storeCurrencies?.length ? storeCurrencies : getEnabledCurrencies(settings)),
+    () => (storeCurrencies?.length ? storeCurrencies : getCheckoutDisplayCurrencies(settings)),
     [storeCurrencies, settings]
   );
   const [payoutCurrency, setPayoutCurrency] = useState(displayCurrencyCode || 'NPR');

@@ -25,9 +25,11 @@ export const adminApi = {
   getCmsPages: (params) => api.get('/admin/cms', { params }),
   getCmsPage: (id) => api.get(`/admin/cms/${id}`),
   createCmsPage: (data) => api.post('/admin/cms', data),
+  setupHomePage: () => api.post('/admin/cms/setup-home'),
   updateCmsPage: (id, data) => api.patch(`/admin/cms/${id}`, data),
   updateCmsBlocks: (id, blocks) => api.patch(`/admin/cms/${id}/blocks`, { blocks }),
   deleteCmsPage: (id) => api.delete(`/admin/cms/${id}`),
+  fetchGoogleReviews: (placeId) => api.post('/admin/cms/google-reviews/fetch', { placeId }),
 
   getNavbars: (location) => api.get('/admin/navbars', { params: location ? { location } : {} }),
   getNavbar: (id) => api.get(`/admin/navbars/${id}`),
@@ -72,6 +74,11 @@ export const adminApi = {
 
   getReminders: (params) => api.get('/admin/reminders', { params }),
   sendReminder: (id, data) => api.post(`/admin/reminders/${id}/send`, data),
+  whatsAppReminder: (id, data) => api.post(`/admin/reminders/${id}/whatsapp`, data || {}),
+
+  getCustomers: (params) => api.get('/admin/users', { params }),
+  getCustomer: (id) => api.get(`/admin/users/${id}`),
+  toggleCustomerStatus: (id) => api.patch(`/admin/users/${id}/toggle-status`),
 
   getProfile: () => api.get('/auth/me'),
   updateProfile: (data) => api.patch('/auth/me', data),
@@ -80,7 +87,12 @@ export const adminApi = {
   uploadImage: (file) => {
     const form = new FormData();
     form.append('image', file);
-    return api.post('/admin/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return api.post('/admin/upload', form);
+  },
+  uploadImages: (files) => {
+    const form = new FormData();
+    [...files].forEach((file) => form.append('images', file));
+    return api.post('/admin/upload/batch', form);
   },
   uploadImageUrl: (url, alt) => api.post('/admin/upload', { url, alt }),
 };

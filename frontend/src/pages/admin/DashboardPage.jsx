@@ -18,6 +18,7 @@ export default function DashboardPage() {
 
   const quickLinks = [
     { to: '/admin/products/new', label: 'Add Product' },
+    { to: '/admin/reminders', label: 'Customer Reminders' },
     { to: '/admin/content', label: 'Edit Homepage' },
     { to: '/admin/navbar', label: 'Edit Navigation' },
     { to: '/admin/settings', label: 'Store Settings' },

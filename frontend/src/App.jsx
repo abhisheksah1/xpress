@@ -26,6 +26,7 @@ import AdminSettings from './pages/admin/SettingsPage';
 import DeliveryGroupsPage from './pages/admin/DeliveryGroupsPage';
 import CouponsPage from './pages/admin/CouponsPage';
 import AdminRemindersPage from './pages/admin/RemindersPage';
+import CustomersPage from './pages/admin/CustomersPage';
 import RemindersPage from './pages/store/RemindersPage';
 
 export default function App() {
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="orders" element={<AdminOrders />} />
         <Route path="leads" element={<LeadOrdersPage />} />
         <Route path="coupons" element={<CouponsPage />} />
+        <Route path="customers" element={<CustomersPage />} />
         <Route path="reminders" element={<AdminRemindersPage />} />
         <Route path="delivery" element={<DeliveryGroupsPage />} />
         <Route path="settings" element={<AdminSettings />} />

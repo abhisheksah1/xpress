@@ -2,8 +2,48 @@ import { Reminder } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { getSettings } from './settings.service.js';
 import { renderTemplate, sendEmail } from './email.service.js';
+import { toE164Digits, formatDisplayPhone } from '../utils/phone.js';
 
 const parseDate = (d) => (d ? new Date(d) : null);
+
+const buildReminderVars = (reminder, adminUser, message) => {
+  const dateLabel = new Date(reminder.occasionDate).toLocaleDateString();
+  return {
+    customer_name: reminder.customer?.name || 'Customer',
+    title: reminder.title || 'Special date',
+    recipient_name: reminder.recipientName || '',
+    relation: reminder.relation || '',
+    occasion_date: dateLabel,
+    delivery_location: reminder.deliveryLocationText || '',
+    admin_name: adminUser?.name || 'Admin',
+    custom_message: message || '',
+  };
+};
+
+const getReminderTemplate = async () => {
+  const emailSettings = await getSettings('email');
+  const map = emailSettings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
+  const templates = map.email_templates || {};
+  return templates.reminder || {
+    subject: 'Reminder: {{title}} on {{occasion_date}}',
+    body:
+      'Hi {{customer_name}},\n\nThis is a reminder for {{title}} ({{relation}}) on {{occasion_date}}.\nDelivery location note: {{delivery_location}}\n\nYou can place your order anytime from our store.',
+  };
+};
+
+const buildReminderContent = async (reminder, adminUser, { subject, message } = {}) => {
+  const tpl = await getReminderTemplate();
+  const vars = buildReminderVars(reminder, adminUser, message);
+
+  const finalSubject = subject?.trim()
+    ? renderTemplate(subject, vars)
+    : renderTemplate(tpl.subject, vars);
+  const bodyText = message?.trim()
+    ? renderTemplate(message, vars)
+    : renderTemplate(tpl.body, vars);
+
+  return { subject: finalSubject, body: bodyText, vars, tpl };
+};
 
 export const getMyReminders = async (userId) => {
   return Reminder.find({ customer: userId }).sort({ occasionDate: 1, createdAt: -1 });
@@ -76,7 +116,7 @@ export const adminListReminders = async ({ from, to, search, isActive, page = 1,
   const skip = (Number(page) - 1) * Number(limit);
   const [reminders, total] = await Promise.all([
     Reminder.find(filter)
-      .populate('customer', 'name email phone')
+      .populate('customer', 'name email phone countryCode')
       .sort({ occasionDate: 1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -87,40 +127,14 @@ export const adminListReminders = async ({ from, to, search, isActive, page = 1,
 };
 
 export const adminSendReminder = async ({ reminderId, subject, message }, adminUser) => {
-  const reminder = await Reminder.findById(reminderId).populate('customer', 'name email phone');
+  const reminder = await Reminder.findById(reminderId).populate('customer', 'name email phone countryCode');
   if (!reminder) throw new ApiError(404, 'Reminder not found');
   if (!reminder.isActive) throw new ApiError(400, 'Reminder is inactive');
 
   const customerEmail = reminder.customer?.email;
   if (!customerEmail) throw new ApiError(400, 'Customer email not found');
 
-  const emailSettings = await getSettings('email');
-  const map = emailSettings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
-  const templates = map.email_templates || {};
-  const tpl = templates.reminder || {
-    subject: 'Reminder: {{title}} on {{occasion_date}}',
-    body:
-      'Hi {{customer_name}},\\n\\nThis is a reminder for {{title}} ({{relation}}) on {{occasion_date}}.\\nDelivery location note: {{delivery_location}}\\n\\nYou can place your order anytime from our store.',
-  };
-
-  const dateLabel = new Date(reminder.occasionDate).toLocaleDateString();
-  const vars = {
-    customer_name: reminder.customer?.name || 'Customer',
-    title: reminder.title || 'Special date',
-    recipient_name: reminder.recipientName || '',
-    relation: reminder.relation || '',
-    occasion_date: dateLabel,
-    delivery_location: reminder.deliveryLocationText || '',
-    admin_name: adminUser?.name || 'Admin',
-    custom_message: message || '',
-  };
-
-  const finalSubject = subject?.trim()
-    ? renderTemplate(subject, vars)
-    : renderTemplate(tpl.subject, vars);
-  const bodyText = message?.trim()
-    ? renderTemplate(message, vars)
-    : renderTemplate(tpl.body, vars);
+  const { subject: finalSubject, body: bodyText, vars } = await buildReminderContent(reminder, adminUser, { subject, message });
 
   const html = `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111">\n` +
     `<p>Hi ${vars.customer_name},</p>\n` +
@@ -135,6 +149,33 @@ export const adminSendReminder = async ({ reminderId, subject, message }, adminU
   reminder.lastSentAt = new Date();
   await reminder.save();
 
-  return { reminderId: reminder._id, sentTo: customerEmail, at: reminder.lastSentAt };
+  return { reminderId: reminder._id, sentTo: customerEmail, channel: 'email', at: reminder.lastSentAt };
 };
 
+export const adminWhatsAppReminder = async ({ reminderId, message }, adminUser) => {
+  const reminder = await Reminder.findById(reminderId).populate('customer', 'name email phone countryCode');
+  if (!reminder) throw new ApiError(404, 'Reminder not found');
+  if (!reminder.isActive) throw new ApiError(400, 'Reminder is inactive');
+
+  const phone = reminder.customer?.phone;
+  const countryCode = reminder.customer?.countryCode || '+977';
+  if (!phone) {
+    throw new ApiError(400, 'Customer phone number not found. Ask them to add it on their profile.');
+  }
+
+  const { body: bodyText } = await buildReminderContent(reminder, adminUser, { message });
+  const digits = toE164Digits(countryCode, phone);
+  const url = `https://wa.me/${digits}?text=${encodeURIComponent(bodyText)}`;
+
+  reminder.lastSentAt = new Date();
+  await reminder.save();
+
+  return {
+    reminderId: reminder._id,
+    url,
+    phone: formatDisplayPhone(countryCode, phone),
+    message: bodyText,
+    channel: 'whatsapp',
+    at: reminder.lastSentAt,
+  };
+};

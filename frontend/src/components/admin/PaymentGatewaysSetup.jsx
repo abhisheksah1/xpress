@@ -3,9 +3,9 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import {
   GATEWAY_FIELD_DEFS,
-  PAYMENT_CURRENCIES,
   mergeGatewayDefaults,
 } from '../../config/paymentGateways.js';
+import { getConfiguredCurrencyCodes } from '../../utils/currency.js';
 
 function EnvToggle({ value, onChange }) {
   return (
@@ -44,10 +44,11 @@ function GatewayToggle({ enabled, onChange }) {
   );
 }
 
-function CurrencyPills({ selected, onChange }) {
+function CurrencyPills({ selected, onChange, codes }) {
+  const options = codes?.length ? codes : ['NPR'];
   return (
     <div className="flex flex-wrap gap-2">
-      {PAYMENT_CURRENCIES.map((code) => {
+      {options.map((code) => {
         const active = selected.includes(code);
         return (
           <button
@@ -70,7 +71,7 @@ function CurrencyPills({ selected, onChange }) {
   );
 }
 
-function GatewayPanel({ gateway, onChange, onUploadLogo }) {
+function GatewayPanel({ gateway, onChange, onUploadLogo, currencyCodes }) {
   const fields = GATEWAY_FIELD_DEFS[gateway.type] || [];
 
   const set = (patch) => onChange({ ...gateway, ...patch });
@@ -213,10 +214,11 @@ function GatewayPanel({ gateway, onChange, onUploadLogo }) {
           <CurrencyPills
             selected={gateway.currencies || []}
             onChange={(currencies) => set({ currencies })}
+            codes={currencyCodes}
           />
           <p className="text-xs text-gray-400 mt-2">
-            Only show this payment gateway during checkout if the customer&apos;s active billing currency matches.
-            If no specific currencies are selected, it defaults to showing all.
+            Currencies come from <strong>Multi-Currencies</strong> setup. Only show this gateway when the customer&apos;s billing currency matches.
+            If none are selected, the gateway appears for all currencies.
           </p>
         </div>
       </div>
@@ -227,6 +229,7 @@ function GatewayPanel({ gateway, onChange, onUploadLogo }) {
 export default function PaymentGatewaysSetup({ values, set }) {
   const [gateways, setGateways] = useState(() => mergeGatewayDefaults(values.payment_gateways));
   const [saving, setSaving] = useState(false);
+  const currencyCodes = getConfiguredCurrencyCodes(values);
 
   useEffect(() => {
     setGateways(mergeGatewayDefaults(values.payment_gateways));
@@ -277,6 +280,7 @@ export default function PaymentGatewaysSetup({ values, set }) {
             gateway={gateway}
             onChange={(next) => updateGateway(index, next)}
             onUploadLogo={uploadImage}
+            currencyCodes={currencyCodes}
           />
         ))}
       </div>

@@ -15,6 +15,8 @@ export const getProduct = asyncHandler(async (req, res) => {
 });
 
 export const getCategories = asyncHandler(async (req, res) => {
-  const categories = await productService.getCategories(true);
+  const categories = await productService.getCategories(true, {
+    withProductCount: req.query.withProductCount === 'true',
+  });
   res.json(new ApiResponse(200, categories));
 });

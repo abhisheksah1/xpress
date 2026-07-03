@@ -5,10 +5,20 @@ import { ApiError } from '../utils/ApiError.js';
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  if (config.upload.allowedImageTypes.includes(file.mimetype)) {
+  const mime = (file.mimetype || '').toLowerCase();
+  const allowed = config.upload.allowedImageTypes.map((t) => t.toLowerCase());
+  const ext = (file.originalname || '').toLowerCase();
+  const extOk = /\.(jpe?g|png|gif|webp)$/.test(ext);
+  const mimeOk =
+    allowed.includes(mime)
+    || mime === 'image/jpg'
+    || (mime === 'application/octet-stream' && extOk)
+    || (!mime && extOk);
+
+  if (mimeOk) {
     cb(null, true);
   } else {
-    cb(new ApiError(400, `Invalid file type. Allowed: ${config.upload.allowedImageTypes.join(', ')}`), false);
+    cb(new ApiError(400, `Invalid file type. Allowed: JPEG, PNG, WebP, GIF`), false);
   }
 };
 

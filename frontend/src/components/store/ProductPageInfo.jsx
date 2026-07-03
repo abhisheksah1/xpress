@@ -8,7 +8,7 @@ export function ProductPageAlert({ message }) {
   );
 }
 
-export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Location Tier' }) {
+export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Location Tier', compact = false }) {
   const rows = schedules || [];
   if (!rows.length) return null;
 
@@ -39,7 +39,7 @@ export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Lo
               <th className="px-3 py-2 font-bold">Delivery Method</th>
               <th className="px-3 py-2 font-bold">Estimated Delivery Time</th>
               <th className="px-3 py-2 font-bold">Cut-off Time</th>
-              <th className="px-3 py-2 font-bold">Availability</th>
+              {!compact && <th className="px-3 py-2 font-bold">Availability</th>}
             </tr>
           </thead>
           <tbody>
@@ -53,17 +53,19 @@ export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Lo
                 <td className="px-3 py-3 text-slate-700">{row.deliveryMethodLabel || '—'}</td>
                 <td className="px-3 py-3 font-semibold text-slate-800">{row.estimatedTimeLabel || '—'}</td>
                 <td className="px-3 py-3 font-bold text-slate-900">{row.cutoffTimeLabel || '—'}</td>
-                <td className="px-3 py-3">
-                  {row.available ? (
-                    <span className="inline-flex text-[10px] font-bold uppercase tracking-wide text-emerald-800 bg-emerald-100 px-2 py-1 rounded-full">
-                      Standard schedule
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-amber-900 leading-snug block max-w-[180px]">
-                      {row.availabilityLabel || 'Manual confirmation — order still accepted'}
-                    </span>
-                  )}
-                </td>
+                {!compact && (
+                  <td className="px-3 py-3">
+                    {row.available ? (
+                      <span className="inline-flex text-[10px] font-bold uppercase tracking-wide text-emerald-800 bg-emerald-100 px-2 py-1 rounded-full">
+                        Standard schedule
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-amber-900 leading-snug block max-w-[180px]">
+                        {row.availabilityLabel || 'Manual confirmation — order still accepted'}
+                      </span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

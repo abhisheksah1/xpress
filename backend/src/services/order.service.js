@@ -250,7 +250,17 @@ export const isLeadOrder = (order) => {
   );
 };
 
-export const getOrders = async ({ page = 1, limit = 20, status, userId, search, lead, excludeLeads }) => {
+export const getOrders = async ({
+  page = 1,
+  limit = 20,
+  status,
+  userId,
+  search,
+  lead,
+  excludeLeads,
+  sortBy,
+  sortOrder,
+}) => {
   const filter = {};
   if (status) filter.status = status;
   if (userId) filter.user = userId;
@@ -274,19 +284,73 @@ export const getOrders = async ({ page = 1, limit = 20, status, userId, search, 
     ];
   }
 
-  const skip = (page - 1) * limit;
-  const [orders, total] = await Promise.all([
-    Order.find(filter)
+  const pageNum = Number(page);
+  const limitNum = Number(limit);
+  const skip = (pageNum - 1) * limitNum;
+  const total = await Order.countDocuments(filter);
+
+  const sortByDelivery = sortBy === 'preferredDeliveryDate';
+  const dir = sortOrder === 'asc' ? 1 : -1;
+
+  let orders;
+  if (sortByDelivery) {
+    const nullFallback = sortOrder === 'asc'
+      ? new Date('2099-12-31T00:00:00.000Z')
+      : new Date(0);
+
+    orders = await Order.aggregate([
+      { $match: filter },
+      {
+        $addFields: {
+          _sortDelivery: { $ifNull: ['$preferredDeliveryDate', nullFallback] },
+        },
+      },
+      { $sort: { _sortDelivery: dir, createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limitNum },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user',
+          pipeline: [{ $project: { name: 1, email: 1, phone: 1 } }],
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'deliverygroups',
+          localField: 'deliveryZone',
+          foreignField: '_id',
+          as: 'deliveryZone',
+          pipeline: [{ $project: { name: 1, estimatedDeliveryLabel: 1 } }],
+        },
+      },
+      { $unwind: { path: '$deliveryZone', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'deliverylocations',
+          localField: 'deliveryLocation',
+          foreignField: '_id',
+          as: 'deliveryLocation',
+          pipeline: [{ $project: { name: 1, deliveryFee: 1 } }],
+        },
+      },
+      { $unwind: { path: '$deliveryLocation', preserveNullAndEmptyArrays: true } },
+      { $project: { _sortDelivery: 0 } },
+    ]);
+  } else {
+    orders = await Order.find(filter)
       .populate('user', 'name email phone')
       .populate('deliveryZone', 'name estimatedDeliveryLabel')
       .populate('deliveryLocation', 'name deliveryFee')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
-    Order.countDocuments(filter),
-  ]);
+      .limit(limitNum);
+  }
 
-  return { orders, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  return { orders, pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) } };
 };
 
 export const getOrderById = async (id, userId = null) => {

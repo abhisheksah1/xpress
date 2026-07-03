@@ -3,6 +3,7 @@ import config from '../config/index.js';
 import { User } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ROLES } from '../config/constants.js';
+import { validatePhoneForCountry } from '../utils/phone.js';
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, config.jwt.accessSecret, {
@@ -14,7 +15,7 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
-export const register = async ({ name, email, phone, password }) => {
+export const register = async ({ name, email, countryCode = '+977', phone, password }) => {
   const { getSettingByKey } = await import('./settings.service.js');
   try {
     const regSetting = await getSettingByKey('registration_enabled');
@@ -26,10 +27,14 @@ export const register = async ({ name, email, phone, password }) => {
   const existing = await User.findOne({ email });
   if (existing) throw new ApiError(409, 'Email already registered');
 
+  const phoneErr = validatePhoneForCountry(phone, countryCode);
+  if (phoneErr) throw new ApiError(400, phoneErr);
+
   const user = await User.create({
     name,
     email,
-    phone,
+    countryCode,
+    phone: String(phone).replace(/\D/g, ''),
     password,
     role: ROLES.CUSTOMER,
   });
@@ -83,10 +88,18 @@ export const getProfile = async (userId) => {
 };
 
 export const updateProfile = async (userId, data) => {
-  const allowed = ['name', 'phone', 'avatar', 'addresses'];
+  const allowed = ['name', 'countryCode', 'phone', 'avatar', 'addresses'];
   const updates = {};
   for (const key of allowed) {
     if (data[key] !== undefined) updates[key] = data[key];
+  }
+
+  if (updates.phone !== undefined) {
+    const existing = await User.findById(userId);
+    const countryCode = updates.countryCode ?? existing?.countryCode ?? '+977';
+    const phoneErr = validatePhoneForCountry(updates.phone, countryCode);
+    if (phoneErr) throw new ApiError(400, phoneErr);
+    updates.phone = String(updates.phone).replace(/\D/g, '');
   }
 
   const user = await User.findByIdAndUpdate(userId, updates, {

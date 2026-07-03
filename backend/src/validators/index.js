@@ -4,7 +4,8 @@ export const registerSchema = z.object({
   body: z.object({
     name: z.string().min(2).max(100),
     email: z.string().email(),
-    phone: z.string().min(10).max(15).optional(),
+    countryCode: z.string().regex(/^\+\d{1,4}$/).default('+977'),
+    phone: z.string().min(6).max(15),
     password: z.string().min(8).max(128),
   }),
 });
@@ -384,5 +385,36 @@ export const confirmLeadOrderSchema = z.object({
 export const cancelLeadOrderSchema = z.object({
   body: z.object({
     note: z.string().optional(),
+  }),
+});
+
+const cmsPageTypeSchema = z.enum(['home', 'about', 'contact', 'faq', 'terms', 'privacy', 'custom']);
+const cmsSlugSchema = z.string().min(2).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers, and hyphens only');
+
+export const createCmsPageSchema = z.object({
+  body: z.object({
+    title: z.string().min(2).max(120),
+    slug: cmsSlugSchema,
+    pageType: cmsPageTypeSchema.default('custom'),
+    isPublished: z.boolean().optional(),
+    metaTitle: z.string().max(160).optional(),
+    metaDescription: z.string().max(300).optional(),
+  }),
+});
+
+export const updateCmsPageSchema = z.object({
+  body: z.object({
+    title: z.string().min(2).max(120).optional(),
+    slug: cmsSlugSchema.optional(),
+    pageType: cmsPageTypeSchema.optional(),
+    isPublished: z.boolean().optional(),
+    metaTitle: z.string().max(160).optional(),
+    metaDescription: z.string().max(300).optional(),
+  }),
+});
+
+export const fetchGoogleReviewsSchema = z.object({
+  body: z.object({
+    placeId: z.string().min(5).max(200),
   }),
 });

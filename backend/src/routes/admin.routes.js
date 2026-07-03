@@ -13,7 +13,7 @@ import * as dashboardController from '../controllers/admin/dashboard.controller.
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { isStaff, isAdmin, isSuperAdmin, hasPermission } from '../middlewares/role.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
-import { uploadSingle } from '../middlewares/upload.middleware.js';
+import { uploadSingle, uploadMultiple } from '../middlewares/upload.middleware.js';
 import * as deliveryController from '../controllers/admin/delivery.controller.js';
 import * as couponController from '../controllers/admin/coupon.controller.js';
 import * as reminderController from '../controllers/admin/reminder.controller.js';
@@ -31,6 +31,9 @@ import {
   updateOrderPaymentSchema,
   confirmLeadOrderSchema,
   cancelLeadOrderSchema,
+  createCmsPageSchema,
+  updateCmsPageSchema,
+  fetchGoogleReviewsSchema,
 } from '../validators/index.js';
 
 const router = Router();
@@ -81,8 +84,9 @@ router.patch('/coupons/:id', isAdmin, validate(updateCouponSchema), couponContro
 router.delete('/coupons/:id', isAdmin, couponController.deleteCoupon);
 
 // Reminders
-router.get('/reminders', isAdmin, reminderController.getReminders);
-router.post('/reminders/:id/send', isAdmin, reminderController.sendReminder);
+router.get('/reminders', hasPermission('reminders:read'), reminderController.getReminders);
+router.post('/reminders/:id/send', hasPermission('reminders:write'), reminderController.sendReminder);
+router.post('/reminders/:id/whatsapp', hasPermission('reminders:write'), reminderController.whatsAppReminder);
 
 // Delivery Locations
 router.get('/delivery-locations', deliveryController.getDeliveryLocations);
@@ -126,9 +130,11 @@ router.delete('/blogs/:id', hasPermission('blog:write'), blogController.deleteBl
 
 // CMS
 router.get('/cms', hasPermission('cms:read'), cmsController.getPages);
-router.post('/cms', hasPermission('cms:write'), cmsController.createPage);
+router.post('/cms/setup-home', hasPermission('cms:write'), cmsController.setupHomePage);
+router.post('/cms/google-reviews/fetch', hasPermission('cms:write'), validate(fetchGoogleReviewsSchema), cmsController.fetchGoogleReviews);
+router.post('/cms', hasPermission('cms:write'), validate(createCmsPageSchema), cmsController.createPage);
 router.get('/cms/:id', hasPermission('cms:read'), cmsController.getPage);
-router.patch('/cms/:id', hasPermission('cms:write'), cmsController.updatePage);
+router.patch('/cms/:id', hasPermission('cms:write'), validate(updateCmsPageSchema), cmsController.updatePage);
 router.patch('/cms/:id/blocks', hasPermission('cms:write'), cmsController.updateBlocks);
 router.delete('/cms/:id', hasPermission('cms:write'), cmsController.deletePage);
 
@@ -150,6 +156,7 @@ router.post('/settings/sync-nrb-rates', isAdmin, settingsController.syncNrbRates
 
 // Upload
 router.post('/upload', uploadSingle('image'), uploadController.uploadImage);
+router.post('/upload/batch', uploadMultiple('images', 20), uploadController.uploadImages);
 router.delete('/upload', uploadController.deleteImage);
 
 export default router;

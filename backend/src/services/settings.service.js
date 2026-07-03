@@ -2,6 +2,7 @@ import { Settings } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { syncLegacyPaymentFlags } from './paymentGateway.service.js';
 import { getDefaultPaymentGateways } from '../config/paymentGatewayDefaults.js';
+import { DEFAULT_BRAND_LOGO_URL } from '../config/brandLogo.js';
 
 const DEFAULT_SETTINGS = [
   // Store Registry Identities
@@ -126,7 +127,7 @@ const DEFAULT_SETTINGS = [
   },
 
   // Branding & Layout (10 core)
-  { key: 'logo_url', value: '', group: 'branding', label: 'Logo URL' },
+  { key: 'logo_url', value: DEFAULT_BRAND_LOGO_URL, group: 'branding', label: 'Logo URL' },
   { key: 'favicon_url', value: '', group: 'branding', label: 'Favicon URL' },
   { key: 'primary_color', value: '#E11D48', group: 'branding', label: 'Primary Color' },
   { key: 'secondary_color', value: '#1E293B', group: 'branding', label: 'Secondary Color' },
@@ -271,6 +272,20 @@ export const getPublicSettings = async () => {
   if (!result.payment_gateways) {
     result.payment_gateways = getDefaultPaymentGateways();
   }
+
+  if (!result.multi_currencies) {
+    const def = DEFAULT_SETTINGS.find((s) => s.key === 'multi_currencies');
+    if (def) result.multi_currencies = def.value;
+  }
+
+  result.payment_gateways = (result.payment_gateways || []).map((g) => ({
+    id: g.id,
+    type: g.type,
+    enabled: g.enabled,
+    currencies: g.currencies || [],
+    displayLabel: g.displayLabel,
+    sortOrder: g.sortOrder,
+  }));
 
   // Sync branding colors to legacy keys for storefront
   if (result.primary_color) {
