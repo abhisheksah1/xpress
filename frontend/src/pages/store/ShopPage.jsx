@@ -3,6 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
+];
+
 export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
@@ -13,6 +20,7 @@ export default function ShopPage() {
 
   const category = searchParams.get('category') || '';
   const page = Number(searchParams.get('page') || 1);
+  const sort = searchParams.get('sort') || 'newest';
 
   useEffect(() => {
     storeApi.getCategories().then((res) => setCategories(res.data.data));
@@ -20,20 +28,29 @@ export default function ShopPage() {
 
   useEffect(() => {
     setLoading(true);
-    const params = { page, limit: 20 };
+    const params = { page, limit: 20, sort };
     if (category) params.category = category;
     if (search) params.search = search;
     storeApi.getProducts(params).then((res) => {
       setProducts(res.data.data.products);
       setPagination(res.data.data.pagination);
     }).finally(() => setLoading(false));
-  }, [category, page, search]);
+  }, [category, page, search, sort]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     const next = new URLSearchParams(searchParams);
     if (search) next.set('search', search);
     else next.delete('search');
+    next.delete('page');
+    setSearchParams(next);
+  };
+
+  const handleSortChange = (e) => {
+    const next = new URLSearchParams(searchParams);
+    const value = e.target.value;
+    if (value && value !== 'newest') next.set('sort', value);
+    else next.delete('sort');
     next.delete('page');
     setSearchParams(next);
   };
@@ -63,14 +80,31 @@ export default function ShopPage() {
         </aside>
 
         <div className="flex-1">
-          <form onSubmit={handleSearch} className="mb-6">
-            <input
-              className="input-field max-w-md"
-              placeholder="Search gifts..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </form>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+            <form onSubmit={handleSearch} className="flex-1 min-w-0">
+              <input
+                className="input-field w-full sm:max-w-md"
+                placeholder="Search gifts..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </form>
+            <div className="flex items-center gap-2 shrink-0">
+              <label htmlFor="shop-sort" className="text-sm text-gray-500 whitespace-nowrap">
+                Sort by
+              </label>
+              <select
+                id="shop-sort"
+                className="input-field text-sm py-2 min-w-[11rem]"
+                value={sort}
+                onChange={handleSortChange}
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
           {loading ? (
             <p className="text-gray-400">Loading products...</p>

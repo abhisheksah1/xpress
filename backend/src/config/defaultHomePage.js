@@ -28,7 +28,7 @@ export const DEFAULT_HOME_PAGE = {
         cutoffTime: '17:00',
         timezone: 'Asia/Kathmandu',
         titleSameDay: 'Need delivery today in Kathmandu Valley?',
-        titleNextDay: 'Next-day delivery — order now for tomorrow',
+        titleNextDay: 'Need delivery Tomorrow in Kathmandu Valley?',
         headingBefore: 'Order closing in...',
         headingAfter: 'Same-day delivery opens in...',
       },

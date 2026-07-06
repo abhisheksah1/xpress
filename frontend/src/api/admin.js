@@ -8,8 +8,10 @@ export const adminApi = {
   createProduct: (data) => api.post('/admin/products', data),
   updateProduct: (id, data) => api.patch(`/admin/products/${id}`, data),
   deleteProduct: (id) => api.delete(`/admin/products/${id}`),
+  bulkDeleteProducts: (productIds) => api.post('/admin/products/bulk/delete', { productIds }),
   cloneProduct: (id) => api.post(`/admin/products/${id}/clone`),
-  importProducts: (products) => api.post('/admin/products/import', { products }),
+  importProducts: (payload) => api.post('/admin/products/import', payload),
+  downloadImportTemplate: () => api.get('/admin/products/import/template', { responseType: 'blob' }),
   exportProducts: () => api.get('/admin/products/export', { responseType: 'blob' }),
 
   getCategories: () => api.get('/admin/categories'),
@@ -95,4 +97,17 @@ export const adminApi = {
     return api.post('/admin/upload/batch', form);
   },
   uploadImageUrl: (url, alt) => api.post('/admin/upload', { url, alt }),
+
+  getApiPartners: (params) => api.get('/admin/api-partners', { params }),
+  getApiPartner: (id) => api.get(`/admin/api-partners/${id}`),
+  createApiPartner: (data) => api.post('/admin/api-partners', data),
+  updateApiPartner: (id, data) => api.patch(`/admin/api-partners/${id}`, data),
+  deleteApiPartner: (id) => api.delete(`/admin/api-partners/${id}`),
+  resetApiPartnerCredentials: (id) => api.post(`/admin/api-partners/${id}/reset-credentials`),
+  getApiPartnerLogs: (id, params) => api.get(`/admin/api-partners/${id}/logs`, { params }),
+  downloadApiPartnerDocs: (id) => api.get(`/admin/api-partners/${id}/documentation`, { responseType: 'blob' }),
+
+  getPartnerExplorerReport: (params) => api.get('/admin/api-partners/reports/explorer', { params }),
+  exportPartnerReportCsv: (params) =>
+    api.get('/admin/api-partners/reports/export', { params, responseType: 'blob' }),
 };

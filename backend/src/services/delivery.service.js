@@ -77,7 +77,10 @@ export const getGroupProducts = async (groupId) => {
 
   const filter = { $or: [] };
   if (group.products?.length) filter.$or.push({ _id: { $in: group.products } });
-  if (group.categories?.length) filter.$or.push({ category: { $in: group.categories } });
+  if (group.categories?.length) {
+    filter.$or.push({ category: { $in: group.categories } });
+    filter.$or.push({ categories: { $in: group.categories } });
+  }
 
   if (!filter.$or.length) return [];
 
@@ -93,7 +96,10 @@ export const countProductsInGroup = async (group) => {
 
   const filter = { $or: [], isActive: true };
   if (g.products?.length) filter.$or.push({ _id: { $in: g.products } });
-  if (g.categories?.length) filter.$or.push({ category: { $in: g.categories } });
+  if (g.categories?.length) {
+    filter.$or.push({ category: { $in: g.categories } });
+    filter.$or.push({ categories: { $in: g.categories } });
+  }
 
   if (!filter.$or.length) return 0;
   return Product.countDocuments(filter);
@@ -107,6 +113,9 @@ export const productMatchesGroup = (product, category, group) => {
 
   if ((group.products || []).some((p) => idStr(p._id || p) === productId)) return true;
   if ((group.categories || []).some((c) => idStr(c._id || c) === categoryId)) return true;
+
+  const extraCategoryIds = (product.categories || []).map((c) => idStr(c._id || c));
+  if ((group.categories || []).some((gc) => extraCategoryIds.includes(idStr(gc._id || gc)))) return true;
 
   const productRule = findRule(product.deliveryGroupRules, group._id);
   if (product.deliveryScope === 'selected' && productRule?.available) return true;

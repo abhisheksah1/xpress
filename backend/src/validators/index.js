@@ -418,3 +418,101 @@ export const fetchGoogleReviewsSchema = z.object({
     placeId: z.string().min(5).max(200),
   }),
 });
+
+const partnerItemSchema = z.object({
+  productId: z.string(),
+  quantity: z.number().min(1),
+  unitPrice: z.number().min(0).optional(),
+  variantId: z.string().optional(),
+  giftMessage: z.string().optional(),
+});
+
+const partnerSenderSchema = z.object({
+  fullName: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().min(6),
+  countryCode: z.string().optional(),
+});
+
+const partnerReceiverSchema = z.object({
+  fullName: z.string().min(1),
+  phone: z.string().min(6),
+  countryCode: z.string().optional(),
+  address: z.string().min(3),
+});
+
+const partnerOrderBodyBase = z.object({
+  items: z.array(partnerItemSchema).min(1),
+  sender: partnerSenderSchema,
+  receiver: partnerReceiverSchema,
+  deliveryLocationId: z.string(),
+  deliveryDate: z.union([z.string(), z.date()]).optional(),
+  preferredDeliveryDate: z.union([z.string(), z.date()]).optional(),
+  timeSlotId: z.string().optional(),
+  giftMessage: z.string().optional(),
+  occasion: z.string().optional(),
+  notes: z.string().optional(),
+  specialInstructions: z.string().optional(),
+  serviceAddonIds: z.array(z.string()).optional(),
+  externalReference: z.string().optional(),
+  partnerOrderRef: z.string().optional(),
+});
+
+export const partnerQuoteSchema = z.object({
+  body: partnerOrderBodyBase,
+});
+
+export const partnerCreateOrderSchema = z.object({
+  body: partnerOrderBodyBase.extend({
+    expectedTotal: z.number().min(0).optional(),
+  }),
+});
+
+export const partnerPaymentConfirmSchema = z.object({
+  body: z.object({
+    receiverName: z.string().min(1),
+    receiverMobile: z.string().min(6),
+    expectedTotal: z.number().min(0).optional(),
+    transactionReference: z.string().optional(),
+    transactionId: z.string().optional(),
+  }),
+});
+
+const partnerOrderFieldSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  enabled: z.boolean(),
+  required: z.boolean(),
+});
+
+export const createApiPartnerSchema = z.object({
+  body: z.object({
+    integrationName: z.string().min(2).max(120),
+    companyName: z.string().optional(),
+    contactPerson: z.string().optional(),
+    email: z.string().email().optional(),
+    status: z.enum(['active', 'disabled']).optional(),
+    allowAllProducts: z.boolean().optional(),
+    allowedProducts: z.array(z.string()).optional(),
+    allowedDeliveryLocations: z.array(z.string()).optional(),
+    orderFields: z.array(partnerOrderFieldSchema).optional(),
+    ipWhitelist: z.array(z.string()).optional(),
+    rateLimitPerMinute: z.number().min(10).max(1000).optional(),
+  }),
+});
+
+export const updateApiPartnerSchema = z.object({
+  body: z.object({
+    integrationName: z.string().min(2).max(120).optional(),
+    companyName: z.string().optional(),
+    contactPerson: z.string().optional(),
+    email: z.string().email().optional(),
+    status: z.enum(['active', 'disabled']).optional(),
+    allowAllProducts: z.boolean().optional(),
+    allowedProducts: z.array(z.string()).optional(),
+    allowedDeliveryLocations: z.array(z.string()).optional(),
+    orderFields: z.array(partnerOrderFieldSchema).optional(),
+    ipWhitelist: z.array(z.string()).optional(),
+    rateLimitPerMinute: z.number().min(10).max(1000).optional(),
+  }),
+});

@@ -78,6 +78,13 @@ const config = {
     allowedImageTypes: (process.env.ALLOWED_IMAGE_TYPES || 'image/jpeg,image/png,image/webp,image/gif').split(','),
   },
 
+  rateLimit: {
+    enabled: process.env.RATE_LIMIT_ENABLED !== 'false' && process.env.NODE_ENV !== 'development',
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 500,
+    authMax: parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 30,
+  },
+
   google: {
     placesApiKey: process.env.GOOGLE_PLACES_API_KEY || '',
   },

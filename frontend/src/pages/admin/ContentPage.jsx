@@ -602,8 +602,8 @@ export default function ContentPage() {
                   {(block.type === 'delivery_countdown') && (
                     <div className="space-y-3 rounded-xl border border-rose-100 bg-rose-50/30 p-4">
                       <p className="text-xs text-rose-800">
-                        <strong>Delivery cycle:</strong> From midnight until cut-off → same-day delivery (countdown to cut-off).
-                        After cut-off until midnight → next-day delivery (countdown to midnight when same-day reopens).
+                        <strong>Delivery cycle:</strong> From midnight NST until cut-off → &quot;today&quot; title and countdown to cut-off.
+                        After cut-off until midnight NST → title switches to &quot;Tomorrow&quot; (auto from same-day title if next-day title is blank).
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -639,8 +639,9 @@ export default function ContentPage() {
                             className="input-field"
                             value={block.settings?.titleNextDay || ''}
                             onChange={(e) => updateBlockSetting(i, 'titleNextDay', e.target.value)}
-                            placeholder="Next-day delivery — order now for tomorrow"
+                            placeholder="Need delivery Tomorrow in Kathmandu Valley?"
                           />
+                          <p className="text-xs text-gray-400 mt-1">Leave blank to auto-change &quot;today&quot; to &quot;Tomorrow&quot; in the same-day title after cut-off.</p>
                         </div>
                         <div>
                           <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Countdown label (same-day)</label>

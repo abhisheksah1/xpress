@@ -28,6 +28,8 @@ import CouponsPage from './pages/admin/CouponsPage';
 import AdminRemindersPage from './pages/admin/RemindersPage';
 import CustomersPage from './pages/admin/CustomersPage';
 import RemindersPage from './pages/store/RemindersPage';
+import ApiPartnersPage from './pages/admin/ApiPartnersPage';
+import PartnerReportsPage from './pages/admin/PartnerReportsPage';
 
 export default function App() {
   return (
@@ -71,6 +73,8 @@ export default function App() {
         <Route path="customers" element={<CustomersPage />} />
         <Route path="reminders" element={<AdminRemindersPage />} />
         <Route path="delivery" element={<DeliveryGroupsPage />} />
+        <Route path="api-partners" element={<ApiPartnersPage />} />
+        <Route path="api-partners/reports" element={<PartnerReportsPage />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>

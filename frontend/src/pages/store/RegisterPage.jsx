@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/client.js';
+import { useAuthStore } from '../../store/authStore.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import {
   COUNTRY_CODES,
@@ -12,7 +13,9 @@ import {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { settings } = useStore();
+  const setUser = useAuthStore((s) => s.setUser);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -48,8 +51,9 @@ export default function RegisterPage() {
     try {
       const { data } = await api.post('/auth/register', form);
       localStorage.setItem('accessToken', data.data.accessToken);
+      if (data.data.user) setUser(data.data.user);
       toast.success('Account created');
-      navigate('/');
+      navigate(location.state?.from || '/');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed');
     } finally {

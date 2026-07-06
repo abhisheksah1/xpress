@@ -15,6 +15,40 @@ import { CheckoutCurrencyToggle, CheckoutPaymentGrid } from '../../components/st
 import { formatTimeSlotOption, formatTimeSlotSummary } from '../../utils/timeSlot.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
+function FormField({ id, label, required, optional, hint, children }) {
+  return (
+    <div>
+      <label htmlFor={id} className="text-xs font-semibold text-slate-600 mb-1.5 block">
+        {label}
+        {required && (
+          <span className="text-rose-600" aria-hidden>
+            {' '}
+            *
+          </span>
+        )}
+        {optional && <span className="font-normal text-slate-400"> (optional)</span>}
+      </label>
+      {children}
+      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+    </div>
+  );
+}
+
+function SummaryMoney({ amount, className = '' }) {
+  return (
+    <span className={`shrink-0 text-right tabular-nums whitespace-nowrap ${className}`}>{amount}</span>
+  );
+}
+
+function SummaryRow({ label, amount, labelClassName = 'text-slate-500', amountClassName = 'font-semibold' }) {
+  return (
+    <div className="flex justify-between items-start gap-3">
+      <span className={`min-w-0 text-xs sm:text-sm ${labelClassName}`}>{label}</span>
+      <SummaryMoney amount={amount} className={`text-xs sm:text-sm ${amountClassName}`} />
+    </div>
+  );
+}
+
 const defaultSender = () => ({
   fullName: '',
   email: '',
@@ -232,8 +266,6 @@ export default function CheckoutPage() {
     };
   }, [quote, itemsSubtotalNpr, addonsSubtotalNpr, deliveryLocationId, selectedDeliveryLocation, coupon, timeSlots, timeSlotId]);
 
-  const deliveryWarnings = totalsNpr.deliveryWarnings || [];
-
   const display = (nprAmount) => convertFromNpr(nprAmount, selectedCurrency);
   const fmt = (nprAmount) => formatMoney(display(nprAmount), selectedCurrency);
 
@@ -305,15 +337,15 @@ export default function CheckoutPage() {
 
   const validateForm = () => {
     if (!sender.fullName.trim()) return 'Sender full name is required';
-    if (!sender.email.trim()) return 'Sender email is required';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender.email.trim())) return 'Enter a valid sender email';
+    if (!sender.email.trim()) return 'Sender email address is required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender.email.trim())) return 'Enter a valid email address';
     if (!sender.phone.trim()) return 'Sender mobile number is required';
-    if (!receiver.fullName.trim()) return 'Receiver name is required';
+    if (!receiver.fullName.trim()) return 'Recipient full name is required';
     const receiverPhoneErr = validatePhoneForCountry(receiver.phone, receiver.countryCode);
     if (receiverPhoneErr) return receiverPhoneErr;
-    if (!deliveryLocationId) return 'Select delivery district / city';
+    if (!deliveryLocationId) return 'Please select a delivery district or city';
     if (!receiver.address.trim()) return 'Delivery address is required';
-    if (!paymentMethod) return 'Select a payment method';
+    if (!paymentMethod) return 'Please select a payment method';
 
     for (const id of selectedAddonIds) {
       const addon = serviceAddons.find((a) => a.id === id);
@@ -396,119 +428,193 @@ export default function CheckoutPage() {
           <p className="text-sm text-slate-500 mt-1">Enter sender & receiver details, choose add-ons and payment.</p>
         </div>
 
+        <div className="mb-6">
+          <CheckoutCurrencyToggle
+            currencies={enabledCurrencies}
+            value={payoutCurrency}
+            selectedCurrency={selectedCurrency}
+            onChange={(code) => {
+              setPayoutCurrency(code);
+              setDisplayCurrencyCode(code);
+            }}
+          />
+        </div>
+
         <div className="grid lg:grid-cols-12 gap-8">
           <div className="lg:col-span-7 space-y-6">
             {/* Sender */}
             <div className="card space-y-4">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Sender details</h2>
-              <input
-                className="input-field"
-                placeholder="Sender full name *"
-                value={sender.fullName}
-                onChange={(e) => setSenderField('fullName', e.target.value)}
-              />
-              <input
-                className="input-field"
-                type="email"
-                placeholder="Sender email id *"
-                value={sender.email}
-                onChange={(e) => setSenderField('email', e.target.value)}
-              />
-              <div className="flex gap-2">
-                <select
-                  className="input-field w-44 sm:w-52 shrink-0 text-sm"
-                  value={sender.countryCode}
-                  onChange={(e) => setSenderField('countryCode', e.target.value)}
-                >
-                  {COUNTRY_CODES.map((c) => (
-                    <option key={`${c.code}-${c.country}`} value={c.code}>{c.label}</option>
-                  ))}
-                </select>
+              <FormField id="sender-full-name" label="Full name" required>
                 <input
-                  className="input-field flex-1"
-                  type="tel"
-                  placeholder="Sender mobile number *"
-                  maxLength={phoneMaxLength(sender.countryCode)}
-                  value={sender.phone}
-                  onChange={(e) => setSenderField('phone', e.target.value.replace(/\D/g, '').slice(0, phoneMaxLength(sender.countryCode)))}
+                  id="sender-full-name"
+                  className="input-field"
+                  autoComplete="name"
+                  placeholder="e.g. John Doe"
+                  value={sender.fullName}
+                  onChange={(e) => setSenderField('fullName', e.target.value)}
                 />
-              </div>
+              </FormField>
+              <FormField id="sender-email" label="Email address" required>
+                <input
+                  id="sender-email"
+                  className="input-field"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="e.g. john@example.com"
+                  value={sender.email}
+                  onChange={(e) => setSenderField('email', e.target.value)}
+                />
+              </FormField>
+              <FormField id="sender-phone" label="Mobile number" required>
+                <div className="flex gap-2">
+                  <select
+                    id="sender-country-code"
+                    className="input-field w-44 sm:w-52 shrink-0 text-sm"
+                    aria-label="Country calling code"
+                    value={sender.countryCode}
+                    onChange={(e) => setSenderField('countryCode', e.target.value)}
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={`${c.code}-${c.country}`} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    id="sender-phone"
+                    className="input-field flex-1"
+                    type="tel"
+                    autoComplete="tel-national"
+                    placeholder={
+                      sender.countryCode === DEFAULT_COUNTRY_CODE
+                        ? 'e.g. 98XXXXXXXX'
+                        : 'Enter mobile number'
+                    }
+                    maxLength={phoneMaxLength(sender.countryCode)}
+                    value={sender.phone}
+                    onChange={(e) =>
+                      setSenderField(
+                        'phone',
+                        e.target.value.replace(/\D/g, '').slice(0, phoneMaxLength(sender.countryCode))
+                      )
+                    }
+                  />
+                </div>
+              </FormField>
             </div>
 
             {/* Receiver */}
             <div className="card space-y-4">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Receiver details</h2>
-              <input
-                className="input-field"
-                placeholder="Receiver name *"
-                value={receiver.fullName}
-                onChange={(e) => setReceiverField('fullName', e.target.value)}
-              />
-              <div className="flex gap-2">
+              <FormField id="receiver-full-name" label="Recipient full name" required>
+                <input
+                  id="receiver-full-name"
+                  className="input-field"
+                  autoComplete="name"
+                  placeholder="e.g. Jane Doe"
+                  value={receiver.fullName}
+                  onChange={(e) => setReceiverField('fullName', e.target.value)}
+                />
+              </FormField>
+              <FormField id="receiver-phone" label="Contact number" required>
+                <div className="flex gap-2">
+                  <select
+                    id="receiver-country-code"
+                    className="input-field w-44 sm:w-52 shrink-0 text-sm"
+                    aria-label="Country calling code"
+                    value={receiver.countryCode}
+                    onChange={(e) => setReceiverField('countryCode', e.target.value)}
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={`recv-${c.code}-${c.country}`} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    id="receiver-phone"
+                    className="input-field flex-1"
+                    type="tel"
+                    autoComplete="tel-national"
+                    placeholder={
+                      receiver.countryCode === DEFAULT_COUNTRY_CODE
+                        ? '10-digit mobile number'
+                        : 'Enter contact number'
+                    }
+                    maxLength={phoneMaxLength(receiver.countryCode)}
+                    value={receiver.phone}
+                    onChange={(e) =>
+                      setReceiverField(
+                        'phone',
+                        e.target.value.replace(/\D/g, '').slice(0, phoneMaxLength(receiver.countryCode))
+                      )
+                    }
+                  />
+                </div>
+              </FormField>
+              <FormField id="delivery-location" label="Delivery district / city" required>
                 <select
-                  className="input-field w-44 sm:w-52 shrink-0 text-sm"
-                  value={receiver.countryCode}
-                  onChange={(e) => setReceiverField('countryCode', e.target.value)}
+                  id="delivery-location"
+                  className="input-field"
+                  value={deliveryLocationId}
+                  onChange={(e) => setDeliveryLocationId(e.target.value)}
                 >
-                  {COUNTRY_CODES.map((c) => (
-                    <option key={`recv-${c.code}-${c.country}`} value={c.code}>{c.label}</option>
+                  <option value="">Select delivery district or city</option>
+                  {deliveryLocations.map((loc) => (
+                    <option key={loc._id} value={loc._id}>
+                      {loc.name}
+                    </option>
                   ))}
                 </select>
+              </FormField>
+              <FormField id="delivery-address" label="Delivery address" required>
                 <input
-                  className="input-field flex-1"
-                  type="tel"
-                  placeholder={receiver.countryCode === DEFAULT_COUNTRY_CODE ? 'Receiver contact (10 digits) *' : 'Receiver contact number *'}
-                  maxLength={phoneMaxLength(receiver.countryCode)}
-                  value={receiver.phone}
-                  onChange={(e) => setReceiverField('phone', e.target.value.replace(/\D/g, '').slice(0, phoneMaxLength(receiver.countryCode)))}
+                  id="delivery-address"
+                  className="input-field"
+                  autoComplete="street-address"
+                  placeholder="House number, street, area, landmark"
+                  value={receiver.address}
+                  onChange={(e) => setReceiverField('address', e.target.value)}
                 />
-              </div>
-              <select
-                className="input-field"
-                value={deliveryLocationId}
-                onChange={(e) => setDeliveryLocationId(e.target.value)}
-              >
-                <option value="">Delivery district / city *</option>
-                {deliveryLocations.map((loc) => (
-                  <option key={loc._id} value={loc._id}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="input-field"
-                placeholder="Address *"
-                value={receiver.address}
-                onChange={(e) => setReceiverField('address', e.target.value)}
-              />
-              <input
-                className="input-field"
-                placeholder="Note (optional)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
+              </FormField>
+              <FormField id="order-note" label="Order note" optional>
+                <input
+                  id="order-note"
+                  className="input-field"
+                  placeholder="Special instructions for delivery"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </FormField>
               <div className="grid sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 mb-1 block">Preferred delivery date</label>
+                <FormField id="preferred-date" label="Preferred delivery date" optional>
                   <input
+                    id="preferred-date"
                     type="date"
                     className="input-field"
                     min={minDeliveryDate}
                     value={preferredDate}
                     onChange={(e) => setPreferredDate(e.target.value)}
                   />
-                </div>
+                </FormField>
                 {timeSlots.length > 0 && (
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold text-slate-500 mb-1 block">Preferred time slot (optional)</label>
-                    <select className="input-field" value={timeSlotId} onChange={(e) => setTimeSlotId(e.target.value)}>
-                      <option value="">Any Time on Selected Date</option>
-                      {timeSlots.map((slot) => (
-                        <option key={slot.id} value={slot.id}>
-                          {formatTimeSlotOption(slot, (npr) => fmt(npr))}
-                        </option>
-                      ))}
-                    </select>
+                    <FormField id="time-slot" label="Preferred time slot" optional>
+                      <select
+                        id="time-slot"
+                        className="input-field"
+                        value={timeSlotId}
+                        onChange={(e) => setTimeSlotId(e.target.value)}
+                      >
+                        <option value="">Any time on selected date</option>
+                        {timeSlots.map((slot) => (
+                          <option key={slot.id} value={slot.id}>
+                            {formatTimeSlotOption(slot, (npr) => fmt(npr))}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
                     {timeSlotId && (
                       <p className="text-xs text-slate-500 mt-1.5">
                         {(() => {
@@ -562,23 +668,26 @@ export default function CheckoutPage() {
                         {selected && (showText || showPhoto) && (
                           <div className="mt-3 pt-3 border-t border-gray-100 space-y-3 pl-7">
                             {showText && (
-                              <div>
-                                <label className="text-xs font-semibold text-slate-500 mb-1 block">
-                                  {addon.inputType === 'both' ? 'Text details *' : 'Text *'}
-                                </label>
+                              <FormField
+                                id={`addon-text-${addon.id}`}
+                                label={addon.inputType === 'both' ? 'Add-on text details' : 'Add-on text'}
+                                required
+                              >
                                 <input
+                                  id={`addon-text-${addon.id}`}
                                   className="input-field"
-                                  placeholder="Enter details for this add-on"
+                                  placeholder={`Enter details for ${addon.name}`}
                                   value={input.text || ''}
                                   onChange={(e) => setAddonInput(addon.id, 'text', e.target.value)}
                                 />
-                              </div>
+                              </FormField>
                             )}
                             {showPhoto && (
-                              <div>
-                                <label className="text-xs font-semibold text-slate-500 mb-1 block">
-                                  {addon.inputType === 'both' ? 'Upload photo *' : 'Photo *'}
-                                </label>
+                              <FormField
+                                id={`addon-photo-${addon.id}`}
+                                label={addon.inputType === 'both' ? 'Add-on photo' : 'Upload photo'}
+                                required
+                              >
                                 <div className="flex flex-wrap items-center gap-3">
                                   <label className="inline-flex items-center px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors">
                                     {addonUploading[addon.id] ? 'Uploading...' : input.photoUrl ? 'Change photo' : 'Choose photo'}
@@ -613,7 +722,7 @@ export default function CheckoutPage() {
                                     <p className="text-xs text-emerald-600 mt-1">Photo ready</p>
                                   </div>
                                 )}
-                              </div>
+                              </FormField>
                             )}
                           </div>
                         )}
@@ -624,16 +733,8 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Display currency & payment — reference layout */}
+            {/* Payment methods */}
             <div className="space-y-4">
-              <CheckoutCurrencyToggle
-                currencies={enabledCurrencies}
-                value={payoutCurrency}
-                onChange={(code) => {
-                  setPayoutCurrency(code);
-                  setDisplayCurrencyCode(code);
-                }}
-              />
               <CheckoutPaymentGrid
                 gateways={gateways}
                 value={paymentMethod}
@@ -648,21 +749,28 @@ export default function CheckoutPage() {
           {/* Summary */}
           <div className="lg:col-span-5 space-y-6">
             <div className="card space-y-4 lg:sticky lg:top-6">
-              <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Payment summary</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Payment summary</h2>
+                {selectedCurrency && (
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] sm:text-xs font-bold text-slate-700">
+                    {selectedCurrency.code}
+                  </span>
+                )}
+              </div>
 
               <div className="space-y-3 max-h-48 overflow-y-auto">
                 {items.map((i) => (
-                  <div key={i.cartItemId} className="flex gap-3">
+                  <div key={i.cartItemId} className="flex gap-2 sm:gap-3">
                     {i.image ? (
-                      <img src={i.image} alt="" className="w-12 h-12 rounded-lg object-cover border border-gray-100" />
+                      <img src={i.image} alt="" className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-100 shrink-0" />
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-gray-100" />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 shrink-0" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-900 truncate">{i.name}</p>
-                      <p className="text-xs text-slate-500">Qty: {i.quantity}</p>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-900 line-clamp-2">{i.name}</p>
+                      <p className="text-[11px] sm:text-xs text-slate-500">Qty: {i.quantity}</p>
                     </div>
-                    <p className="text-sm font-bold text-slate-900 shrink-0">{fmt(i.price * i.quantity)}</p>
+                    <SummaryMoney amount={fmt(i.price * i.quantity)} className="text-xs sm:text-sm font-bold text-slate-900" />
                   </div>
                 ))}
               </div>
@@ -673,9 +781,9 @@ export default function CheckoutPage() {
                     const addon = serviceAddons.find((a) => a.id === id);
                     if (!addon) return null;
                     return (
-                      <div key={id} className="flex justify-between text-sm">
-                        <span className="text-slate-500">{addon.name}</span>
-                        <span className="font-semibold">{fmt(addon.price)}</span>
+                      <div key={id} className="flex justify-between items-start gap-3 text-xs sm:text-sm">
+                        <span className="text-slate-500 min-w-0 truncate">{addon.name}</span>
+                        <SummaryMoney amount={fmt(addon.price)} className="font-semibold" />
                       </div>
                     );
                   })}
@@ -683,18 +791,20 @@ export default function CheckoutPage() {
               )}
 
               <form onSubmit={applyCoupon} className="pt-3 border-t border-gray-100 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Apply discount coupon</label>
-                <div className="flex gap-2">
-                  <input
-                    className="input-field uppercase flex-1"
-                    placeholder="Coupon code"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  />
-                  <button type="submit" className="btn-secondary shrink-0" disabled={couponApplying}>
-                    {couponApplying ? '...' : 'Apply'}
-                  </button>
-                </div>
+                <FormField id="coupon-code" label="Coupon code">
+                  <div className="flex gap-2">
+                    <input
+                      id="coupon-code"
+                      className="input-field uppercase flex-1"
+                      placeholder="Enter coupon code"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    />
+                    <button type="submit" className="btn-secondary shrink-0" disabled={couponApplying}>
+                      {couponApplying ? '...' : 'Apply'}
+                    </button>
+                  </div>
+                </FormField>
                 {(quote?.coupon?.code || coupon?.coupon?.code) && (
                   <div className="flex items-center justify-between text-xs bg-green-50 border border-green-100 rounded-lg px-3 py-2">
                     <span className="text-green-700 font-medium">{quote?.coupon?.code || coupon?.coupon?.code} applied</span>
@@ -703,57 +813,48 @@ export default function CheckoutPage() {
                 )}
               </form>
 
-              <div className="pt-3 border-t border-gray-100 space-y-1.5 text-sm">
+              <div className="pt-3 border-t border-gray-100 space-y-1.5">
                 {quoteLoading && <p className="text-xs text-slate-400">Updating totals...</p>}
-                {deliveryWarnings.length > 0 && (
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-900 space-y-1 mb-2">
-                    {deliveryWarnings.map((w) => (
-                      <p key={w}>{w}</p>
-                    ))}
-                    <p className="font-medium">You can still proceed — we will confirm delivery details with you.</p>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Subtotal</span>
-                  <span className="font-semibold">{fmt(totalsNpr.subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Base delivery</span>
-                  <span className="font-semibold">
-                    {deliveryLocationId ? fmt(totalsNpr.baseDeliveryFee) : '—'}
-                  </span>
-                </div>
+                <SummaryRow label="Subtotal" amount={fmt(totalsNpr.subtotal)} />
+                <SummaryRow
+                  label="Base delivery"
+                  amount={deliveryLocationId ? fmt(totalsNpr.baseDeliveryFee) : '—'}
+                />
                 {deliveryLocationId && totalsNpr.timeSlot?.id && (
-                  <div className="flex justify-between text-xs text-slate-500">
-                    <span className="max-w-[70%]">
+                  <div className="flex justify-between items-start gap-3 text-[11px] sm:text-xs text-slate-500">
+                    <span className="min-w-0 max-w-[65%] sm:max-w-[70%] leading-snug">
                       Time slot — {formatTimeSlotSummary(
                         timeSlots.find((s) => s.id === totalsNpr.timeSlot.id) || totalsNpr.timeSlot,
                         (npr) => fmt(npr)
                       )}
                     </span>
-                    <span className="font-semibold">
-                      {Number(totalsNpr.slotFee || 0) > 0 ? fmt(totalsNpr.slotFee) : 'No extra fee'}
-                    </span>
+                    <SummaryMoney
+                      amount={Number(totalsNpr.slotFee || 0) > 0 ? fmt(totalsNpr.slotFee) : 'No extra fee'}
+                      className="font-semibold"
+                    />
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Total delivery</span>
-                  <span className="font-semibold">
-                    {deliveryLocationId ? fmt(totalsNpr.shippingFee) : '—'}
-                  </span>
-                </div>
+                <SummaryRow
+                  label="Total delivery"
+                  amount={deliveryLocationId ? fmt(totalsNpr.shippingFee) : '—'}
+                />
                 {totalsNpr.discount > 0 && (
-                  <div className="flex justify-between text-emerald-700">
-                    <span>Discount</span>
-                    <span className="font-bold">- {fmt(totalsNpr.discount)}</span>
-                  </div>
+                  <SummaryRow
+                    label="Discount"
+                    amount={`- ${fmt(totalsNpr.discount)}`}
+                    labelClassName="text-emerald-700"
+                    amountClassName="font-bold text-emerald-700"
+                  />
                 )}
-                <div className="flex justify-between pt-2 text-lg font-extrabold text-slate-900">
-                  <span>Total</span>
-                  <span>{fmt(totalsNpr.total)}</span>
+                <div className="flex justify-between items-baseline gap-3 pt-2 border-t border-gray-100">
+                  <span className="text-base sm:text-lg font-extrabold text-slate-900">Total</span>
+                  <SummaryMoney
+                    amount={fmt(totalsNpr.total)}
+                    className="text-base sm:text-xl font-extrabold text-slate-900"
+                  />
                 </div>
                 {showNprDisclaimer && (
-                  <p className="text-xs text-slate-500 pt-1">
+                  <p className="text-[11px] sm:text-xs text-slate-500 pt-1 leading-relaxed">
                     NPR equivalent: Rs. {Number(totalsNpr.total).toLocaleString('en-NP')}
                   </p>
                 )}

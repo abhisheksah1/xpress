@@ -12,3 +12,5 @@ export { default as Navbar } from './Navbar.model.js';
 export { default as Settings } from './Settings.model.js';
 export { default as Coupon } from './Coupon.model.js';
 export { default as Reminder } from './Reminder.model.js';
+export { default as ApiPartner } from './ApiPartner.model.js';
+export { default as ApiPartnerLog } from './ApiPartnerLog.model.js';

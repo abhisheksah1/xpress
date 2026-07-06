@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { storeApi } from '../../api/store.js';
+import { useAuthStore } from '../../store/authStore.js';
 
 const empty = () => ({
   title: '',
@@ -11,6 +13,41 @@ const empty = () => ({
   notes: '',
   isActive: true,
 });
+
+function RemindersLoginPrompt({ staffSignedIn = false }) {
+  if (staffSignedIn) {
+    return (
+      <div className="card text-center py-10 px-5 sm:px-8">
+        <h2 className="text-lg font-bold text-slate-900 mb-2">Customer account required</h2>
+        <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto leading-relaxed">
+          Special date reminders are saved under registered customer accounts so our team can contact
+          them. Please sign in with a customer account to add your own reminders.
+        </p>
+        <Link to="/" className="btn-primary inline-block">
+          Continue shopping
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card text-center py-10 px-5 sm:px-8">
+      <h2 className="text-lg font-bold text-slate-900 mb-2">Sign in to save reminders</h2>
+      <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto leading-relaxed">
+        Special date reminders are available for registered customers only. Please log in or create
+        an account so our team can remind you before birthdays, anniversaries, and other important dates.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <Link to="/login" state={{ from: '/reminders' }} className="btn-primary">
+          Log in
+        </Link>
+        <Link to="/register" state={{ from: '/reminders' }} className="btn-secondary">
+          Register
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function ReminderModal({ open, initial, onClose, onSave, saving }) {
   const [form, setForm] = useState(empty());
@@ -97,28 +134,82 @@ function ReminderModal({ open, initial, onClose, onSave, saving }) {
 }
 
 export default function RemindersPage() {
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const fetchProfile = useAuthStore((s) => s.fetchProfile);
+
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [modal, setModal] = useState({ open: false, reminder: null });
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const { data } = await storeApi.getMyReminders();
-      setReminders(data.data || []);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load reminders');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const hasToken = Boolean(localStorage.getItem('accessToken'));
+  const isCustomer = user?.role === 'customer';
 
   useEffect(() => {
-    load();
-  }, []);
+    let cancelled = false;
+
+    const init = async () => {
+      if (!hasToken) {
+        setCheckingAuth(false);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const profile = user || (await fetchProfile());
+        if (cancelled) return;
+        if (profile?.role !== 'customer') {
+          setCheckingAuth(false);
+          setLoading(false);
+          return;
+        }
+        setCheckingAuth(false);
+        const { data } = await storeApi.getMyReminders();
+        if (!cancelled) setReminders(data.data || []);
+      } catch {
+        if (!cancelled) {
+          localStorage.removeItem('accessToken');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    init();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasToken, user, fetchProfile]);
+
+  const requireCustomer = () => {
+    toast.error('Please log in or register to save reminders');
+    navigate('/login', { state: { from: '/reminders' } });
+  };
+
+  const openAddModal = () => {
+    if (!isCustomer) {
+      requireCustomer();
+      return;
+    }
+    setModal({ open: true, reminder: null });
+  };
+
+  const openEditModal = (reminder) => {
+    if (!isCustomer) {
+      requireCustomer();
+      return;
+    }
+    setModal({ open: true, reminder });
+  };
 
   const save = async (payload) => {
+    if (!isCustomer) {
+      requireCustomer();
+      return;
+    }
+
     setSaving(true);
     try {
       if (modal.reminder?._id) {
@@ -129,39 +220,58 @@ export default function RemindersPage() {
         toast.success('Reminder saved');
       }
       setModal({ open: false, reminder: null });
-      load();
+      const { data } = await storeApi.getMyReminders();
+      setReminders(data.data || []);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save reminder');
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        requireCustomer();
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to save reminder');
+      }
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (id) => {
+    if (!isCustomer) {
+      requireCustomer();
+      return;
+    }
     if (!window.confirm('Delete this reminder?')) return;
     try {
       await storeApi.deleteReminder(id);
       toast.success('Reminder deleted');
-      load();
+      const { data } = await storeApi.getMyReminders();
+      setReminders(data.data || []);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete reminder');
     }
   };
+
+  const showLoginPrompt = !hasToken || !isCustomer;
+  const staffSignedIn = hasToken && user && user.role !== 'customer';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Special Date Reminders</h1>
-          <p className="text-sm text-gray-500 mt-1">Save upcoming dates and we’ll remind you before the day.</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Save upcoming dates and we&apos;ll remind you before the day.
+          </p>
         </div>
-        <button className="btn-primary" type="button" onClick={() => setModal({ open: true, reminder: null })}>
-          + Add date
-        </button>
+        {isCustomer && (
+          <button className="btn-primary shrink-0" type="button" onClick={openAddModal}>
+            + Add date
+          </button>
+        )}
       </div>
 
-      {loading ? (
+      {checkingAuth || loading ? (
         <p className="text-gray-400">Loading...</p>
+      ) : showLoginPrompt ? (
+        <RemindersLoginPrompt staffSignedIn={staffSignedIn} />
       ) : reminders.length === 0 ? (
         <div className="card text-gray-600">
           No reminders yet. Add birthdays, anniversaries, and special occasions.
@@ -175,17 +285,21 @@ export default function RemindersPage() {
                   {r.title || (r.relation ? `${r.relation} occasion` : 'Special date')}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Date: {new Date(r.occasionDate).toLocaleDateString()} {r.recipientName ? `· Recipient: ${r.recipientName}` : ''} {r.relation ? `· Relation: ${r.relation}` : ''}
+                  Date: {new Date(r.occasionDate).toLocaleDateString()}{' '}
+                  {r.recipientName ? `· Recipient: ${r.recipientName}` : ''}{' '}
+                  {r.relation ? `· Relation: ${r.relation}` : ''}
                 </p>
                 {r.deliveryLocationText && (
                   <p className="text-xs text-gray-400 mt-1 truncate">Delivery note: {r.deliveryLocationText}</p>
                 )}
                 {r.lastSentAt && (
-                  <p className="text-xs text-gray-400 mt-1">Last reminder sent: {new Date(r.lastSentAt).toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Last reminder sent: {new Date(r.lastSentAt).toLocaleString()}
+                  </p>
                 )}
               </div>
               <div className="flex gap-2 shrink-0">
-                <button className="btn-secondary" type="button" onClick={() => setModal({ open: true, reminder: r })}>Edit</button>
+                <button className="btn-secondary" type="button" onClick={() => openEditModal(r)}>Edit</button>
                 <button className="text-red-500 text-sm hover:underline" type="button" onClick={() => remove(r._id)}>Delete</button>
               </div>
             </div>
@@ -193,14 +307,15 @@ export default function RemindersPage() {
         </div>
       )}
 
-      <ReminderModal
-        open={modal.open}
-        initial={modal.reminder}
-        onClose={() => setModal({ open: false, reminder: null })}
-        onSave={save}
-        saving={saving}
-      />
+      {isCustomer && (
+        <ReminderModal
+          open={modal.open}
+          initial={modal.reminder}
+          onClose={() => setModal({ open: false, reminder: null })}
+          onSave={save}
+          saving={saving}
+        />
+      )}
     </div>
   );
 }
-

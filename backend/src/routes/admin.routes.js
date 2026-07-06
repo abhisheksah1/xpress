@@ -17,6 +17,8 @@ import { uploadSingle, uploadMultiple } from '../middlewares/upload.middleware.j
 import * as deliveryController from '../controllers/admin/delivery.controller.js';
 import * as couponController from '../controllers/admin/coupon.controller.js';
 import * as reminderController from '../controllers/admin/reminder.controller.js';
+import * as apiPartnerController from '../controllers/admin/apiPartner.controller.js';
+import * as apiPartnerReportController from '../controllers/admin/apiPartnerReport.controller.js';
 import {
   createProductSchema,
   bulkPriceSchema,
@@ -34,6 +36,8 @@ import {
   createCmsPageSchema,
   updateCmsPageSchema,
   fetchGoogleReviewsSchema,
+  createApiPartnerSchema,
+  updateApiPartnerSchema,
 } from '../validators/index.js';
 
 const router = Router();
@@ -46,14 +50,16 @@ router.get('/dashboard', dashboardController.getDashboard);
 // Products
 router.get('/products/stats', hasPermission('products:read'), productController.getCatalogStats);
 router.get('/products/export', hasPermission('products:read'), productController.exportProducts);
+router.get('/products/import/template', hasPermission('products:read'), productController.importCsvTemplate);
 router.post('/products/import', hasPermission('products:write'), productController.importProducts);
+router.post('/products/bulk/delete', hasPermission('products:write'), productController.bulkDeleteProducts);
+router.patch('/products/bulk/prices', hasPermission('products:write'), validate(bulkPriceSchema), productController.bulkUpdatePrices);
 router.get('/products', hasPermission('products:read'), productController.getProducts);
 router.post('/products', hasPermission('products:write'), validate(createProductSchema), productController.createProduct);
 router.post('/products/:id/clone', hasPermission('products:write'), productController.cloneProduct);
 router.get('/products/:id', hasPermission('products:read'), productController.getProduct);
 router.patch('/products/:id', hasPermission('products:write'), productController.updateProduct);
 router.delete('/products/:id', hasPermission('products:write'), productController.deleteProduct);
-router.patch('/products/bulk/prices', hasPermission('products:write'), validate(bulkPriceSchema), productController.bulkUpdatePrices);
 
 // Categories
 router.get('/categories', productController.getCategories);
@@ -158,5 +164,18 @@ router.post('/settings/sync-nrb-rates', isAdmin, settingsController.syncNrbRates
 router.post('/upload', uploadSingle('image'), uploadController.uploadImage);
 router.post('/upload/batch', uploadMultiple('images', 20), uploadController.uploadImages);
 router.delete('/upload', uploadController.deleteImage);
+
+// API Gateway Partners
+router.get('/api-partners/reports/explorer', isAdmin, apiPartnerReportController.getExplorerReport);
+router.get('/api-partners/reports/export', isAdmin, apiPartnerReportController.exportReportCsv);
+router.get('/api-partners', isAdmin, apiPartnerController.listPartners);
+router.post('/api-partners', isAdmin, validate(createApiPartnerSchema), apiPartnerController.createPartner);
+router.get('/api-partners/:id', isAdmin, apiPartnerController.getPartner);
+router.patch('/api-partners/:id', isAdmin, validate(updateApiPartnerSchema), apiPartnerController.updatePartner);
+router.delete('/api-partners/:id', isAdmin, apiPartnerController.deletePartner);
+router.post('/api-partners/:id/reset-credentials', isAdmin, apiPartnerController.resetCredentials);
+router.get('/api-partners/:id/logs', isAdmin, apiPartnerController.getLogs);
+router.get('/api-partners/:id/documentation', isAdmin, apiPartnerController.downloadDocumentation);
+router.get('/api-partners/:id/documentation/preview', isAdmin, apiPartnerController.previewDocumentation);
 
 export default router;

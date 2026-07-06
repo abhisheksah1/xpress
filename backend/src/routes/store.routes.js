@@ -8,6 +8,8 @@ import * as settingsController from '../controllers/store/settings.controller.js
 import * as storeUploadController from '../controllers/store/upload.controller.js';
 import * as reminderController from '../controllers/store/reminder.controller.js';
 import { authenticate, optionalAuth } from '../middlewares/auth.middleware.js';
+import { authorize } from '../middlewares/role.middleware.js';
+import { ROLES } from '../config/constants.js';
 import { validate } from '../middlewares/validate.middleware.js';
 import { createOrderSchema, validateCouponSchema, createReminderSchema, updateReminderSchema } from '../validators/index.js';
 import { maintenanceGate } from '../middlewares/maintenance.middleware.js';
@@ -45,11 +47,11 @@ router.get('/orders/track', orderController.trackOrder);
 router.get('/orders/my', authenticate, orderController.getMyOrders);
 router.get('/orders/my/:id', authenticate, orderController.getMyOrder);
 
-// Reminders (customer special dates)
-router.get('/reminders/my', authenticate, reminderController.getMyReminders);
-router.post('/reminders', authenticate, validate(createReminderSchema), reminderController.createReminder);
-router.patch('/reminders/:id', authenticate, validate(updateReminderSchema), reminderController.updateReminder);
-router.delete('/reminders/:id', authenticate, reminderController.deleteReminder);
+// Reminders (registered customers only)
+router.get('/reminders/my', authenticate, authorize(ROLES.CUSTOMER), reminderController.getMyReminders);
+router.post('/reminders', authenticate, authorize(ROLES.CUSTOMER), validate(createReminderSchema), reminderController.createReminder);
+router.patch('/reminders/:id', authenticate, authorize(ROLES.CUSTOMER), validate(updateReminderSchema), reminderController.updateReminder);
+router.delete('/reminders/:id', authenticate, authorize(ROLES.CUSTOMER), reminderController.deleteReminder);
 
 // Blog
 router.get('/blogs', blogController.getBlogs);

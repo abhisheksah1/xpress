@@ -4,7 +4,7 @@ import { storeApi } from '../../api/store.js';
 import ProductCard from './ProductCard.jsx';
 import { applyCategoriesGridRules } from '../../utils/categoriesGrid.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
-import { getDeliveryCountdownState, formatCutoffTimeLabel } from '../../utils/deliveryCountdown.js';
+import { getDeliveryCountdownState, formatCutoffTimeLabel, getDeliveryCountdownCopy } from '../../utils/deliveryCountdown.js';
 import { resolveVideoEmbed, getVideoUrlFromBlock } from '../../utils/videoEmbed.js';
 
 function HeroBlock({ block }) {
@@ -519,35 +519,57 @@ function DeliveryCountdownBlock({ block }) {
   );
 
   const isSameDay = state.phase === 'same_day';
-  const mainTitle = isSameDay
-    ? (cfg.titleSameDay || block.title || 'Need delivery today?')
-    : (cfg.titleNextDay || block.title || 'Next-day delivery available');
-  const countdownLabel = isSameDay
-    ? (cfg.headingBefore || 'Order closing in...')
-    : (cfg.headingAfter || 'Same-day delivery opens in...');
-  const deliveryBadge = isSameDay ? 'Same-day delivery' : 'Next-day delivery';
+  const { mainTitle, countdownLabel, deliveryBadge } = getDeliveryCountdownCopy({
+    cfg,
+    block,
+    phase: state.phase,
+  });
   const cutoffNote = cfg.cutoffNote || `Zone Cutoff: ${formatCutoffTimeLabel(cutoff)} Time`;
+  const bgImage = block.image?.url || block.images?.[0]?.url;
 
   return (
     <section className="cms-section-tight">
-      <div className="rounded-xl sm:rounded-2xl border border-rose-100 bg-white p-4 sm:p-6 md:p-10 text-center shadow-sm">
+      <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl border text-center shadow-sm ${
+        bgImage ? 'border-slate-800 min-h-[280px] sm:min-h-[320px]' : 'border-rose-100 bg-white p-4 sm:p-6 md:p-10'
+      }`}>
+        {bgImage && (
+          <>
+            <img
+              src={resolveMediaUrl(bgImage)}
+              alt={block.image?.alt || block.title || ''}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-slate-900/55" />
+          </>
+        )}
+        <div className={`relative z-10 ${bgImage ? 'flex flex-col justify-center min-h-[280px] sm:min-h-[320px] p-5 sm:p-8 md:p-10 text-white' : ''}`}>
         <span className={`inline-block text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 sm:px-3 py-1 rounded-full mb-3 sm:mb-4 ${
-          isSameDay ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'
+          isSameDay
+            ? bgImage ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-700'
+            : bgImage ? 'bg-white/15 text-white/90' : 'bg-slate-100 text-slate-600'
         }`}>
           {deliveryBadge}
         </span>
-        <h2 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-rose-700 mb-2 leading-snug px-1">{mainTitle}</h2>
+        <h2 className={`text-lg sm:text-2xl md:text-3xl font-extrabold mb-2 leading-snug px-1 ${
+          bgImage ? 'text-white' : 'text-rose-700'
+        }`}>{mainTitle}</h2>
         {block.content && (
-          <p className="text-xs sm:text-sm text-slate-500 mb-3 sm:mb-4 max-w-2xl mx-auto whitespace-pre-line px-1">{block.content}</p>
+          <p className={`text-xs sm:text-sm mb-3 sm:mb-4 max-w-2xl mx-auto whitespace-pre-line px-1 ${
+            bgImage ? 'text-white/85' : 'text-slate-500'
+          }`}>{block.content}</p>
         )}
-        <p className="text-sm sm:text-base text-slate-500 font-medium mb-4 sm:mb-6">{countdownLabel}</p>
+        <p className={`text-sm sm:text-base font-medium mb-4 sm:mb-6 ${
+          bgImage ? 'text-white/90' : 'text-slate-500'
+        }`}>{countdownLabel}</p>
         <div className="flex flex-wrap items-stretch justify-center gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 max-w-md sm:max-w-none mx-auto">
           {[
             { label: 'Hours', value: String(state.hours).padStart(2, '0') },
             { label: 'Minutes', value: String(state.mins).padStart(2, '0') },
             { label: 'Seconds', value: String(state.secs).padStart(2, '0') },
           ].map((x) => (
-            <div key={x.label} className="flex-1 sm:flex-none rounded-lg sm:rounded-xl bg-slate-50 border border-slate-200 px-3 sm:px-5 py-3 sm:py-4 text-center min-w-[72px] sm:min-w-[90px] md:min-w-[100px]">
+            <div key={x.label} className={`flex-1 sm:flex-none rounded-lg sm:rounded-xl px-3 sm:px-5 py-3 sm:py-4 text-center min-w-[72px] sm:min-w-[90px] md:min-w-[100px] ${
+              bgImage ? 'bg-white/95 border border-white/30' : 'bg-slate-50 border border-slate-200'
+            }`}>
               <div className="text-2xl sm:text-3xl font-black text-rose-600 tabular-nums">{x.value}</div>
               <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-500 font-bold mt-0.5 sm:mt-1">{x.label}</div>
             </div>
@@ -559,11 +581,14 @@ function DeliveryCountdownBlock({ block }) {
           </Link>
         )}
         {cfg.showCutoffNote !== false && (
-          <p className="text-[10px] sm:text-xs text-slate-400 mt-4 sm:mt-6 flex flex-wrap items-center justify-center gap-1.5 px-2">
+          <p className={`text-[10px] sm:text-xs mt-4 sm:mt-6 flex flex-wrap items-center justify-center gap-1.5 px-2 ${
+            bgImage ? 'text-white/70' : 'text-slate-400'
+          }`}>
             <span aria-hidden>🕐</span>
             <span>{cutoffNote}</span>
           </p>
         )}
+        </div>
       </div>
     </section>
   );

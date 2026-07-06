@@ -1,3 +1,29 @@
+function ScheduleField({ label, value, emphasize }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-0.5">{label}</dt>
+      <dd className={`text-sm leading-snug ${emphasize ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+        {value || '—'}
+      </dd>
+    </div>
+  );
+}
+
+function ScheduleCard({ row }) {
+  return (
+    <article className="rounded-xl border border-amber-200/90 bg-white/90 p-4 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-900 mb-3 pb-2 border-b border-amber-100">
+        {row.groupName}
+      </h3>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <ScheduleField label="Coverage Area" value={row.coverageText} />
+        <ScheduleField label="Estimated Delivery Time" value={row.estimatedTimeLabel} emphasize />
+        <ScheduleField label="Cut-off Time" value={row.cutoffTimeLabel} emphasize />
+      </dl>
+    </article>
+  );
+}
+
 export function ProductPageAlert({ message }) {
   if (!message?.trim()) return null;
   return (
@@ -8,16 +34,16 @@ export function ProductPageAlert({ message }) {
   );
 }
 
-export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Location Tier', compact = false }) {
+export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Location Tier' }) {
   const rows = schedules || [];
   if (!rows.length) return null;
 
   return (
-    <div className="rounded-2xl border-2 border-amber-400 overflow-hidden bg-amber-50 shadow-sm">
-      <div className="bg-amber-400 px-4 py-3 flex items-center justify-between gap-3">
+    <section className="w-full rounded-2xl border-2 border-amber-400 overflow-hidden bg-amber-50 shadow-sm">
+      <div className="bg-amber-400 px-3 sm:px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
         <h2 className="text-xs sm:text-sm font-black uppercase tracking-wide text-slate-900 flex items-center gap-2">
           <span aria-hidden>⚡</span>
-          Product Delivery &amp; Availability Schedule
+          Product Delivery Schedule
         </h2>
         {tierLabel && (
           <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-amber-300 px-2.5 py-1 rounded-full shrink-0">
@@ -26,46 +52,31 @@ export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Lo
         )}
       </div>
 
-      <p className="px-4 py-2 text-[11px] text-slate-700 bg-amber-100/60 border-b border-amber-200 leading-relaxed">
-        This table shows expected delivery windows by area. If your location or timing is not listed as available, you can still place an order — our team will confirm delivery with you.
-      </p>
+      {/* Mobile / tablet cards */}
+      <div className="p-3 sm:p-4 space-y-3 lg:hidden">
+        {rows.map((row) => (
+          <ScheduleCard key={row.groupId} row={row} />
+        ))}
+      </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs sm:text-sm min-w-[720px]">
+      {/* Desktop table */}
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-amber-100/80 text-[10px] uppercase tracking-wider text-slate-700 border-b border-amber-300">
-              <th className="px-3 py-2 font-bold">Delivery Group</th>
-              <th className="px-3 py-2 font-bold">Coverage Area</th>
-              <th className="px-3 py-2 font-bold">Delivery Method</th>
-              <th className="px-3 py-2 font-bold">Estimated Delivery Time</th>
-              <th className="px-3 py-2 font-bold">Cut-off Time</th>
-              {!compact && <th className="px-3 py-2 font-bold">Availability</th>}
+              <th className="px-4 py-2.5 font-bold">Delivery Group</th>
+              <th className="px-4 py-2.5 font-bold">Coverage Area</th>
+              <th className="px-4 py-2.5 font-bold">Estimated Delivery Time</th>
+              <th className="px-4 py-2.5 font-bold">Cut-off Time</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr
-                key={row.groupId}
-                className={`border-b border-amber-200/80 align-top ${row.available ? 'bg-amber-50/50' : 'bg-slate-50/80'}`}
-              >
-                <td className="px-3 py-3 font-bold text-slate-900">{row.groupName}</td>
-                <td className="px-3 py-3 text-slate-700">{row.coverageText || '—'}</td>
-                <td className="px-3 py-3 text-slate-700">{row.deliveryMethodLabel || '—'}</td>
-                <td className="px-3 py-3 font-semibold text-slate-800">{row.estimatedTimeLabel || '—'}</td>
-                <td className="px-3 py-3 font-bold text-slate-900">{row.cutoffTimeLabel || '—'}</td>
-                {!compact && (
-                  <td className="px-3 py-3">
-                    {row.available ? (
-                      <span className="inline-flex text-[10px] font-bold uppercase tracking-wide text-emerald-800 bg-emerald-100 px-2 py-1 rounded-full">
-                        Standard schedule
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-amber-900 leading-snug block max-w-[180px]">
-                        {row.availabilityLabel || 'Manual confirmation — order still accepted'}
-                      </span>
-                    )}
-                  </td>
-                )}
+              <tr key={row.groupId} className="border-b border-amber-200/80 align-top bg-amber-50/40 even:bg-white/60">
+                <td className="px-4 py-3 font-bold text-slate-900">{row.groupName}</td>
+                <td className="px-4 py-3 text-slate-700">{row.coverageText || '—'}</td>
+                <td className="px-4 py-3 font-semibold text-slate-800">{row.estimatedTimeLabel || '—'}</td>
+                <td className="px-4 py-3 font-bold text-slate-900">{row.cutoffTimeLabel || '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -73,11 +84,11 @@ export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Lo
       </div>
 
       {disclaimer?.trim() && (
-        <p className="px-4 py-3 text-[11px] text-slate-600 italic border-t border-amber-200 bg-amber-50/80 leading-relaxed">
+        <p className="px-3 sm:px-4 py-3 text-[11px] sm:text-xs text-slate-600 italic border-t border-amber-200 bg-amber-50/80 leading-relaxed">
           {disclaimer}
         </p>
       )}
-    </div>
+    </section>
   );
 }
 

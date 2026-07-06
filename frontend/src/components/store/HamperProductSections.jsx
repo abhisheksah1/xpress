@@ -4,6 +4,7 @@ import {
   ProductDeliverySchedule,
   ProductWhatsappHelp,
 } from './ProductPageInfo.jsx';
+import ProductRichText from './ProductRichText.jsx';
 
 function SectionHeading({ icon, children }) {
   return (
@@ -19,12 +20,12 @@ export function HamperProductDescription({ product }) {
   if (!text?.trim()) return null;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-4 sm:px-5 py-3 border-b border-slate-100 bg-slate-50/80">
+    <section className="rounded-xl border border-slate-200 bg-white overflow-hidden w-full min-w-0">
+      <div className="px-3 sm:px-5 py-3 border-b border-slate-100 bg-slate-50/80">
         <SectionHeading>Product Description</SectionHeading>
       </div>
-      <div className="px-4 sm:px-5 py-4 text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-        {text}
+      <div className="px-3 sm:px-5 py-3 sm:py-4 min-w-0 overflow-hidden">
+        <ProductRichText content={text} />
       </div>
     </section>
   );
@@ -75,7 +76,9 @@ export function HamperComboIncludes({ comboItems }) {
                       </p>
                     )}
                     {desc && (
-                      <p className="text-xs sm:text-sm text-slate-500 mt-1.5 leading-relaxed">{desc}</p>
+                      <div className="text-xs sm:text-sm mt-1.5">
+                        <ProductRichText content={desc} className="!text-xs sm:!text-sm !text-slate-500" />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -195,20 +198,14 @@ export function HamperProductInfoSections({
   const deliverySchedules = product.deliveryInfo || [];
 
   return (
-    <div className="mt-10 space-y-6 max-w-5xl">
+    <div className="mt-10 space-y-6 w-full min-w-0">
       <HamperProductDescription product={product} />
       <HamperComboIncludes comboItems={comboItems} />
       <HamperComplianceSla message={settings.product_page_alert_message} />
-      {product.deliveryScheduleNote && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {product.deliveryScheduleNote}
-        </div>
-      )}
       <ProductDeliverySchedule
         schedules={deliverySchedules}
         disclaimer={settings.product_delivery_schedule_disclaimer}
         tierLabel={settings.product_delivery_location_tier_label || 'Location Tier'}
-        compact
       />
       <HamperDisclaimer
         terms={settings.product_page_short_terms}

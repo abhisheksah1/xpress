@@ -51,6 +51,31 @@ export function formatCutoffTimeLabel(time, suffix = 'NST') {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}${suffix ? ` ${suffix}` : ''}`;
 }
 
+/** Auto-derive next-day headline from same-day copy (today → Tomorrow). */
+export function deriveNextDayTitle(sameDayTitle) {
+  const base = String(sameDayTitle || 'Need delivery today in Kathmandu Valley?').trim();
+  if (/\btomorrow\b/i.test(base)) return base;
+  if (/\btoday\b/i.test(base)) {
+    return base.replace(/\btoday\b/gi, 'Tomorrow');
+  }
+  return 'Need delivery Tomorrow in Kathmandu Valley?';
+}
+
+export function getDeliveryCountdownCopy({ cfg = {}, block = {}, phase }) {
+  const sameDayTitle = cfg.titleSameDay || block.title || 'Need delivery today in Kathmandu Valley?';
+  const isSameDay = phase === 'same_day';
+
+  return {
+    mainTitle: isSameDay
+      ? sameDayTitle
+      : (cfg.titleNextDay?.trim() || deriveNextDayTitle(sameDayTitle)),
+    countdownLabel: isSameDay
+      ? (cfg.headingBefore || 'Order closing in...')
+      : (cfg.headingAfter || 'Same-day delivery opens in...'),
+    deliveryBadge: isSameDay ? 'Same-day delivery' : 'Next-day delivery',
+  };
+}
+
 /**
  * Delivery countdown cycle:
  * - Midnight → cutoff: same-day window (count down to cutoff)

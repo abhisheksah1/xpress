@@ -3,6 +3,21 @@ import { ApiError } from '../utils/ApiError.js';
 import { normalizePersonalizationFields } from '../utils/personalization.js';
 import * as deliveryService from './delivery.service.js';
 import * as comboService from './combo.service.js';
+import * as productImportService from './productImport.service.js';
+import { productInCategoryFilter } from '../utils/productCategories.js';
+
+const PRODUCT_SORT_MAP = {
+  newest: '-createdAt',
+  oldest: 'createdAt',
+  price_asc: 'price',
+  price_desc: '-price',
+  '-createdAt': '-createdAt',
+  createdAt: 'createdAt',
+  price: 'price',
+  '-price': '-price',
+};
+
+const resolveProductSort = (sort) => PRODUCT_SORT_MAP[sort] || '-createdAt';
 
 const withNormalizedPersonalization = (data) => {
   if (!data?.personalizationFields) return data;
@@ -43,15 +58,18 @@ export const getProducts = async ({
   deliveryGroup,
   excludeId,
   forComboPicker,
-  sort = '-createdAt',
+  sort = 'newest',
 }) => {
+  const sortBy = resolveProductSort(sort);
   const isComboPicker = forComboPicker === 'true' || forComboPicker === true;
   const filter = {};
   if (isActive !== undefined && !isComboPicker) {
     filter.isActive = isActive === 'true' || isActive === true;
   }
   if (isFeatured !== undefined) filter.isFeatured = isFeatured === 'true' || isFeatured === true;
-  if (category) filter.category = category;
+  if (category) {
+    filter.$and = [...(filter.$and || []), productInCategoryFilter(category)];
+  }
   if (minPrice || maxPrice) {
     filter.price = {};
     if (minPrice) filter.price.$gte = Number(minPrice);
@@ -92,7 +110,8 @@ export const getProducts = async ({
   if (deliveryGroup) {
     let products = await Product.find(filter)
       .populate('category', 'name slug deliveryScope deliveryGroupRules')
-      .sort(sort);
+      .populate('categories', 'name slug')
+      .sort(sortBy);
     products = await deliveryService.filterProductsByGroup(products, deliveryGroup);
     const total = products.length;
     const paged = products.slice(skip, skip + limit);
@@ -102,8 +121,9 @@ export const getProducts = async ({
   const [products, total] = await Promise.all([
     Product.find(filter)
       .populate('category', 'name slug deliveryScope deliveryGroupRules')
+      .populate('categories', 'name slug')
       .select(isComboPicker ? 'name slug sku price stock images isHamper isActive' : undefined)
-      .sort(sort)
+      .sort(sortBy)
       .skip(skip)
       .limit(limit),
     Product.countDocuments(filter),
@@ -115,6 +135,7 @@ export const getProducts = async ({
 export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
   const product = await Product.findOne({ slug, isActive: true })
     .populate('category', 'name slug deliveryScope deliveryGroupRules')
+    .populate('categories', 'name slug')
     .populate('comboItems.product', 'name slug price images stock shortDescription description');
   if (!product) throw new ApiError(404, 'Product not found');
 
@@ -148,6 +169,19 @@ export const getProductById = async (id) => {
 export const deleteProduct = async (id) => {
   const product = await Product.findByIdAndDelete(id);
   if (!product) throw new ApiError(404, 'Product not found');
+};
+
+export const bulkDeleteProducts = async (productIds) => {
+  if (!productIds?.length) throw new ApiError(400, 'Product IDs required');
+
+  const ids = [...new Set(productIds.map(String))];
+  const result = await Product.deleteMany({ _id: { $in: ids } });
+
+  return {
+    deleted: result.deletedCount,
+    requested: ids.length,
+    notFound: Math.max(0, ids.length - result.deletedCount),
+  };
 };
 
 export const bulkUpdatePrices = async ({ productIds, type, value }) => {
@@ -218,7 +252,9 @@ export const updateCategory = async (id, data) => {
 };
 
 export const deleteCategory = async (id) => {
-  const count = await Product.countDocuments({ category: id });
+  const count = await Product.countDocuments({
+    $or: [{ category: id }, { categories: id }],
+  });
   if (count > 0) throw new ApiError(400, 'Cannot delete category with products');
   const category = await Category.findByIdAndDelete(id);
   if (!category) throw new ApiError(404, 'Category not found');
@@ -248,35 +284,7 @@ export const cloneProduct = async (id, userId) => {
   });
 };
 
-export const importProducts = async (items, userId) => {
-  if (!items?.length) throw new ApiError(400, 'No products to import');
+export const importProducts = async (items, userId) => productImportService.importProducts(items, userId);
 
-  const results = { created: 0, failed: [] };
-  for (const [index, item] of items.entries()) {
-    try {
-      const category = await Category.findOne({
-        $or: [{ _id: item.category }, { name: new RegExp(`^${item.categoryName}$`, 'i') }],
-      });
-      if (!category) throw new Error(`Category not found: ${item.categoryName || item.category}`);
-
-      await Product.create({
-        name: item.name,
-        sku: item.sku || undefined,
-        description: item.description,
-        shortDescription: item.shortDescription,
-        category: category._id,
-        price: Number(item.price),
-        compareAtPrice: item.compareAtPrice ? Number(item.compareAtPrice) : undefined,
-        stock: item.stock !== undefined ? Number(item.stock) : 0,
-        isActive: item.isActive !== 'false' && item.isActive !== false,
-        tags: item.tags ? String(item.tags).split('|').map((t) => t.trim()) : [],
-        createdBy: userId,
-        updatedBy: userId,
-      });
-      results.created += 1;
-    } catch (err) {
-      results.failed.push({ row: index + 1, name: item.name, error: err.message });
-    }
-  }
-  return results;
-};
+export const importProductsFromCsv = async (csvText, userId) =>
+  productImportService.importProductsFromCsv(csvText, userId);

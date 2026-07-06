@@ -1,6 +1,15 @@
 import * as productService from '../../services/product.service.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+import { PRODUCT_CSV_TEMPLATE_HEADERS } from '../../utils/productCsvMapper.js';
+
+const escapeCsv = (val) => {
+  const str = String(val ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
 
 export const createProduct = asyncHandler(async (req, res) => {
   const product = await productService.createProduct(req.body, req.user._id);
@@ -25,6 +34,11 @@ export const updateProduct = asyncHandler(async (req, res) => {
 export const deleteProduct = asyncHandler(async (req, res) => {
   await productService.deleteProduct(req.params.id);
   res.json(new ApiResponse(200, null, 'Product deleted'));
+});
+
+export const bulkDeleteProducts = asyncHandler(async (req, res) => {
+  const result = await productService.bulkDeleteProducts(req.body.productIds);
+  res.json(new ApiResponse(200, result, `${result.deleted} product(s) deleted`));
 });
 
 export const bulkUpdatePrices = asyncHandler(async (req, res) => {
@@ -63,8 +77,37 @@ export const cloneProduct = asyncHandler(async (req, res) => {
 });
 
 export const importProducts = asyncHandler(async (req, res) => {
-  const result = await productService.importProducts(req.body.products, req.user._id);
+  const result = req.body.csv
+    ? await productService.importProductsFromCsv(req.body.csv, req.user._id)
+    : await productService.importProducts(req.body.products, req.user._id);
   res.json(new ApiResponse(200, result, 'Import completed'));
+});
+
+export const importCsvTemplate = asyncHandler(async (req, res) => {
+  const sample = [
+    'Red Rose Bouquet',
+    '900',
+    '1200',
+    '600',
+    '10',
+    '',
+    'KX-ROSE-001',
+    '2244',
+    'Y',
+    '',
+    '',
+    'M',
+    'red-rose-bouquet',
+    'Active',
+    '',
+    'Red Rose Bouquet, Gift For Wife, Birthday Gifts',
+    'https://cdn.example.com/product.jpg',
+    'Fresh red roses hand-tied bouquet.',
+  ];
+  const csv = [PRODUCT_CSV_TEMPLATE_HEADERS.join(','), sample.map(escapeCsv).join(',')].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="product-import-template.csv"');
+  res.send(csv);
 });
 
 export const exportProducts = asyncHandler(async (req, res) => {
@@ -85,11 +128,3 @@ export const exportProducts = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="products-export.csv"');
   res.send(csv);
 });
-
-const escapeCsv = (val) => {
-  const str = String(val ?? '');
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-};

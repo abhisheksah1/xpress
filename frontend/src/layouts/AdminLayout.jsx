@@ -15,6 +15,8 @@ const navItems = [
   { to: '/admin/customers', label: 'Customers' },
   { to: '/admin/reminders', label: 'Reminders' },
   { to: '/admin/delivery', label: 'Delivery' },
+  { to: '/admin/api-partners', label: 'API Partners' },
+  { to: '/admin/api-partners/reports', label: 'Partner Reports' },
   { to: '/admin/settings', label: 'Settings' },
 ];
 

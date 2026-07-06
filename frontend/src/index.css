@@ -82,4 +82,124 @@
   .cms-page iframe {
     max-width: 100%;
   }
+
+  .product-rich-text-container {
+    @apply min-w-0 w-full max-w-full;
+  }
+
+  /* Product descriptions (HTML from CSV / admin) */
+  .product-rich-text {
+    @apply text-sm sm:text-base text-slate-600 leading-relaxed max-w-full;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .product-rich-text > *:first-child {
+    @apply mt-0;
+  }
+
+  .product-rich-text h1,
+  .product-rich-text h2 {
+    @apply text-lg sm:text-xl font-bold text-slate-900 mt-5 mb-2 leading-snug;
+  }
+
+  .product-rich-text h3,
+  .product-rich-text h4 {
+    @apply text-base font-semibold text-primary-700 mt-4 mb-2;
+  }
+
+  .product-rich-text p {
+    @apply my-2.5;
+  }
+
+  .product-rich-text ul,
+  .product-rich-text ol {
+    @apply my-3 pl-5 space-y-1.5;
+  }
+
+  .product-rich-text ul {
+    @apply list-disc;
+  }
+
+  .product-rich-text ol {
+    @apply list-decimal;
+  }
+
+  .product-rich-text li {
+    @apply leading-relaxed;
+  }
+
+  .product-rich-text a {
+    @apply text-primary-600 font-medium underline underline-offset-2 hover:text-primary-700 break-words;
+  }
+
+  .product-rich-text strong,
+  .product-rich-text b {
+    @apply font-semibold text-slate-800;
+  }
+
+  .product-rich-text em,
+  .product-rich-text i {
+    @apply italic text-slate-700;
+  }
+
+  .product-rich-text img {
+    @apply block max-w-full w-auto h-auto rounded-lg border border-slate-100 my-3 sm:my-4 mx-auto;
+    max-height: min(16rem, 70vw);
+  }
+
+  @media (min-width: 640px) {
+    .product-rich-text img {
+      max-height: 20rem;
+    }
+  }
+
+  .product-rich-text table {
+    @apply my-4 text-xs sm:text-sm border-collapse;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .product-rich-text table tbody,
+  .product-rich-text table thead,
+  .product-rich-text table tfoot {
+    display: table;
+    width: 100%;
+    min-width: 280px;
+  }
+
+  .product-rich-text th,
+  .product-rich-text td {
+    @apply border border-slate-200 px-2 sm:px-3 py-2 text-left align-top;
+  }
+
+  .product-rich-text th {
+    @apply bg-slate-50 font-semibold text-slate-800;
+  }
+
+  .product-rich-text pre {
+    @apply my-3 p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs sm:text-sm overflow-x-auto max-w-full whitespace-pre-wrap;
+  }
+
+  .product-rich-text code {
+    @apply text-xs sm:text-sm break-words;
+  }
+
+  .product-rich-text blockquote {
+    @apply my-4 pl-3 sm:pl-4 border-l-4 border-primary-200 text-slate-700 italic;
+  }
+
+  .product-rich-text iframe,
+  .product-rich-text video {
+    @apply block max-w-full w-full my-4 rounded-lg border border-slate-100;
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+
+  .product-rich-text hr {
+    @apply my-6 border-slate-200;
+  }
 }

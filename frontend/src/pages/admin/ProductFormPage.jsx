@@ -544,13 +544,16 @@ export default function ProductFormPage() {
 
           <section className="card space-y-4">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Descriptions</h2>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              CSV import leaves descriptions blank — add delivery details, HTML content, and notes here. Supports headings, lists, and links.
+            </p>
             <div>
               <FieldLabel>Product Description</FieldLabel>
-              <textarea className="input-field" rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} />
+              <textarea className="input-field font-mono text-sm" rows={4} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Short summary or HTML content for the product page" />
             </div>
             <div>
               <FieldLabel>Product Long Description (SEO Rich Paragraphs)</FieldLabel>
-              <textarea className="input-field" rows={5} value={form.longDescription} onChange={(e) => set('longDescription', e.target.value)} />
+              <textarea className="input-field font-mono text-sm" rows={8} value={form.longDescription} onChange={(e) => set('longDescription', e.target.value)} placeholder="Full HTML description — delivery info, tutorial links, WhatsApp, etc." />
             </div>
             <div>
               <FieldLabel>Additional Note</FieldLabel>

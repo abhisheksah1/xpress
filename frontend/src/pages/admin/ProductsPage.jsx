@@ -171,6 +171,9 @@ export default function ProductsPage() {
     search: '', category: '', stockStatus: '', composition: '', isActive: '',
   });
   const [stockProduct, setStockProduct] = useState(null);
+  const [importResult, setImportResult] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const importRef = useRef(null);
 
   const loadCategories = useCallback(async () => {
@@ -219,6 +222,30 @@ export default function ProductsPage() {
     loadCategories();
   };
 
+  const handleBulkDelete = async () => {
+    if (!selected.length) return;
+    const names = products
+      .filter((p) => selected.includes(p._id))
+      .map((p) => p.name)
+      .slice(0, 5);
+    const preview = names.join(', ');
+    const more = selected.length > 5 ? ` and ${selected.length - 5} more` : '';
+    if (!confirm(`Delete ${selected.length} selected product(s)?\n\n${preview}${more}`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const { data } = await adminApi.bulkDeleteProducts(selected);
+      const { deleted, notFound } = data.data;
+      toast.success(`Deleted ${deleted} product(s)${notFound ? ` (${notFound} not found)` : ''}`);
+      setSelected([]);
+      refresh();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Bulk delete failed');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleDelete = async (product) => {
     if (!confirm(`Delete "${product.name}"?`)) return;
     try {
@@ -254,40 +281,46 @@ export default function ProductsPage() {
     }
   };
 
-  const parseCsv = (text) => {
-    const lines = text.trim().split('\n');
-    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-    return lines.slice(1).map((line) => {
-      const vals = line.match(/(".*?"|[^,]+)/g)?.map((v) => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim()) || [];
-      const row = {};
-      headers.forEach((h, i) => { row[h] = vals[i]; });
-      return {
-        name: row.name,
-        sku: row.sku,
-        categoryName: row.category,
-        price: row.price,
-        stock: row.stock,
-        isActive: row.isactive ?? row.isactive,
-        description: row.description,
-        tags: row.tags,
-      };
-    }).filter((r) => r.name);
+  const handleDownloadTemplate = async () => {
+    try {
+      const { data } = await adminApi.downloadImportTemplate();
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'product-import-template.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download template');
+    }
   };
 
   const handleImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImporting(true);
     try {
-      const text = await file.text();
-      const products = parseCsv(text);
-      const { data } = await adminApi.importProducts(products);
-      const { created, failed } = data.data;
-      toast.success(`Imported ${created} product(s)${failed.length ? `, ${failed.length} failed` : ''}`);
+      const csv = await file.text();
+      const { data } = await adminApi.importProducts({ csv });
+      const result = data.data;
+      setImportResult(result);
+      const parts = [
+        `${result.created} created`,
+        result.updated ? `${result.updated} updated` : null,
+        result.failed?.length ? `${result.failed.length} failed` : null,
+      ].filter(Boolean);
+      toast.success(`Import finished: ${parts.join(', ')}`);
+      if (result.categoriesCreated?.length) {
+        toast.success(`New categories: ${result.categoriesCreated.join(', ')}`, { duration: 5000 });
+      }
       refresh();
-    } catch {
-      toast.error('Import failed');
+      loadCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed');
+    } finally {
+      setImporting(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const toggleSelect = (id) =>
@@ -333,6 +366,11 @@ export default function ProductsPage() {
           </div>
 
           <div className="card mb-4 space-y-3">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              CSV import supports Koseli Xpress export columns: <span className="font-mono">product_name, price, crossed_price, quantity, slug, status, product_category, images</span>, etc.
+              The <span className="font-mono">product_description</span> column is <strong>ignored on import</strong> — add descriptions later in each product&apos;s edit page.
+              Categories in <span className="font-mono">product_category</span> are comma-separated — the product is assigned to <strong>all</strong> of them (e.g. &quot;Red Rose Bouquet, Gift For Wife, Gift For Girlfriend&quot;). Existing categories are reused; missing ones are created automatically.
+            </p>
             <div className="flex flex-wrap gap-3 items-center">
               <input
                 className="input-field flex-1 min-w-[200px]"
@@ -362,14 +400,79 @@ export default function ProductsPage() {
               </select>
             </div>
             <div className="flex flex-wrap gap-2 justify-end">
+              <button onClick={handleDownloadTemplate} className="btn-secondary text-sm">CSV Template</button>
               <button onClick={handleExport} className="btn-secondary text-sm">Export CSV</button>
-              <button onClick={() => importRef.current?.click()} className="btn-secondary text-sm">Import CSV</button>
-              <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
+              <button
+                onClick={() => importRef.current?.click()}
+                disabled={importing}
+                className="btn-secondary text-sm disabled:opacity-50"
+              >
+                {importing ? 'Importing...' : 'Import CSV'}
+              </button>
+              <input ref={importRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
               <button onClick={() => navigate('/admin/products/new')} className="btn-primary text-sm">
                 + Add Product
               </button>
             </div>
           </div>
+
+          {importResult && (
+            <div className="card mb-4 text-sm space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">Last CSV import</p>
+                  <p className="text-gray-500 mt-1">
+                    {importResult.created} created
+                    {importResult.updated ? ` · ${importResult.updated} updated` : ''}
+                    {importResult.failed?.length ? ` · ${importResult.failed.length} failed` : ''}
+                  </p>
+                  {importResult.categoriesCreated?.length > 0 && (
+                    <p className="text-green-700 mt-1">
+                      New categories: {importResult.categoriesCreated.join(', ')}
+                    </p>
+                  )}
+                </div>
+                <button type="button" onClick={() => setImportResult(null)} className="text-gray-400 hover:text-gray-600 text-xs">
+                  Dismiss
+                </button>
+              </div>
+              {importResult.failed?.length > 0 && (
+                <div className="rounded-lg border border-red-100 bg-red-50 p-3 max-h-40 overflow-y-auto">
+                  {importResult.failed.map((item) => (
+                    <p key={`${item.row}-${item.name}`} className="text-red-700 text-xs">
+                      Row {item.row}{item.name ? ` (${item.name})` : ''}: {item.error}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {selected.length > 0 && (
+            <div className="card mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-primary-200 bg-primary-50/50">
+              <p className="text-sm font-medium text-gray-800">
+                {selected.length} product{selected.length === 1 ? '' : 's'} selected
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelected([])}
+                  className="btn-secondary text-sm"
+                  disabled={bulkDeleting}
+                >
+                  Clear selection
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="text-sm font-semibold px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {bulkDeleting ? 'Deleting...' : `Delete selected (${selected.length})`}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="card overflow-hidden p-0">
             <div className="overflow-x-auto">
@@ -404,7 +507,13 @@ export default function ProductsPage() {
                           <p className="text-xs text-gray-400 font-mono">{product.sku}</p>
                           <p className="font-medium text-gray-900">{product.name}</p>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{product.category?.name || '—'}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {[...(product.categories || []), product.category]
+                            .filter(Boolean)
+                            .map((c) => c.name || c)
+                            .filter((name, i, arr) => arr.indexOf(name) === i)
+                            .join(', ') || '—'}
+                        </td>
                         <td className="px-4 py-3 font-medium">{formatPrice(product.price)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">

@@ -162,6 +162,13 @@ const orderSchema = new mongoose.Schema(
       },
     ],
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    apiPartner: { type: mongoose.Schema.Types.ObjectId, ref: 'ApiPartner' },
+    partnerExternalRef: { type: String, trim: true },
+    orderSource: {
+      type: String,
+      enum: ['website', 'api_partner'],
+      default: 'website',
+    },
   },
   { timestamps: true }
 );

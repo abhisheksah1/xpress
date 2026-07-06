@@ -30,12 +30,16 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: { success: false, message: 'Too many requests, please try again later' },
-});
-app.use('/api', limiter);
+if (config.rateLimit.enabled) {
+  const limiter = rateLimit({
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests, please try again later' },
+  });
+  app.use('/api', limiter);
+}
 
 app.use(
   `/api/${config.apiVersion}/uploads`,

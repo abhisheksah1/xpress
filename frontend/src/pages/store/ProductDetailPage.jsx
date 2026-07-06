@@ -20,6 +20,8 @@ import {
   HamperProductInfoSections,
   quickAddToBasket,
 } from '../../components/store/HamperProductSections.jsx';
+import ProductAssociatedCategories from '../../components/store/ProductAssociatedCategories.jsx';
+import ProductRichText from '../../components/store/ProductRichText.jsx';
 
 function buildGallery(product, comboComponents) {
   const base = product?.images?.length
@@ -121,7 +123,6 @@ function BuyPanel({
   hasDiscount,
   discountPct,
   soldOut,
-  lowStock,
   formatPriceNpr,
   selectedOptions,
   setSelectedOptions,
@@ -140,61 +141,33 @@ function BuyPanel({
           <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-1">{product.brand}</p>
         )}
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">{product.name}</h1>
-        {product.category?.name && (
-          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mt-2">
-            Category: {product.category.name}
-          </p>
-        )}
       </div>
 
-      {!isHamper && (product.shortDescription || product.description) && (
-        <p className="text-sm text-slate-600 leading-relaxed">
-          {product.shortDescription || product.description}
-        </p>
-      )}
-
       <div
-        className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+        className={`p-4 rounded-2xl border ${
           isHamper ? 'bg-sky-50 border-sky-100' : 'bg-white border-rose-100'
         }`}
       >
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Price</p>
-          <div className="flex items-baseline flex-wrap gap-2">
-            {displayCompare != null && (
-              <span className="text-sm line-through text-slate-400 font-semibold">
-                {formatPriceNpr(displayCompare)}
-              </span>
-            )}
-            <span className={`text-3xl font-black font-mono ${isHamper ? 'text-rose-600' : 'text-amber-500'}`}>
-              {formatPriceNpr(unitPrice)}
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Price</p>
+        <div className="flex items-baseline flex-wrap gap-2">
+          {displayCompare != null && (
+            <span className="text-sm line-through text-slate-400 font-semibold">
+              {formatPriceNpr(displayCompare)}
             </span>
-            {hasDiscount && (
-              <span className="bg-rose-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">
-                {discountPct}% OFF
-              </span>
-            )}
-          </div>
-          {!isHamper && (
-            <p className="text-[11px] text-slate-400 italic mt-1">(shipping calculated at checkout)</p>
+          )}
+          <span className={`text-3xl font-black font-mono ${isHamper ? 'text-rose-600' : 'text-amber-500'}`}>
+            {formatPriceNpr(unitPrice)}
+          </span>
+          {hasDiscount && (
+            <span className="bg-rose-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">
+              {discountPct}% OFF
+            </span>
           )}
         </div>
-        <span
-          className={`inline-block px-3 py-1 text-[10px] uppercase font-bold tracking-wider rounded-lg border shrink-0 ${
-            soldOut
-              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-              : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-          }`}
-        >
-          {soldOut ? 'Sold Out' : 'Available'}
-        </span>
+        {!isHamper && (
+          <p className="text-[11px] text-slate-400 italic mt-1">(shipping calculated at checkout)</p>
+        )}
       </div>
-
-      {lowStock && (
-        <p className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-          Only {product.stock} left in stock
-        </p>
-      )}
 
       {(product.optionCategories || []).map((cat, index) => {
         const catId = cat._id || `cat-${index}`;
@@ -284,7 +257,7 @@ function BuyPanel({
         </button>
       </div>
 
-      {!isHamper && (
+      {!isHamper && (product.sku || product.standardSize) && (
         <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
           {product.sku && (
             <p>
@@ -294,16 +267,6 @@ function BuyPanel({
           {product.standardSize && (
             <p>
               <span className="font-semibold text-slate-600">Size:</span> {product.standardSize}
-            </p>
-          )}
-          {product.weight != null && (
-            <p>
-              <span className="font-semibold text-slate-600">Weight:</span> {product.weight} kg
-            </p>
-          )}
-          {!soldOut && (
-            <p>
-              <span className="font-semibold text-slate-600">Stock:</span> {product.stock}
             </p>
           )}
         </div>
@@ -384,7 +347,6 @@ export default function ProductDetailPage() {
   const displayCompare = hasDiscount ? comparePrice + optionAdjustment : null;
   const discountPct = hasDiscount ? Math.round(((comparePrice - basePrice) / comparePrice) * 100) : 0;
   const soldOut = (product?.stock ?? 0) <= 0;
-  const lowStock = !soldOut && product?.lowStockThreshold != null && product.stock <= product.lowStockThreshold;
 
   const handleAddToCart = () => {
     if (showPersonalization) {
@@ -467,7 +429,6 @@ export default function ProductDetailPage() {
             hasDiscount={hasDiscount}
             discountPct={discountPct}
             soldOut={soldOut}
-            lowStock={lowStock}
             formatPriceNpr={formatPriceNpr}
             selectedOptions={selectedOptions}
             setSelectedOptions={setSelectedOptions}
@@ -492,9 +453,8 @@ export default function ProductDetailPage() {
           />
         ) : (
           <>
-            <section className="mt-10 space-y-5 max-w-5xl">
+            <section className="mt-10 space-y-5 w-full">
               <ProductPageAlert message={settings.product_page_alert_message} />
-              {product.deliveryScheduleNote && <ProductPageAlert message={product.deliveryScheduleNote} />}
               <ProductDeliverySchedule
                 schedules={deliverySchedules}
                 disclaimer={settings.product_delivery_schedule_disclaimer}
@@ -504,13 +464,13 @@ export default function ProductDetailPage() {
               <ProductShortTerms terms={settings.product_page_short_terms} />
             </section>
 
-            {product.longDescription && (
-              <section className="mt-12 pt-8 border-t border-rose-100/60 max-w-5xl">
-                <h2 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-4">
+            {(product.longDescription || product.description) && (
+              <section className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-rose-100/60 w-full min-w-0">
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-800 mb-3 sm:mb-4">
                   Product details
                 </h2>
-                <div className="p-5 rounded-xl bg-white border border-rose-100 text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                  {product.longDescription}
+                <div className="p-3 sm:p-5 rounded-xl bg-white border border-rose-100 w-full min-w-0 overflow-hidden">
+                  <ProductRichText content={product.longDescription || product.description} />
                 </div>
               </section>
             )}
@@ -527,6 +487,8 @@ export default function ProductDetailPage() {
             )}
           </>
         )}
+
+        <ProductAssociatedCategories product={product} />
 
         <div className="mt-8">
           <Link to="/shop" className="text-sm text-primary-600 hover:underline font-medium">

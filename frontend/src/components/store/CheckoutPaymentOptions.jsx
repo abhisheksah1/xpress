@@ -18,14 +18,47 @@ function PaymentFallbackIcon({ id }) {
   );
 }
 
-export function CheckoutCurrencyToggle({ currencies, value, onChange }) {
+export function CheckoutCurrencyToggle({ currencies, value, onChange, selectedCurrency }) {
   if (!currencies?.length) return null;
 
+  const activeMeta = selectedCurrency || currencies.find((c) => c.code === value);
+  const count = currencies.length;
+
+  const gridClass =
+    count <= 2
+      ? 'grid-cols-2'
+      : count <= 4
+        ? 'grid-cols-2 sm:grid-cols-4'
+        : count <= 6
+          ? 'grid-cols-3 sm:grid-cols-6'
+          : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5';
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <span className="text-sm sm:text-base font-bold text-slate-900">Display Currency</span>
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 w-full">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <p className="text-sm sm:text-base font-bold text-slate-900">Display currency</p>
+          {activeMeta && (
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
+              Prices shown in{' '}
+              <span className="font-semibold text-slate-700">
+                {activeMeta.name || activeMeta.code}
+              </span>
+              {activeMeta.symbol && activeMeta.symbol !== activeMeta.code ? (
+                <span className="text-slate-400"> ({activeMeta.symbol})</span>
+              ) : null}
+            </p>
+          )}
+        </div>
+        {activeMeta && (
+          <span className="inline-flex self-start items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-slate-700 shrink-0">
+            {activeMeta.code}
+          </span>
+        )}
+      </div>
+
       <div
-        className="inline-flex flex-wrap items-center rounded-full border border-slate-900 p-1 gap-0.5"
+        className={`mt-3 grid ${gridClass} gap-1.5 sm:gap-2 w-full`}
         role="radiogroup"
         aria-label="Display currency"
       >
@@ -37,15 +70,25 @@ export function CheckoutCurrencyToggle({ currencies, value, onChange }) {
               type="button"
               role="radio"
               aria-checked={active}
+              aria-label={`${c.name || c.code} (${c.code})`}
               onClick={() => onChange(c.code)}
-              className={`min-w-[3.25rem] px-4 sm:px-5 py-2 rounded-full text-sm font-bold transition-colors ${
+              className={`min-w-0 w-full px-2 py-2.5 sm:py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-colors border ${
                 active
-                  ? 'text-white shadow-sm'
-                  : 'text-slate-900 bg-white hover:bg-slate-50'
+                  ? 'text-white border-transparent shadow-sm'
+                  : 'text-slate-900 bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
               }`}
               style={active ? { backgroundColor: 'var(--brand-primary, #e11d48)' } : undefined}
             >
-              {c.code}
+              <span className="block truncate">{c.code}</span>
+              {c.symbol && c.symbol !== c.code && (
+                <span
+                  className={`block truncate text-[10px] font-medium mt-0.5 ${
+                    active ? 'text-white/90' : 'text-slate-400'
+                  }`}
+                >
+                  {c.symbol}
+                </span>
+              )}
             </button>
           );
         })}
@@ -58,7 +101,7 @@ export function CheckoutPaymentGrid({ gateways, value, onChange }) {
   if (!gateways?.length) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-2">Choose Payment Method</h3>
+        <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-2">Choose payment method</h3>
         <p className="text-sm text-slate-500">No payment options available for the selected currency.</p>
       </div>
     );
@@ -68,7 +111,7 @@ export function CheckoutPaymentGrid({ gateways, value, onChange }) {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
-      <h3 className="text-sm sm:text-base font-bold text-slate-900">Choose Payment Method</h3>
+      <h3 className="text-sm sm:text-base font-bold text-slate-900">Choose payment method</h3>
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {sorted.map((g) => {
           const selected = value === g.id;
