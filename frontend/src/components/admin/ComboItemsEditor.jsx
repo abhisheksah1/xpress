@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminApi } from '../../api/admin.js';
+import { computeComboItemsTotal, formatNprAmount, getComboItemLineTotal, serializeComboItemsForApi } from '../../utils/comboItems.js';
 
 function mergeComboImagesPreview(existingImages, comboItems) {
   const manual = [...existingImages];
@@ -97,7 +98,8 @@ export default function ComboItemsEditor({
         const byId = new Map((data.data?.products || []).map((p) => [String(p._id), p]));
         const refreshed = comboItems.map((item) => ({
           ...item,
-          productData: byId.get(String(item.product)) || item.productData,
+          product: serializeComboItemsForApi([item])[0]?.product || item.product,
+          productData: byId.get(String(item.product?._id || item.product)) || item.productData,
         }));
         hydratedRef.current = true;
         onChange(refreshed);
@@ -108,6 +110,7 @@ export default function ComboItemsEditor({
   }, [comboItems, onChange]);
 
   const stockPreview = useMemo(() => computeComboStockPreview(comboItems), [comboItems]);
+  const componentsTotal = useMemo(() => computeComboItemsTotal(comboItems), [comboItems]);
   const hasOutOfStockComponent = comboItems.some((item) => (item.productData?.stock ?? 0) <= 0);
 
   useEffect(() => {
@@ -124,7 +127,7 @@ export default function ComboItemsEditor({
     const next = [
       ...comboItems,
       {
-        product: product._id,
+        product: String(product._id),
         productData: product,
         quantity: 1,
         sortOrder: comboItems.length,
@@ -224,6 +227,7 @@ export default function ComboItemsEditor({
             const img = p.images?.find((i) => i.isPrimary) || p.images?.[0];
             const outOfStock = (p.stock ?? 0) <= 0;
             const bundlesFromItem = Math.floor((p.stock ?? 0) / Math.max(1, item.quantity || 1));
+            const lineTotal = getComboItemLineTotal(item);
             return (
               <div
                 key={`${item.product}-${index}`}
@@ -241,6 +245,9 @@ export default function ComboItemsEditor({
                   <p className={`text-xs ${outOfStock ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
                     {outOfStock ? 'Out of stock — combo unavailable' : `Stock: ${p.stock} · Supports ${bundlesFromItem} combo(s)`}
                   </p>
+                  {lineTotal > 0 && (
+                    <p className="text-xs font-semibold text-primary-600 mt-0.5">{formatNprAmount(lineTotal)}</p>
+                  )}
                 </div>
                 <label className="text-xs text-gray-500 flex items-center gap-1 shrink-0">
                   Qty
@@ -258,6 +265,12 @@ export default function ComboItemsEditor({
               </div>
             );
           })}
+          {componentsTotal > 0 && (
+            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-white px-3 py-2.5 mt-1">
+              <span className="text-sm font-semibold text-gray-700">Total value of included products</span>
+              <span className="text-base font-bold text-primary-600">{formatNprAmount(componentsTotal)}</span>
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-sm text-amber-700">No items in this combo yet. Pick products from the list above.</p>

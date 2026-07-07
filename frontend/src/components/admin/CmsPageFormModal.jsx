@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import SeoMetaEditor, { emptySeoMeta } from './SeoMetaEditor.jsx';
+import { mergeEntitySeo } from '../../utils/seoMeta.js';
 
 export const PAGE_TYPES = [
   { value: 'home', label: 'Homepage', hint: 'Shown at /' },
@@ -32,8 +34,7 @@ const defaultForm = () => ({
   slug: '',
   pageType: 'custom',
   isPublished: true,
-  metaTitle: '',
-  metaDescription: '',
+  seo: emptySeoMeta(),
 });
 
 const slugForType = (pageType, title) => {
@@ -68,8 +69,7 @@ export default function CmsPageFormModal({
         slug: suggestCloneSlug(initial.slug),
         pageType: SINGLETON_TYPES.has(initial.pageType) ? 'custom' : (initial.pageType || 'custom'),
         isPublished: false,
-        metaTitle: initial.metaTitle || '',
-        metaDescription: initial.metaDescription || '',
+        seo: mergeEntitySeo(initial),
       });
       setSlugTouched(true);
       return;
@@ -80,8 +80,7 @@ export default function CmsPageFormModal({
         slug: initial.slug || '',
         pageType: initial.pageType || 'custom',
         isPublished: initial.isPublished !== false,
-        metaTitle: initial.metaTitle || '',
-        metaDescription: initial.metaDescription || '',
+        seo: mergeEntitySeo(initial),
       });
       setSlugTouched(true);
     } else {
@@ -188,15 +187,21 @@ export default function CmsPageFormModal({
           Published (visible on storefront)
         </label>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Meta title (optional)</label>
-          <input className="input-field" value={form.metaTitle} onChange={(e) => setField('metaTitle', e.target.value)} />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Meta description (optional)</label>
-          <textarea className="input-field" rows={2} value={form.metaDescription} onChange={(e) => setField('metaDescription', e.target.value)} />
-        </div>
+        <SeoMetaEditor
+          value={form.seo}
+          onChange={(seo) => setField('seo', seo)}
+          pageTitle={form.title}
+          canonicalPreview={storeUrlForPage(form)}
+          defaultSchemaType={
+            form.pageType === 'faq'
+              ? 'FAQPage'
+              : form.pageType === 'about'
+                ? 'AboutPage'
+                : form.pageType === 'contact'
+                  ? 'ContactPage'
+                  : 'WebPage'
+          }
+        />
 
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>

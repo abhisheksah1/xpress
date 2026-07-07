@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { generateSlug } from '../utils/helpers.js';
 import { deliveryGroupRuleSchema } from './schemas/deliveryGroupRule.schema.js';
+import { seoMetaSchema, syncLegacySeoFields } from './schemas/seoMeta.schema.js';
 
 const categorySchema = new mongoose.Schema(
   {
@@ -23,6 +24,7 @@ const categorySchema = new mongoose.Schema(
     deliveryGroupRules: [deliveryGroupRuleSchema],
     metaTitle: { type: String },
     metaDescription: { type: String },
+    seo: { type: seoMetaSchema, default: () => ({}) },
   },
   { timestamps: true }
 );
@@ -30,6 +32,11 @@ const categorySchema = new mongoose.Schema(
 categorySchema.pre('save', function (next) {
   if (!this.slug && this.name) {
     this.slug = generateSlug(this.name);
+  }
+  syncLegacySeoFields(this);
+  if (!this.seo?.schemaType) {
+    if (!this.seo) this.seo = {};
+    this.seo.schemaType = 'CollectionPage';
   }
   next();
 });

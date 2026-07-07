@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore.js';
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isAdminLogin = location.pathname === '/admin/login';
   const login = useAuthStore((s) => s.login);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +18,12 @@ export default function LoginPage() {
     try {
       const user = await login(email, password);
       const staffRoles = ['super_admin', 'admin', 'staff'];
-      const redirect = location.state?.from || (staffRoles.includes(user.role) ? '/admin' : '/');
+      if (isAdminLogin && !staffRoles.includes(user.role)) {
+        toast.error('This login is for admin staff only');
+        return;
+      }
+      const defaultRedirect = isAdminLogin || staffRoles.includes(user.role) ? '/admin' : '/';
+      const redirect = location.state?.from || defaultRedirect;
       toast.success('Logged in successfully');
       navigate(redirect);
     } catch (err) {
@@ -28,10 +34,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <div className="card">
-        <h1 className="text-2xl font-bold mb-2 text-center">Login</h1>
-        <p className="text-sm text-gray-500 text-center mb-6">Sign in to access the admin panel or your account</p>
+    <div className={`max-w-md mx-auto px-4 py-16${isAdminLogin ? ' min-h-screen flex items-center' : ''}`}>
+      <div className="card w-full">
+        <h1 className="text-2xl font-bold mb-2 text-center">{isAdminLogin ? 'Admin Login' : 'Login'}</h1>
+        <p className="text-sm text-gray-500 text-center mb-6">
+          {isAdminLogin
+            ? 'Sign in to access the admin panel'
+            : 'Sign in to access your account'}
+        </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
@@ -59,9 +69,11 @@ export default function LoginPage() {
             {loading ? 'Signing in...' : 'Login'}
           </button>
         </form>
-        <p className="text-sm text-center mt-4 text-gray-500">
-          No account? <Link to="/register" className="text-primary-600 hover:underline">Register</Link>
-        </p>
+        {!isAdminLogin && (
+          <p className="text-sm text-center mt-4 text-gray-500">
+            No account? <Link to="/register" className="text-primary-600 hover:underline">Register</Link>
+          </p>
+        )}
       </div>
     </div>
   );

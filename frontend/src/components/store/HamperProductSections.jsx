@@ -5,6 +5,7 @@ import {
 } from './ProductPageInfo.jsx';
 import ProductRichText from './ProductRichText.jsx';
 import { quickAddProductToCart } from '../../utils/quickAddProduct.js';
+import { getComboItemQuantity } from '../../utils/comboItems.js';
 
 function SectionHeading({ icon, children }) {
   return (
@@ -12,22 +13,6 @@ function SectionHeading({ icon, children }) {
       {icon && <span className="text-base shrink-0" aria-hidden>{icon}</span>}
       {children}
     </h2>
-  );
-}
-
-export function HamperProductDescription({ product }) {
-  const text = product?.longDescription || product?.description || product?.shortDescription;
-  if (!text?.trim()) return null;
-
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white overflow-hidden w-full min-w-0">
-      <div className="px-3 sm:px-5 py-3 border-b border-slate-100 bg-slate-50/80">
-        <SectionHeading>Product Description</SectionHeading>
-      </div>
-      <div className="px-3 sm:px-5 py-3 sm:py-4 min-w-0 overflow-hidden">
-        <ProductRichText content={text} />
-      </div>
-    </section>
   );
 }
 
@@ -42,9 +27,9 @@ export function HamperComboIncludes({ comboItems }) {
       <ul className="divide-y divide-dashed divide-slate-200">
         {comboItems.map((item, index) => {
           const p = item.product;
-          const img = p?.images?.find((i) => i.isPrimary) || p?.images?.[0];
           const desc = p?.shortDescription || p?.description || '';
-          const qty = item.quantity > 1 ? ` ×${item.quantity}` : '';
+          const qty = getComboItemQuantity(item);
+          const qtyLabel = qty > 1 ? ` ×${qty}` : '';
 
           return (
             <li key={p?._id || index} className="px-4 sm:px-5 py-4 flex gap-4">
@@ -52,36 +37,15 @@ export function HamperComboIncludes({ comboItems }) {
                 {index + 1}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-start gap-3">
-                  {img?.url && (
-                    <img
-                      src={img.url}
-                      alt=""
-                      className="w-14 h-14 rounded-lg object-cover border border-slate-100 shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    {p?.slug ? (
-                      <Link
-                        to={`/shop/${p.slug}`}
-                        className="font-bold text-slate-900 hover:text-primary-600 text-sm sm:text-base leading-snug"
-                      >
-                        {p.name}
-                        {qty}
-                      </Link>
-                    ) : (
-                      <p className="font-bold text-slate-900 text-sm sm:text-base">
-                        {p?.name || 'Product'}
-                        {qty}
-                      </p>
-                    )}
-                    {desc && (
-                      <div className="text-xs sm:text-sm mt-1.5">
-                        <ProductRichText content={desc} className="!text-xs sm:!text-sm !text-slate-500" />
-                      </div>
-                    )}
+                <p className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+                  {p?.name || 'Product'}
+                  {qtyLabel}
+                </p>
+                {desc && (
+                  <div className="text-xs sm:text-sm mt-1.5">
+                    <ProductRichText content={desc} className="!text-xs sm:!text-sm !text-slate-500" />
                   </div>
-                </div>
+                )}
               </div>
             </li>
           );
@@ -199,7 +163,6 @@ export function HamperProductInfoSections({
 
   return (
     <div className="mt-10 space-y-6 w-full min-w-0">
-      <HamperProductDescription product={product} />
       <HamperComboIncludes comboItems={comboItems} />
       <HamperComplianceSla message={settings.product_page_alert_message} />
       <ProductDeliverySchedule

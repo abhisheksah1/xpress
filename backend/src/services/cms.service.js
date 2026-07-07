@@ -101,8 +101,9 @@ export const clonePage = async (id, data = {}, userId) => {
     slug,
     pageType,
     blocks: cloneBlocks(source.blocks),
-    metaTitle: source.metaTitle,
-    metaDescription: source.metaDescription,
+    metaTitle: data.seo?.metaTitle || source.metaTitle,
+    metaDescription: data.seo?.metaDescription || source.metaDescription,
+    seo: data.seo || source.seo,
     isPublished: data.isPublished === true,
     updatedBy: userId,
   });

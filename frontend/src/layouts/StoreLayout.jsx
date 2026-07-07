@@ -1,4 +1,4 @@
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import StoreHeader from '../components/store/StoreHeader.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
@@ -14,7 +14,7 @@ export default function StoreLayout() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {(settings.plugins_config?.whatsapp_chat_enabled !== false) && whatsappNumber && (
+      {(settings.plugins_config?.whatsapp_chat_enabled !== false) && whatsappNumber && !maintenanceEnabled && (
         <a
           href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`}
           target="_blank"
@@ -26,7 +26,7 @@ export default function StoreLayout() {
         </a>
       )}
 
-      <StoreHeader />
+      {!maintenanceEnabled && <StoreHeader />}
 
       <main className="flex-1">
         {maintenanceEnabled ? (
@@ -34,10 +34,6 @@ export default function StoreLayout() {
             <div className="card">
               <h1 className="text-2xl font-bold mb-3">Maintenance Mode</h1>
               <p className="text-gray-600 whitespace-pre-line">{maintenanceMessage}</p>
-              <p className="text-xs text-gray-400 mt-6">If you are an admin, use the Admin Panel to disable maintenance.</p>
-              <div className="mt-6">
-                <Link to="/login" className="btn-secondary">Admin Login</Link>
-              </div>
             </div>
           </div>
         ) : (
@@ -45,7 +41,7 @@ export default function StoreLayout() {
         )}
       </main>
 
-      <StoreFooter />
+      {!maintenanceEnabled && <StoreFooter />}
     </div>
   );
 }

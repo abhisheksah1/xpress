@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { CMS_PAGE_TYPES } from '../config/constants.js';
 import { generateSlug } from '../utils/helpers.js';
+import { seoMetaSchema, syncLegacySeoFields } from './schemas/seoMeta.schema.js';
 
 const contentBlockSchema = new mongoose.Schema(
   {
@@ -52,6 +53,7 @@ const cmsPageSchema = new mongoose.Schema(
     blocks: [contentBlockSchema],
     metaTitle: { type: String },
     metaDescription: { type: String },
+    seo: { type: seoMetaSchema, default: () => ({}) },
     isPublished: { type: Boolean, default: true },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
@@ -60,6 +62,7 @@ const cmsPageSchema = new mongoose.Schema(
 
 cmsPageSchema.pre('save', function (next) {
   if (!this.slug && this.title) this.slug = generateSlug(this.title);
+  syncLegacySeoFields(this);
   next();
 });
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import { CategoryDeliveryRulesEditor } from '../../components/admin/DeliveryGroupRulesEditor.jsx';
+import CategoryEditModal from '../../components/admin/CategoryEditModal.jsx';
 import StockAdjustModal from '../../components/admin/StockAdjustModal.jsx';
 
 const formatPrice = (n) => `Rs. ${Number(n).toLocaleString('en-NP')}`;
@@ -27,6 +28,7 @@ function CategoriesTab({ categories, onRefresh }) {
   const [editing, setEditing] = useState(null);
   const [editName, setEditName] = useState('');
   const [deliveryCategory, setDeliveryCategory] = useState(null);
+  const [seoCategory, setSeoCategory] = useState(null);
   const [deliveryGroups, setDeliveryGroups] = useState([]);
 
   useEffect(() => {
@@ -92,6 +94,7 @@ function CategoriesTab({ categories, onRefresh }) {
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Slug</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Status</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Delivery</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">SEO</th>
               <th className="text-right px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Actions</th>
             </tr>
           </thead>
@@ -116,7 +119,17 @@ function CategoriesTab({ categories, onRefresh }) {
                     {cat.deliveryScope === 'selected' ? 'Restricted groups' : 'All groups'}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  {(cat.seo?.metaTitle || cat.metaTitle) ? (
+                    <span className="text-xs text-green-700 truncate block max-w-[140px]" title={cat.seo?.metaTitle || cat.metaTitle}>
+                      {cat.seo?.metaTitle || cat.metaTitle}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-amber-600">Not set</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right space-x-2">
+                  <button onClick={() => setSeoCategory(cat)} className="text-primary-600 text-xs font-medium">SEO</button>
                   <button onClick={() => setDeliveryCategory(cat)} className="text-primary-600 text-xs font-medium">Delivery</button>
                   {editing === cat._id ? (
                     <>
@@ -133,11 +146,19 @@ function CategoriesTab({ categories, onRefresh }) {
               </tr>
             ))}
             {!categories.length && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No categories yet</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No categories yet</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {seoCategory && (
+        <CategoryEditModal
+          category={seoCategory}
+          onClose={() => setSeoCategory(null)}
+          onSaved={onRefresh}
+        />
+      )}
 
       {deliveryCategory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -367,8 +388,8 @@ export default function ProductsPage() {
 
           <div className="card mb-4 space-y-3">
             <p className="text-xs text-gray-500 leading-relaxed">
-              CSV import supports Koseli Xpress export columns: <span className="font-mono">product_name, price, crossed_price, quantity, slug, status, product_category, images</span>, etc.
-              The <span className="font-mono">product_description</span> column is <strong>ignored on import</strong> — add descriptions later in each product&apos;s edit page.
+              CSV import supports Koseli Xpress export columns: <span className="font-mono">product_name, price, crossed_price, quantity, slug, status, product_category, images, product_description</span>, etc.
+              Column <span className="font-mono">product_description</span> (column R) is imported as the product <strong>long description</strong>.
               Categories in <span className="font-mono">product_category</span> are comma-separated — the product is assigned to <strong>all</strong> of them (e.g. &quot;Red Rose Bouquet, Gift For Wife, Gift For Girlfriend&quot;). Existing categories are reused; missing ones are created automatically.
             </p>
             <div className="flex flex-wrap gap-3 items-center">
@@ -505,7 +526,13 @@ export default function ProductsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <p className="text-xs text-gray-400 font-mono">{product.sku}</p>
-                          <p className="font-medium text-gray-900">{product.name}</p>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/products/${product._id}/edit`)}
+                            className="font-medium text-gray-900 text-left hover:text-primary-600 hover:underline"
+                          >
+                            {product.name}
+                          </button>
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {[...(product.categories || []), product.category]

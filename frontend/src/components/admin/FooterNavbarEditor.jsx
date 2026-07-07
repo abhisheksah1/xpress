@@ -139,6 +139,7 @@ export default function FooterNavbarEditor({
         </label>
         <CmsImagePicker
           mode="single"
+          guideKey="logo"
           images={logoImages}
           onChange={(imgs) => {
             const first = imgs[0];

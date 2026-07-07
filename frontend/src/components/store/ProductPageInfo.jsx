@@ -16,12 +16,24 @@ function ScheduleCard({ row }) {
         {row.groupName}
       </h3>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <ScheduleField label="Coverage Area" value={row.coverageText} />
+        <ScheduleField label="Location" value={row.coverageText} />
         <ScheduleField label="Estimated Delivery Time" value={row.estimatedTimeLabel} emphasize />
         <ScheduleField label="Cut-off Time" value={row.cutoffTimeLabel} emphasize />
       </dl>
     </article>
   );
+}
+
+/** Buy-panel footer: include cut-off time when schedule rows provide it. */
+function resolveScheduleDisclaimer(disclaimer, rows, { compact = false } = {}) {
+  if (!compact && disclaimer?.trim()) return disclaimer.trim();
+
+  const rawCutoff = rows[0]?.cutoffTimeLabel?.trim();
+  const cutoffPhrase = rawCutoff
+    ? rawCutoff.replace(/:00\s+/, ' ').replace(/\s+NST$/, ' NST')
+    : '4 PM NST';
+
+  return `* Orders submitted beyond the cut-off times (${cutoffPhrase}) are queued and dispatched on the subsequent fulfillment cycle. All speeds verified by carriers.`;
 }
 
 export function ProductPageAlert({ message }) {
@@ -34,12 +46,20 @@ export function ProductPageAlert({ message }) {
   );
 }
 
-export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Location Tier' }) {
+export function ProductDeliverySchedule({
+  schedules,
+  disclaimer,
+  tierLabel = 'Location Tier',
+  compact = false,
+  className = '',
+}) {
   const rows = schedules || [];
   if (!rows.length) return null;
 
+  const footerNote = resolveScheduleDisclaimer(disclaimer, rows, { compact });
+
   return (
-    <section className="w-full rounded-2xl border-2 border-amber-400 overflow-hidden bg-amber-50 shadow-sm">
+    <section className={`w-full max-w-none min-w-0 rounded-2xl border-2 border-amber-400 overflow-hidden bg-amber-50 shadow-sm ${className}`.trim()}>
       <div className="bg-amber-400 px-3 sm:px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
         <h2 className="text-xs sm:text-sm font-black uppercase tracking-wide text-slate-900 flex items-center gap-2">
           <span aria-hidden>⚡</span>
@@ -52,20 +72,36 @@ export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Lo
         )}
       </div>
 
-      {/* Mobile / tablet cards */}
-      <div className="p-3 sm:p-4 space-y-3 lg:hidden">
-        {rows.map((row) => (
-          <ScheduleCard key={row.groupId} row={row} />
-        ))}
-      </div>
+      {/* Buy panel: Location + estimated time only */}
+      {compact && (
+        <div className="w-full overflow-x-auto">
+          <table className="w-full table-fixed text-left text-xs sm:text-sm">
+            <thead>
+              <tr className="bg-amber-100/80 text-[10px] uppercase tracking-wider text-slate-700 border-b border-amber-300">
+                <th className="px-3 py-2 font-bold w-[58%]">Location</th>
+                <th className="px-3 py-2 font-bold w-[42%]">Estimated Delivery Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.groupId} className="border-b border-amber-200/80 align-top bg-amber-50/40 even:bg-white/60">
+                  <td className="px-3 py-2.5 text-slate-700 break-words">{row.coverageText || '—'}</td>
+                  <td className="px-3 py-2.5 font-semibold text-slate-800 break-words">{row.estimatedTimeLabel || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {/* Desktop table */}
-      <div className="hidden lg:block overflow-x-auto">
+      {/* Full table (e.g. hamper / wide layouts) */}
+      {!compact && (
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-amber-100/80 text-[10px] uppercase tracking-wider text-slate-700 border-b border-amber-300">
               <th className="px-4 py-2.5 font-bold">Delivery Group</th>
-              <th className="px-4 py-2.5 font-bold">Coverage Area</th>
+              <th className="px-4 py-2.5 font-bold">Location</th>
               <th className="px-4 py-2.5 font-bold">Estimated Delivery Time</th>
               <th className="px-4 py-2.5 font-bold">Cut-off Time</th>
             </tr>
@@ -81,18 +117,19 @@ export function ProductDeliverySchedule({ schedules, disclaimer, tierLabel = 'Lo
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      )}
 
-      {disclaimer?.trim() && (
+      {footerNote && (
         <p className="px-3 sm:px-4 py-3 text-[11px] sm:text-xs text-slate-600 italic border-t border-amber-200 bg-amber-50/80 leading-relaxed">
-          {disclaimer}
+          {footerNote}
         </p>
       )}
     </section>
   );
 }
 
-export function ProductWhatsappHelp({ settings }) {
+export function ProductWhatsappHelp({ settings, className = '' }) {
   const enabled = settings.product_whatsapp_help_enabled === true
     || settings.product_whatsapp_help_enabled === 'true';
   if (!enabled) return null;
@@ -106,10 +143,10 @@ export function ProductWhatsappHelp({ settings }) {
   const waUrl = `https://wa.me/${String(rawNumber).replace(/\D/g, '')}`;
 
   return (
-    <div className="rounded-xl border border-green-200 bg-green-50/80 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div className="flex gap-3">
+    <div className={`w-full max-w-none min-w-0 rounded-xl border border-green-200 bg-green-50/80 p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 ${className}`.trim()}>
+      <div className="flex gap-3 min-w-0 flex-1">
         <span className="text-2xl shrink-0" aria-hidden>💬</span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
             {settings.product_whatsapp_help_title || 'WhatsApp Emergency Help & Customization'}
           </h3>
@@ -123,7 +160,7 @@ export function ProductWhatsappHelp({ settings }) {
         href={waUrl}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-sm shrink-0 transition-colors"
+        className="inline-flex w-full lg:w-auto items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-sm shrink-0 transition-colors"
       >
         <span aria-hidden>📞</span>
         {settings.product_whatsapp_help_button_text || 'WhatsApp Chat'}
@@ -132,10 +169,10 @@ export function ProductWhatsappHelp({ settings }) {
   );
 }
 
-export function ProductShortTerms({ terms }) {
+export function ProductShortTerms({ terms, className = '' }) {
   if (!terms?.trim()) return null;
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className={`w-full max-w-none min-w-0 rounded-xl border border-slate-200 bg-white p-4 ${className}`.trim()}>
       <h3 className="text-xs font-black uppercase tracking-widest text-slate-700 mb-2">Short Terms &amp; Conditions</h3>
       <p className="text-xs sm:text-sm text-slate-600 leading-relaxed whitespace-pre-line">{terms}</p>
     </div>

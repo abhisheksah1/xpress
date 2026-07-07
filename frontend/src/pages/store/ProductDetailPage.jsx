@@ -16,7 +16,6 @@ import {
   persistProductPrintUpload,
 } from '../../utils/personalization.js';
 import {
-  ProductPageAlert,
   ProductDeliverySchedule,
   ProductWhatsappHelp,
   ProductShortTerms,
@@ -52,7 +51,7 @@ function optionsKey(selectedOptions) {
 
 function ProductGallery({ product, gallery, comboComponents, activeImage, onSelectImage }) {
   return (
-    <div className="lg:col-span-7 space-y-4">
+    <div className="lg:col-span-7 w-full min-w-0 space-y-4">
       <div className="aspect-square rounded-2xl overflow-hidden shadow-sm border border-rose-100 bg-white relative">
         {gallery[activeImage] ? (
           <img
@@ -120,6 +119,67 @@ function ProductGallery({ product, gallery, comboComponents, activeImage, onSele
   );
 }
 
+function BuyPanelExtended({
+  product,
+  isHamper,
+  shortTerms,
+  storeSettings,
+  deliverySchedules,
+  deliveryDisclaimer,
+  deliveryTierLabel,
+}) {
+  const blockClass = 'w-full max-w-none min-w-0';
+
+  if (isHamper) return null;
+
+  const hasDelivery = (deliverySchedules || []).length > 0;
+  const hasLongDescription = product.longDescription || (!product.shortDescriptionEnabled && product.description);
+  const hasContent =
+    hasDelivery ||
+    product.additionalNote ||
+    shortTerms ||
+    storeSettings ||
+    hasLongDescription;
+
+  if (!hasContent) return null;
+
+  return (
+    <div className={`lg:col-span-12 w-full max-w-none min-w-0 space-y-4 sm:space-y-5 pt-2 lg:pt-4`}>
+      {hasDelivery && (
+        <ProductDeliverySchedule
+          className={blockClass}
+          schedules={deliverySchedules}
+          disclaimer={deliveryDisclaimer}
+          tierLabel={deliveryTierLabel || 'Location Tier'}
+          compact
+        />
+      )}
+
+      {product.additionalNote && (
+        <div className={`${blockClass} p-3 sm:p-4 rounded-xl bg-amber-50 border border-amber-100 text-xs sm:text-sm text-amber-900 leading-relaxed`}>
+          <span className="font-bold uppercase tracking-wide text-[10px] block mb-1">Important note</span>
+          {product.additionalNote}
+        </div>
+      )}
+
+      {shortTerms && <ProductShortTerms terms={shortTerms} className={blockClass} />}
+
+      {storeSettings && <ProductWhatsappHelp settings={storeSettings} className={blockClass} />}
+
+      {hasLongDescription && (
+        <section className={blockClass}>
+          <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-800 mb-3">
+            Product details
+          </h2>
+          <div className="p-3 sm:p-5 lg:p-6 rounded-xl bg-white border border-rose-100 w-full min-w-0 overflow-hidden">
+            <ProductRichText content={product.longDescription || product.description} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
 function BuyPanel({
   product,
   isHamper,
@@ -140,22 +200,19 @@ function BuyPanel({
   setQty,
   onAddToCart,
 }) {
+  const blockClass = 'w-full max-w-none min-w-0';
+
   return (
-    <div className="lg:col-span-5 space-y-5">
-      <div>
+    <div className={`lg:col-span-5 w-full max-w-none min-w-0 self-start space-y-4 sm:space-y-5`}>
+      <div className={blockClass}>
         {product.brand && (
           <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-1">{product.brand}</p>
         )}
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">{product.name}</h1>
-        {product.shortDescriptionEnabled && (product.shortDescription || product.description) && (
-          <div className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
-            <ProductRichText content={product.shortDescription || product.description} />
-          </div>
-        )}
       </div>
 
       <div
-        className={`p-4 rounded-2xl border ${
+        className={`${blockClass} p-3 sm:p-4 rounded-2xl border ${
           isHamper ? 'bg-sky-50 border-sky-100' : 'bg-white border-rose-100'
         }`}
       >
@@ -184,7 +241,7 @@ function BuyPanel({
         const catId = cat._id || `cat-${index}`;
         const chosen = selectedOptions[catId];
         return (
-          <div key={catId} className="p-4 rounded-xl bg-white border border-rose-100 space-y-2">
+          <div key={catId} className={`${blockClass} p-3 sm:p-4 rounded-xl bg-white border border-rose-100 space-y-2`}>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
               Select {cat.name}
             </label>
@@ -218,16 +275,18 @@ function BuyPanel({
       })}
 
       {showPersonalization && (
-        <ProductPersonalization
-          personalizationFields={fields}
-          values={personalization}
-          onChange={setPersonalization}
-          onImageUploaded={onImageUploaded}
-        />
+        <div className={blockClass}>
+          <ProductPersonalization
+            personalizationFields={fields}
+            values={personalization}
+            onChange={setPersonalization}
+            onImageUploaded={onImageUploaded}
+          />
+        </div>
       )}
 
-      <div className="flex items-stretch gap-3">
-        <div className="flex items-center border border-slate-200 rounded-xl bg-white overflow-hidden">
+      <div className={`${blockClass} flex flex-col sm:flex-row items-stretch gap-3`}>
+        <div className="flex items-center justify-between border border-slate-200 rounded-xl bg-white overflow-hidden w-full sm:w-auto sm:shrink-0">
           <button
             type="button"
             className="px-3 py-3 text-slate-500 hover:bg-slate-50 font-bold"
@@ -242,7 +301,7 @@ function BuyPanel({
             max={product.stock || 1}
             value={qty}
             onChange={(e) => setQty(Math.max(1, Math.min(product.stock || 1, Number(e.target.value) || 1)))}
-            className="w-12 text-center text-sm font-bold border-x border-slate-200 py-3 outline-none"
+            className="w-16 sm:w-12 text-center text-sm font-bold border-x border-slate-200 py-3 outline-none"
             disabled={soldOut}
           />
           <button
@@ -258,7 +317,7 @@ function BuyPanel({
           type="button"
           onClick={onAddToCart}
           disabled={soldOut}
-          className={`flex-1 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl px-6 py-3 text-sm uppercase tracking-wide shadow-sm transition-colors flex items-center justify-center gap-2 ${
+          className={`w-full sm:flex-1 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl px-6 py-3 text-sm uppercase tracking-wide shadow-sm transition-colors flex items-center justify-center gap-2 ${
             isHamper
               ? 'bg-orange-500 hover:bg-orange-600'
               : 'bg-[#e11d48] hover:bg-[#be123c]'
@@ -270,7 +329,7 @@ function BuyPanel({
       </div>
 
       {!isHamper && (product.sku || product.standardSize) && (
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+        <div className={`${blockClass} grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-500`}>
           {product.sku && (
             <p>
               <span className="font-semibold text-slate-600">SKU:</span> {product.sku}
@@ -284,10 +343,9 @@ function BuyPanel({
         </div>
       )}
 
-      {!isHamper && product.additionalNote && (
-        <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-900 leading-relaxed">
-          <span className="font-bold uppercase tracking-wide text-[10px] block mb-1">Important note</span>
-          {product.additionalNote}
+      {!isHamper && product.shortDescriptionEnabled && (product.shortDescription || product.description) && (
+        <div className={`${blockClass} text-sm sm:text-base text-slate-600 leading-relaxed`}>
+          <ProductRichText content={product.shortDescription || product.description} />
         </div>
       )}
     </div>
@@ -441,7 +499,7 @@ export default function ProductDetailPage() {
           <span className="text-gray-800 font-medium truncate max-w-[200px]">{product.name}</span>
         </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-start w-full">
           <ProductGallery
             product={product}
             gallery={gallery}
@@ -475,6 +533,15 @@ export default function ProductDetailPage() {
             setQty={setQty}
             onAddToCart={handleAddToCart}
           />
+          <BuyPanelExtended
+            product={product}
+            isHamper={isHamper}
+            shortTerms={settings.product_page_short_terms}
+            storeSettings={settings}
+            deliverySchedules={deliverySchedules}
+            deliveryDisclaimer={settings.product_delivery_schedule_disclaimer}
+            deliveryTierLabel={settings.product_delivery_location_tier_label}
+          />
         </div>
 
         {isHamper ? (
@@ -488,28 +555,6 @@ export default function ProductDetailPage() {
           />
         ) : (
           <>
-            <section className="mt-10 space-y-5 w-full">
-              <ProductPageAlert message={settings.product_page_alert_message} />
-              <ProductDeliverySchedule
-                schedules={deliverySchedules}
-                disclaimer={settings.product_delivery_schedule_disclaimer}
-                tierLabel={settings.product_delivery_location_tier_label || 'Location Tier'}
-              />
-              <ProductWhatsappHelp settings={settings} />
-              <ProductShortTerms terms={settings.product_page_short_terms} />
-            </section>
-
-            {(product.longDescription || (!product.shortDescriptionEnabled && product.description)) && (
-              <section className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-rose-100/60 w-full min-w-0">
-                <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-800 mb-3 sm:mb-4">
-                  Product details
-                </h2>
-                <div className="p-3 sm:p-5 rounded-xl bg-white border border-rose-100 w-full min-w-0 overflow-hidden">
-                  <ProductRichText content={product.longDescription || product.description} />
-                </div>
-              </section>
-            )}
-
             {related.length > 0 && (
               <section className="mt-12 pt-8 border-t border-rose-100/60">
                 <h2 className="text-xl font-bold text-slate-900 mb-6">You may also like</h2>

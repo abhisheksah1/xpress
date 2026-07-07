@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
+import { useStore } from '../../context/StoreContext.jsx';
 import ProductCard from '../../components/store/ProductCard.jsx';
+import SeoHead from '../../components/store/SeoHead.jsx';
+import { mergeEntitySeo } from '../../utils/seoMeta.js';
+import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -11,6 +15,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function ShopPage() {
+  const { settings } = useStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -21,6 +26,11 @@ export default function ShopPage() {
   const category = searchParams.get('category') || '';
   const page = Number(searchParams.get('page') || 1);
   const sort = searchParams.get('sort') || 'newest';
+
+  const activeCategory = useMemo(
+    () => categories.find((cat) => cat._id === category),
+    [categories, category]
+  );
 
   useEffect(() => {
     storeApi.getCategories().then((res) => setCategories(res.data.data));
@@ -55,9 +65,40 @@ export default function ShopPage() {
     setSearchParams(next);
   };
 
+  const categorySeo = activeCategory ? mergeEntitySeo(activeCategory) : null;
+  const pageTitle = activeCategory ? activeCategory.name : 'Shop Gifts';
+  const pageDescription = activeCategory?.description
+    || (activeCategory ? `Browse ${activeCategory.name} gifts and products at KoseliXpress Nepal.` : 'Browse gifts and products at KoseliXpress Nepal.');
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Shop Gifts</h1>
+      <SeoHead
+        seo={categorySeo || undefined}
+        siteSettings={settings}
+        fallbacks={{
+          title: activeCategory ? `${activeCategory.name} | Shop Gifts` : 'Shop Gifts | KoseliXpress',
+          description: pageDescription,
+          image: activeCategory?.image?.url,
+          path: activeCategory ? `/shop?category=${activeCategory._id}` : '/shop',
+          schemaType: activeCategory ? 'CollectionPage' : 'CollectionPage',
+        }}
+        jsonLdContext={{ title: pageTitle, path: activeCategory ? `/shop?category=${activeCategory._id}` : '/shop' }}
+        jsonLdId="shop-json-ld"
+      />
+
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">{pageTitle}</h1>
+        {activeCategory?.description && (
+          <p className="text-sm text-gray-600 mt-2 max-w-3xl">{activeCategory.description}</p>
+        )}
+        {activeCategory?.image?.url && (
+          <img
+            src={resolveMediaUrl(activeCategory.image.url)}
+            alt={activeCategory.image.alt || activeCategory.name}
+            className="mt-4 h-36 w-full max-w-xl object-cover rounded-xl border"
+          />
+        )}
+      </div>
 
       <div className="flex flex-col md:flex-row gap-8">
         <aside className="md:w-48 flex-shrink-0">

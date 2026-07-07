@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import CmsImagePicker from '../../components/admin/CmsImagePicker.jsx';
 import CmsPageFormModal, { storeUrlForPage } from '../../components/admin/CmsPageFormModal.jsx';
+import SeoMetaEditor, { emptySeoMeta } from '../../components/admin/SeoMetaEditor.jsx';
+import { mergeEntitySeo } from '../../utils/seoMeta.js';
 import CategoriesGridBlockEditor from '../../components/admin/CategoriesGridBlockEditor.jsx';
 import ImageContentLayoutSettings from '../../components/admin/ImageContentLayoutSettings.jsx';
 import GoogleReviewsBlockEditor from '../../components/admin/GoogleReviewsBlockEditor.jsx';
@@ -54,8 +56,9 @@ export default function ContentPage() {
 
   const selectPage = async (page) => {
     const { data } = await adminApi.getCmsPage(page._id);
-    setSelected(data.data);
-    setBlocks(data.data.blocks || []);
+    const pageData = data.data;
+    setSelected({ ...pageData, seo: mergeEntitySeo(pageData) });
+    setBlocks(pageData.blocks || []);
   };
 
   const updateBlock = (index, field, value) => {
@@ -257,8 +260,9 @@ export default function ContentPage() {
         title: selected.title,
         slug: selected.slug,
         pageType: selected.pageType,
-        metaTitle: selected.metaTitle,
-        metaDescription: selected.metaDescription,
+        metaTitle: selected.seo?.metaTitle,
+        metaDescription: selected.seo?.metaDescription,
+        seo: selected.seo,
       });
       toast.success('Page settings saved');
       load();
@@ -394,18 +398,25 @@ export default function ContentPage() {
                     <input className="input-field font-mono text-sm" value={selected.slug || ''} onChange={(e) => setSelected((p) => ({ ...p, slug: e.target.value }))} />
                   </div>
                 </div>
-                <input
-                  className="input-field"
-                  placeholder="Meta title (optional)"
-                  value={selected.metaTitle || ''}
-                  onChange={(e) => setSelected((p) => ({ ...p, metaTitle: e.target.value }))}
-                />
-                <textarea
-                  className="input-field"
-                  rows={2}
-                  placeholder="Meta description (optional)"
-                  value={selected.metaDescription || ''}
-                  onChange={(e) => setSelected((p) => ({ ...p, metaDescription: e.target.value }))}
+                <SeoMetaEditor
+                  value={selected.seo || emptySeoMeta()}
+                  onChange={(seo) => setSelected((p) => ({ ...p, seo }))}
+                  pageTitle={selected.title}
+                  pageDescription={blocks.find((b) => b.content)?.content || ''}
+                  canonicalPreview={storeUrlForPage(selected)}
+                  defaultSchemaType={
+                    selected.pageType === 'faq'
+                      ? 'FAQPage'
+                      : selected.pageType === 'about'
+                        ? 'AboutPage'
+                        : selected.pageType === 'contact'
+                          ? 'ContactPage'
+                          : 'WebPage'
+                  }
+                  onUploadImage={async (file) => {
+                    const { data } = await adminApi.uploadImage(file);
+                    return data.data;
+                  }}
                 />
                 <button onClick={savePageSettings} disabled={pageSaving} className="btn-secondary text-sm">
                   {pageSaving ? 'Saving...' : 'Save page settings'}
@@ -678,15 +689,6 @@ export default function ContentPage() {
                             value={block.settings?.headingAfter || ''}
                             onChange={(e) => updateBlockSetting(i, 'headingAfter', e.target.value)}
                             placeholder="Same-day delivery opens in..."
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Cut-off note (footer)</label>
-                          <input
-                            className="input-field"
-                            value={block.settings?.cutoffNote || ''}
-                            onChange={(e) => updateBlockSetting(i, 'cutoffNote', e.target.value)}
-                            placeholder="Zone Cutoff: 05:00 PM NST Time"
                           />
                         </div>
                       </div>

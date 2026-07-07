@@ -5,6 +5,7 @@ import { Product, Order, Settings } from '../models/index.js';
 import { validateOrderPersonalization } from '../utils/personalization.js';
 import { normalizeItemPersonalization, toStoredMediaUrl } from '../utils/mediaUrl.js';
 import { ApiError } from '../utils/ApiError.js';
+import { assertPreferredDeliverySelection } from '../utils/deliveryScheduling.js';
 import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '../config/constants.js';
 
 /** COD and manual bank: regular orders with payment collected later (not checkout leads). */
@@ -142,6 +143,20 @@ export const createOrder = async (data) => {
     estimatedDeliveryDays = deliveryCheck.estimatedDeliveryDays;
     shippingFee = deliveryCheck.fee;
     timeSlot = deliveryCheck.timeSlot || null;
+  } else if (data.preferredDeliveryDate || data.timeSlotId) {
+    throw new ApiError(400, 'Select a delivery location before choosing a delivery date or time slot.');
+  }
+
+  if (data.preferredDeliveryDate || data.timeSlotId) {
+    try {
+      assertPreferredDeliverySelection({
+        preferredDeliveryDate: data.preferredDeliveryDate,
+        timeSlotId: data.timeSlotId,
+        timeSlots: deliveryLocationDoc?.timeSlots || [],
+      });
+    } catch (prepErr) {
+      throw new ApiError(400, prepErr.message);
+    }
   }
 
   const addonEntries = data.serviceAddons?.length
@@ -271,6 +286,7 @@ export const getOrders = async ({
   page = 1,
   limit = 20,
   status,
+  paymentStatus,
   userId,
   search,
   lead,
@@ -280,6 +296,7 @@ export const getOrders = async ({
 }) => {
   const filter = {};
   if (status) filter.status = status;
+  if (paymentStatus) filter['payment.status'] = paymentStatus;
   if (userId) filter.user = userId;
   if (lead === 'true' || lead === true) {
     Object.assign(filter, buildLeadFilter());
@@ -368,6 +385,50 @@ export const getOrders = async ({
   }
 
   return { orders, pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) } };
+};
+
+export const getOrdersForExport = async ({
+  startDate,
+  endDate,
+  status,
+  paymentStatus,
+  lead,
+  excludeLeads,
+}) => {
+  const filter = {};
+  if (status) filter.status = status;
+  if (paymentStatus) filter['payment.status'] = paymentStatus;
+  if (lead === 'true' || lead === true) {
+    Object.assign(filter, buildLeadFilter());
+  } else if (excludeLeads === 'true' || excludeLeads === true || lead === 'false') {
+    filter.$nor = [buildLeadFilter()];
+  }
+
+  if (startDate || endDate) {
+    const createdAt = {};
+    if (startDate) {
+      const from = new Date(startDate);
+      if (!Number.isNaN(from.getTime())) createdAt.$gte = from;
+    }
+    if (endDate) {
+      const to = new Date(endDate);
+      if (!Number.isNaN(to.getTime())) {
+        to.setHours(23, 59, 59, 999);
+        createdAt.$lte = to;
+      }
+    }
+    if (Object.keys(createdAt).length) {
+      filter.createdAt = createdAt;
+    }
+  }
+
+  const orders = await Order.find(filter)
+    .populate('user', 'name email phone')
+    .populate('deliveryZone', 'name')
+    .populate('deliveryLocation', 'name')
+    .sort({ createdAt: 1 });
+
+  return orders;
 };
 
 export const getOrderById = async (id, userId = null) => {

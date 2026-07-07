@@ -17,7 +17,7 @@ export const FIELD_CONFIG = {
   imagePrint: {
     key: 'printImageUrl',
     label: 'Upload Image or Design',
-    hint: 'Upload a photo or design to print on the product (JPG, PNG)',
+    hint: 'JPG or PNG only',
     kind: 'image',
   },
 };

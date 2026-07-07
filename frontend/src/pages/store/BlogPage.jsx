@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
+import { useStore } from '../../context/StoreContext.jsx';
+import SeoHead from '../../components/store/SeoHead.jsx';
 
 export default function BlogPage() {
+  const { settings } = useStore();
   const [blogs, setBlogs] = useState([]);
 
   useEffect(() => {
@@ -11,6 +14,16 @@ export default function BlogPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      <SeoHead
+        siteSettings={settings}
+        fallbacks={{
+          title: 'Blog | KoseliXpress',
+          description: 'Gift ideas, delivery tips, and stories from KoseliXpress Nepal.',
+          path: '/blog',
+          schemaType: 'CollectionPage',
+        }}
+        jsonLdId="blog-list-json-ld"
+      />
       <h1 className="text-2xl font-bold mb-8">Blog</h1>
       {blogs.length === 0 ? (
         <p className="text-gray-400">No blog posts yet.</p>

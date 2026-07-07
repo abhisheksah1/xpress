@@ -2,6 +2,7 @@ import * as orderService from '../../services/order.service.js';
 import { toStoredMediaUrl, enrichPersonalizationForClient, forClientMediaUrl, requestBaseUrl } from '../../utils/mediaUrl.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+import { rowsToCsv, withBom } from '../../utils/csvExport.js';
 
 const enrichOrderMedia = (order, req) => {
   const obj = order.toObject ? order.toObject() : { ...order };
@@ -39,6 +40,85 @@ export const getOrders = asyncHandler(async (req, res) => {
     ...result,
     orders: result.orders.map((order) => withOrderMeta(order, req)),
   }));
+});
+
+export const exportOrdersCsv = asyncHandler(async (req, res) => {
+  const orders = await orderService.getOrdersForExport(req.query);
+
+  const header = [
+    'Date',
+    'Time',
+    'Order Number',
+    'Status',
+    'Payment Status',
+    'Payment Method',
+    'Customer Name',
+    'Customer Email',
+    'Customer Phone',
+    'Subtotal',
+    'Shipping Fee',
+    'Discount',
+    'Tax',
+    'Total',
+    'Currency',
+    'Delivery Zone',
+    'Delivery Location',
+    'Preferred Delivery',
+    'Items',
+  ];
+
+  const rows = orders.map((o) => {
+    const created = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
+    const dateStr = Number.isNaN(created.getTime()) ? '' : created.toISOString().slice(0, 10);
+    const timeStr = Number.isNaN(created.getTime()) ? '' : created.toISOString().slice(11, 19);
+    const senderName = o.sender?.fullName
+      || o.shippingAddress?.fullName
+      || o.receiver?.fullName
+      || o.user?.name
+      || '';
+    const email = o.user?.email || o.guestEmail || o.sender?.email || o.shippingAddress?.email || '';
+    const phone = o.user?.phone || o.guestPhone || o.receiver?.phone || o.shippingAddress?.phone || '';
+    const deliveryLabel = o.timeSlot?.label
+      || (o.preferredDeliveryDate
+        ? new Date(o.preferredDeliveryDate).toISOString().slice(0, 10)
+        : '');
+    const itemsSummary = (o.items || [])
+      .map((item) => `${item.quantity}x ${item.name}`)
+      .join(' | ');
+
+    return [
+      dateStr,
+      timeStr,
+      o.orderNumber,
+      o.status,
+      o.payment?.status || '',
+      o.payment?.method || '',
+      senderName,
+      email,
+      phone,
+      o.subtotal ?? '',
+      o.shippingFee ?? '',
+      o.discount ?? '',
+      o.tax ?? '',
+      o.total ?? '',
+      o.checkoutCurrency || 'NPR',
+      o.deliveryZone?.name || '',
+      o.deliveryLocation?.name || '',
+      deliveryLabel,
+      itemsSummary,
+    ];
+  });
+
+  const csv = rowsToCsv([header, ...rows]);
+  const { startDate, endDate } = req.query;
+  const today = new Date().toISOString().slice(0, 10);
+  const from = startDate || 'all';
+  const to = endDate || today;
+  const filename = `orders-${from}-to-${to}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(withBom(csv));
 });
 
 export const getLeadOrderCount = asyncHandler(async (req, res) => {

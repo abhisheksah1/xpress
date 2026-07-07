@@ -40,7 +40,7 @@ export default function AdminLayout() {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = '/login';
+    window.location.href = '/admin/login';
   };
 
   return (

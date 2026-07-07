@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import DeliveryGroupRulesEditor from '../../components/admin/DeliveryGroupRulesEditor.jsx';
 import ComboItemsEditor from '../../components/admin/ComboItemsEditor.jsx';
+import ImageSizeGuide from '../../components/ImageSizeGuide.jsx';
+import { serializeComboItemsForApi, buildComboShortDescription } from '../../utils/comboItems.js';
 import { auditSeo, generateSeoFields, generateSkuPreview, slugify } from '../../utils/seoAuditor.js';
 import {
   ADMIN_PERSONALIZATION_OPTIONS,
@@ -60,6 +62,29 @@ const defaultForm = () => ({
   focusKeyword: '',
   tags: '',
 });
+
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function toOptionalNumber(value) {
+  if (value === '' || value == null) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function formatApiError(err, fallback = 'Failed to save product') {
+  const data = err.response?.data;
+  const validationErrors = data?.errors;
+  if (Array.isArray(validationErrors) && validationErrors.length) {
+    const detail = validationErrors
+      .map((e) => (typeof e === 'string' ? e : `${e.field}: ${e.message}`))
+      .join(' · ');
+    return detail || data?.message || fallback;
+  }
+  return data?.message || fallback;
+}
 
 function FieldLabel({ children, hint }) {
   return (
@@ -134,6 +159,33 @@ export default function ProductFormPage() {
   }, []);
 
   useEffect(() => {
+    if (!deliveryZones.length) return;
+    setForm((f) => {
+      const existing = new Map(f.deliveryGroupRules.map((r) => [String(r.group), r]));
+      let changed = f.deliveryGroupRules.length !== deliveryZones.length;
+      const merged = deliveryZones.map((g) => {
+        const id = String(g._id);
+        if (existing.has(id)) {
+          const rule = existing.get(id);
+          return {
+            ...rule,
+            group: id,
+            estimatedDays: rule.estimatedDays || { min: '', max: '' },
+          };
+        }
+        changed = true;
+        return {
+          group: id,
+          available: false,
+          sameDay: false,
+          estimatedDays: { min: '', max: '' },
+        };
+      });
+      return changed ? { ...f, deliveryGroupRules: merged } : f;
+    });
+  }, [deliveryZones]);
+
+  useEffect(() => {
     if (!isEdit) return;
     setLoading(true);
     adminApi
@@ -145,6 +197,13 @@ export default function ProductFormPage() {
           : p.category
             ? [p.category._id || p.category]
             : [];
+        const mappedComboItems = (p.comboItems || []).map((item, index) => ({
+            product: item.product?._id || item.product,
+            productData: item.product?._id ? item.product : undefined,
+            quantity: item.quantity || 1,
+            sortOrder: item.sortOrder ?? index,
+          }));
+        const autoDescription = p.isHamper ? buildComboShortDescription(mappedComboItems) : '';
         setForm({
           name: p.name || '',
           sku: p.sku || '',
@@ -165,8 +224,10 @@ export default function ProductFormPage() {
             sameDay: r.sameDay,
             estimatedDays: r.estimatedDays || { min: '', max: '' },
           })),
-          description: p.description || '',
-          shortDescriptionEnabled: p.shortDescriptionEnabled === true,
+          description: autoDescription || p.description || '',
+          shortDescriptionEnabled: p.isHamper
+            ? Boolean(autoDescription || p.shortDescriptionEnabled)
+            : p.shortDescriptionEnabled === true,
           longDescription: p.longDescription || '',
           additionalNote: p.additionalNote || '',
           imageUrlInput: '',
@@ -178,12 +239,7 @@ export default function ProductFormPage() {
           skuVariant: p.skuVariant || '',
           standardSize: p.standardSize || '',
           isHamper: p.isHamper ?? false,
-          comboItems: (p.comboItems || []).map((item, index) => ({
-            product: item.product?._id || item.product,
-            productData: item.product?._id ? item.product : undefined,
-            quantity: item.quantity || 1,
-            sortOrder: item.sortOrder ?? index,
-          })),
+          comboItems: mappedComboItems,
           optionCategories: p.optionCategories || [],
           metaTitle: p.metaTitle || '',
           metaDescription: p.metaDescription || '',
@@ -205,6 +261,17 @@ export default function ProductFormPage() {
 
   const seoAudit = useMemo(() => auditSeo(form, images), [form, images]);
 
+  const handleComboItemsChange = (items) => {
+    const autoDescription = buildComboShortDescription(items);
+    setForm((f) => ({
+      ...f,
+      comboItems: items,
+      ...(f.isHamper && autoDescription
+        ? { description: autoDescription, shortDescriptionEnabled: true }
+        : {}),
+    }));
+  };
+
   const toggleCategory = (catId) => {
     setForm((f) => ({
       ...f,
@@ -216,13 +283,14 @@ export default function ProductFormPage() {
 
   const buildDeliveryGroupRules = () =>
     form.deliveryGroupRules
-      .filter((r) =>
-        form.deliveryScope === 'selected'
-          ? r.available
-          : r.sameDay || r.estimatedDays?.min != null || r.estimatedDays?.max != null
-      )
+      .filter((r) => {
+        if (form.deliveryScope === 'selected') return !!r.available;
+        const min = r.estimatedDays?.min;
+        const max = r.estimatedDays?.max;
+        return !!r.sameDay || (min !== '' && min != null) || (max !== '' && max != null);
+      })
       .map((r) => ({
-        group: r.group,
+        group: String(r.group),
         available: form.deliveryScope === 'selected' ? !!r.available : true,
         sameDay: !!r.sameDay,
         estimatedDays: {
@@ -348,11 +416,11 @@ export default function ProductFormPage() {
       category: form.categoryIds[0],
       categories: form.categoryIds,
       brand: form.brand,
-      price: Number(form.price),
-      compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : undefined,
-      costPrice: form.costPrice ? Number(form.costPrice) : undefined,
-      stock: Number(form.stock),
-      lowStockThreshold: Number(form.lowStockThreshold),
+      price: toNumber(form.price),
+      compareAtPrice: toOptionalNumber(form.compareAtPrice),
+      costPrice: toOptionalNumber(form.costPrice),
+      stock: toNumber(form.stock),
+      lowStockThreshold: toNumber(form.lowStockThreshold, 3),
       deliveryZones: form.deliveryScope === 'selected'
         ? form.deliveryGroupRules.filter((r) => r.available).map((r) => r.group)
         : form.deliveryZoneIds,
@@ -362,19 +430,21 @@ export default function ProductFormPage() {
       personalizationFields: normalizePersonalizationFields(form.personalizationFields),
       allowBackorder: form.allowBackorder,
       isHamper: form.isHamper,
-      comboItems: form.isHamper
-        ? form.comboItems.map((item, index) => ({
-            product: item.product,
-            quantity: item.quantity || 1,
-            sortOrder: item.sortOrder ?? index,
-          }))
-        : [],
+      comboItems: form.isHamper ? serializeComboItemsForApi(form.comboItems) : [],
       barcode: form.barcode || undefined,
-      weight: form.weight ? Number(form.weight) : undefined,
+      weight: toOptionalNumber(form.weight),
       productGroup: form.productGroup || undefined,
       skuVariant: form.skuVariant || undefined,
       standardSize: form.standardSize || undefined,
-      optionCategories: form.optionCategories,
+      optionCategories: (form.optionCategories || []).map((cat) => ({
+        name: cat.name,
+        options: (cat.options || []).map((opt) => ({
+          label: opt.label,
+          ...(toOptionalNumber(opt.priceAdjustment) !== undefined
+            ? { priceAdjustment: toOptionalNumber(opt.priceAdjustment) }
+            : {}),
+        })),
+      })),
       isActive: statusOpt.isActive,
       isGiftWrappable: form.personalizationFields.giftMessage?.enabled,
       giftMessageEnabled: form.personalizationFields.giftMessage?.enabled,
@@ -394,7 +464,7 @@ export default function ProductFormPage() {
     if (!form.categoryIds.length) return toast.error('Select at least one category');
     if (!form.price && form.price !== 0) return toast.error('Original price is required');
 
-    if (form.isHamper && !form.comboItems.length) {
+    if (form.isHamper && !serializeComboItemsForApi(form.comboItems).length) {
       return toast.error('Add at least one product to this combo');
     }
 
@@ -410,7 +480,7 @@ export default function ProductFormPage() {
       }
       navigate('/admin/products');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save product');
+      toast.error(formatApiError(err));
     } finally {
       setSaving(false);
     }
@@ -530,6 +600,7 @@ export default function ProductFormPage() {
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Delivery Availability</h2>
             <p className="text-xs text-gray-500">
               Control which delivery groups can receive this product, same-day options, and custom delivery times.
+              Choose <strong>Only selected groups</strong> to limit areas (e.g. Kathmandu only), or <strong>Deliver to all groups</strong> with per-group overrides below.
               <Link to="/admin/delivery" className="text-primary-600 ml-1">Manage delivery groups</Link>
             </p>
             {deliveryZones.length === 0 ? (
@@ -548,7 +619,7 @@ export default function ProductFormPage() {
           <section className="card space-y-4">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Descriptions</h2>
             <p className="text-xs text-gray-500 leading-relaxed">
-              CSV import leaves descriptions blank — add delivery details, HTML content, and notes here. Supports headings, lists, and links.
+              CSV import maps column <span className="font-mono">product_description</span> to long description. Add or edit short description, HTML, and notes here.
             </p>
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
@@ -570,7 +641,9 @@ export default function ProductFormPage() {
                 placeholder="Brief summary shown below the product title when enabled"
               />
               <p className="text-xs text-gray-400 mt-1">
-                CSV imports keep this hidden until you enable it here.
+                {form.isHamper
+                  ? 'Auto-filled from linked product short descriptions when combo contents change. Enable to show below the product title on the store.'
+                  : 'CSV imports keep this hidden until you enable it here.'}
               </p>
             </div>
             <div>
@@ -585,6 +658,7 @@ export default function ProductFormPage() {
 
           <section className="card space-y-4">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Visual Digital Media Assets</h2>
+            <ImageSizeGuide guide="product" variant="admin" className="rounded-lg border border-blue-100" />
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -806,7 +880,7 @@ export default function ProductFormPage() {
                 productId={id}
                 comboItems={form.comboItems}
                 images={images}
-                onChange={(items) => set('comboItems', items)}
+                onChange={handleComboItemsChange}
                 onImagesChange={setImages}
                 onStockPreview={setComboStockPreview}
               />

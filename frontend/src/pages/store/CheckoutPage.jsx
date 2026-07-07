@@ -12,9 +12,16 @@ import {
   phoneMaxLength,
 } from '../../utils/countryCodes.js';
 import { CheckoutCurrencyToggle, CheckoutPaymentGrid } from '../../components/store/CheckoutPaymentOptions.jsx';
+import ImageSizeGuide from '../../components/ImageSizeGuide.jsx';
 import { formatTimeSlotOption, formatTimeSlotSummary } from '../../utils/timeSlot.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { resolveCartItemPersonalization } from '../../utils/personalization.js';
+import {
+  DELIVERY_PREP_HOURS,
+  filterAvailableTimeSlots,
+  getMinPreferredDeliveryDate,
+  validatePreferredDeliverySelection,
+} from '../../utils/deliveryScheduling.js';
 
 function FormField({ id, label, required, optional, hint, children }) {
   return (
@@ -89,6 +96,12 @@ export default function CheckoutPage() {
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const enabledCurrencies = useMemo(
     () => (storeCurrencies?.length ? storeCurrencies : getCheckoutDisplayCurrencies(settings)),
@@ -109,11 +122,10 @@ export default function CheckoutPage() {
     [settings.service_addons]
   );
 
-  const minDeliveryDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  }, []);
+  const minDeliveryDate = useMemo(
+    () => getMinPreferredDeliveryDate({ nowMs }),
+    [nowMs]
+  );
 
   useEffect(() => {
     storeApi.getDeliveryLocations().then((res) => setDeliveryLocations(res.data.data || [])).catch(() => setDeliveryLocations([]));
@@ -131,12 +143,24 @@ export default function CheckoutPage() {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [selectedDeliveryLocation]);
 
+  const availableTimeSlots = useMemo(
+    () => filterAvailableTimeSlots(timeSlots, preferredDate, { nowMs }),
+    [timeSlots, preferredDate, nowMs]
+  );
+
   useEffect(() => {
     if (!timeSlotId) return;
-    if (!timeSlots.length || !timeSlots.find((s) => s.id === timeSlotId)) {
+    if (!availableTimeSlots.length || !availableTimeSlots.find((s) => s.id === timeSlotId)) {
       setTimeSlotId('');
     }
-  }, [deliveryLocationId, timeSlots, timeSlotId]);
+  }, [deliveryLocationId, availableTimeSlots, timeSlotId, preferredDate]);
+
+  useEffect(() => {
+    if (!preferredDate) return;
+    if (preferredDate < minDeliveryDate) {
+      setPreferredDate('');
+    }
+  }, [preferredDate, minDeliveryDate]);
 
   useEffect(() => {
     setTimeSlotId('');
@@ -359,6 +383,14 @@ export default function CheckoutPage() {
       }
       if (addonUploading[id]) return 'Please wait for photo upload to finish';
     }
+
+    const deliveryErrors = validatePreferredDeliverySelection({
+      preferredDeliveryDate: preferredDate,
+      timeSlotId,
+      timeSlots,
+      nowMs,
+    });
+    if (deliveryErrors.length) return deliveryErrors[0];
 
     return null;
   };
@@ -586,7 +618,12 @@ export default function CheckoutPage() {
                 />
               </FormField>
               <div className="grid sm:grid-cols-2 gap-3">
-                <FormField id="preferred-date" label="Preferred delivery date" optional>
+                <FormField
+                  id="preferred-date"
+                  label="Preferred delivery date"
+                  optional
+                  hint={`Orders need at least ${DELIVERY_PREP_HOURS} hours preparation time.`}
+                >
                   <input
                     id="preferred-date"
                     type="date"
@@ -598,7 +635,12 @@ export default function CheckoutPage() {
                 </FormField>
                 {timeSlots.length > 0 && (
                   <div className="sm:col-span-2">
-                    <FormField id="time-slot" label="Preferred time slot" optional>
+                    <FormField
+                      id="time-slot"
+                      label="Preferred time slot"
+                      optional
+                      hint={`Only slots at least ${DELIVERY_PREP_HOURS} hours from now are shown.`}
+                    >
                       <select
                         id="time-slot"
                         className="input-field"
@@ -606,17 +648,22 @@ export default function CheckoutPage() {
                         onChange={(e) => setTimeSlotId(e.target.value)}
                       >
                         <option value="">Any time on selected date</option>
-                        {timeSlots.map((slot) => (
+                        {availableTimeSlots.map((slot) => (
                           <option key={slot.id} value={slot.id}>
                             {formatTimeSlotOption(slot, (npr) => fmt(npr))}
                           </option>
                         ))}
                       </select>
                     </FormField>
+                    {availableTimeSlots.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1.5">
+                        No time slots are available for the selected date. Choose a later date or delivery time.
+                      </p>
+                    )}
                     {timeSlotId && (
                       <p className="text-xs text-slate-500 mt-1.5">
                         {(() => {
-                          const slot = timeSlots.find((s) => s.id === timeSlotId);
+                          const slot = availableTimeSlots.find((s) => s.id === timeSlotId);
                           if (!slot) return null;
                           const fee = Number(slot.fee || 0);
                           const summary = formatTimeSlotSummary(slot, (npr) => fmt(npr));
@@ -686,6 +733,7 @@ export default function CheckoutPage() {
                                 label={addon.inputType === 'both' ? 'Add-on photo' : 'Upload photo'}
                                 required
                               >
+                                <ImageSizeGuide guide="customerPhoto" variant="store" className="mb-2" />
                                 <div className="flex flex-wrap items-center gap-3">
                                   <label className="inline-flex items-center px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors">
                                     {addonUploading[addon.id] ? 'Uploading...' : input.photoUrl ? 'Change photo' : 'Choose photo'}

@@ -1,4 +1,5 @@
 import * as productService from '../../services/product.service.js';
+import { mergeSeoPayload } from '../../utils/seoMeta.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { PRODUCT_CSV_TEMPLATE_HEADERS } from '../../utils/productCsvMapper.js';
@@ -52,12 +53,12 @@ export const getCategories = asyncHandler(async (req, res) => {
 });
 
 export const createCategory = asyncHandler(async (req, res) => {
-  const category = await productService.createCategory(req.body);
+  const category = await productService.createCategory(mergeSeoPayload(req.validated.body));
   res.status(201).json(new ApiResponse(201, category, 'Category created'));
 });
 
 export const updateCategory = asyncHandler(async (req, res) => {
-  const category = await productService.updateCategory(req.params.id, req.body);
+  const category = await productService.updateCategory(req.params.id, mergeSeoPayload(req.validated.body));
   res.json(new ApiResponse(200, category, 'Category updated'));
 });
 

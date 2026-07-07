@@ -27,7 +27,8 @@ api.interceptors.response.use(
         return api(error.config);
       } catch {
         localStorage.removeItem('accessToken');
-        window.location.href = '/login';
+        const loginPath = window.location.pathname.startsWith('/admin') ? '/admin/login' : '/login';
+        window.location.href = loginPath;
       }
     }
     return Promise.reject(error);

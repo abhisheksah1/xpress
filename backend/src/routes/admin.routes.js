@@ -22,9 +22,12 @@ import * as apiPartnerReportController from '../controllers/admin/apiPartnerRepo
 import * as financeController from '../controllers/admin/finance.controller.js';
 import {
   createProductSchema,
+  createCategorySchema,
+  updateCategorySchema,
   bulkPriceSchema,
   createStaffSchema,
   createBlogSchema,
+  updateBlogSchema,
   deliveryGroupSchema,
   deliveryLocationSchema,
   updateSettingsSchema,
@@ -72,8 +75,8 @@ router.delete('/products/:id', hasPermission('products:write'), productControlle
 
 // Categories
 router.get('/categories', productController.getCategories);
-router.post('/categories', hasPermission('products:write'), productController.createCategory);
-router.patch('/categories/:id', hasPermission('products:write'), productController.updateCategory);
+router.post('/categories', hasPermission('products:write'), validate(createCategorySchema), productController.createCategory);
+router.patch('/categories/:id', hasPermission('products:write'), validate(updateCategorySchema), productController.updateCategory);
 router.delete('/categories/:id', hasPermission('products:write'), productController.deleteCategory);
 
 // Inventory
@@ -84,6 +87,7 @@ router.post('/inventory/adjust', hasPermission('inventory:write'), inventoryCont
 // Orders
 router.get('/orders/leads/count', hasPermission('orders:read'), orderController.getLeadOrderCount);
 router.get('/orders', hasPermission('orders:read'), orderController.getOrders);
+router.get('/orders/export/csv', hasPermission('orders:read'), orderController.exportOrdersCsv);
 router.get('/orders/:id', hasPermission('orders:read'), orderController.getOrder);
 router.post('/orders/:id/confirm', hasPermission('orders:write'), validate(confirmLeadOrderSchema), orderController.confirmLead);
 router.post('/orders/:id/cancel-lead', hasPermission('orders:write'), validate(cancelLeadOrderSchema), orderController.cancelLead);
@@ -140,7 +144,7 @@ router.delete('/staff/:id', isSuperAdmin, staffController.deleteStaff);
 router.get('/blogs', hasPermission('blog:read'), blogController.getBlogs);
 router.post('/blogs', hasPermission('blog:write'), validate(createBlogSchema), blogController.createBlog);
 router.get('/blogs/:id', hasPermission('blog:read'), blogController.getBlog);
-router.patch('/blogs/:id', hasPermission('blog:write'), blogController.updateBlog);
+router.patch('/blogs/:id', hasPermission('blog:write'), validate(updateBlogSchema), blogController.updateBlog);
 router.delete('/blogs/:id', hasPermission('blog:write'), blogController.deleteBlog);
 
 // CMS

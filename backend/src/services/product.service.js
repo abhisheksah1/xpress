@@ -131,7 +131,7 @@ export const getProducts = async ({
     Product.find(filter)
       .populate('category', 'name slug deliveryScope deliveryGroupRules')
       .populate('categories', 'name slug')
-      .select(isComboPicker ? 'name slug sku price stock images isHamper isActive' : undefined)
+      .select(isComboPicker ? 'name slug sku price stock images isHamper isActive shortDescription description' : undefined)
       .sort(sortBy)
       .skip(skip)
       .limit(limit),
@@ -168,7 +168,8 @@ export const getProductById = async (id) => {
   const product = await Product.findById(id)
     .populate('category', 'name slug deliveryScope deliveryGroupRules')
     .populate('categories', 'name slug deliveryScope deliveryGroupRules')
-    .populate('comboItems.product', 'name slug sku price stock images isHamper')
+    .populate('comboItems.product', 'name slug sku price stock images isHamper shortDescription description')
+    .populate('deliveryGroupRules.group', 'name code estimatedDays estimatedHours cutoffTime')
     .populate('deliveryZones', 'name code estimatedDeliveryLabel estimatedDays cutoffTime coverageLocations')
     .populate('deliveryGroups', 'name code estimatedDeliveryLabel estimatedDays cutoffTime');
   if (!product) throw new ApiError(404, 'Product not found');

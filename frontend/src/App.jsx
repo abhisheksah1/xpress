@@ -41,6 +41,8 @@ import FinanceTreasuryPage from './pages/admin/finance/FinanceTreasuryPage';
 export default function App() {
   return (
     <Routes>
+      <Route path="/admin/login" element={<LoginPage />} />
+
       <Route path="/" element={<StoreLayout />}>
         <Route index element={<HomePage />} />
         <Route path="shop" element={<ShopPage />} />

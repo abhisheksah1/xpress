@@ -4,7 +4,7 @@ import { storeApi } from '../../api/store.js';
 import ProductCard from './ProductCard.jsx';
 import { applyCategoriesGridRules } from '../../utils/categoriesGrid.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
-import { getDeliveryCountdownState, formatCutoffTimeLabel, getDeliveryCountdownCopy } from '../../utils/deliveryCountdown.js';
+import { getDeliveryCountdownState, getDeliveryCountdownCopy } from '../../utils/deliveryCountdown.js';
 import { resolveVideoEmbed, getVideoUrlFromBlock } from '../../utils/videoEmbed.js';
 
 function HeroBlock({ block }) {
@@ -524,7 +524,6 @@ function DeliveryCountdownBlock({ block }) {
     block,
     phase: state.phase,
   });
-  const cutoffNote = cfg.cutoffNote || `Zone Cutoff: ${formatCutoffTimeLabel(cutoff)} Time`;
   const bgImage = block.image?.url || block.images?.[0]?.url;
 
   return (
@@ -579,14 +578,6 @@ function DeliveryCountdownBlock({ block }) {
           <Link to={btnUrl} className="btn-primary inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 text-xs sm:text-sm font-bold uppercase tracking-wide w-full sm:w-auto max-w-xs sm:max-w-none mx-auto">
             {btnText}
           </Link>
-        )}
-        {cfg.showCutoffNote !== false && (
-          <p className={`text-[10px] sm:text-xs mt-4 sm:mt-6 flex flex-wrap items-center justify-center gap-1.5 px-2 ${
-            bgImage ? 'text-white/70' : 'text-slate-400'
-          }`}>
-            <span aria-hidden>🕐</span>
-            <span>{cutoffNote}</span>
-          </p>
         )}
         </div>
       </div>

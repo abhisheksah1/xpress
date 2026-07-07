@@ -27,10 +27,21 @@ function Toggle({ label, checked, onChange, hint }) {
   );
 }
 
+function isGroupSameDayCapable(group) {
+  return group?.estimatedDays?.min === 0 || group?.estimatedHours != null;
+}
+
+function formatGroupDefaultLabel(group) {
+  const min = group?.estimatedDays?.min ?? 0;
+  const max = group?.estimatedDays?.max ?? 1;
+  const sameDayHint = isGroupSameDayCapable(group) ? ' · same-day OK' : '';
+  return `${min}–${max} days${sameDayHint}`;
+}
+
 export default function DeliveryGroupRulesEditor({ groups, scope, onScopeChange, rules, onRulesChange }) {
   const getRule = (groupId) =>
     rules.find((r) => String(r.group) === String(groupId)) || {
-      group: groupId,
+      group: String(groupId),
       available: false,
       sameDay: false,
       estimatedDays: { min: '', max: '' },
@@ -39,7 +50,7 @@ export default function DeliveryGroupRulesEditor({ groups, scope, onScopeChange,
   const updateRule = (groupId, patch) => {
     const existing = getRule(groupId);
     const next = rules.filter((r) => String(r.group) !== String(groupId));
-    onRulesChange([...next, { ...existing, group: groupId, ...patch }]);
+    onRulesChange([...next, { ...existing, group: String(groupId), ...patch }]);
   };
 
   return (
@@ -71,27 +82,36 @@ export default function DeliveryGroupRulesEditor({ groups, scope, onScopeChange,
           <tbody className="divide-y divide-gray-50">
             {groups.map((group) => {
               const rule = getRule(group._id);
-              const disabledAvailable = scope !== 'selected';
+              const sameDayCapable = isGroupSameDayCapable(group);
               return (
                 <tr key={group._id}>
                   <td className="px-3 py-2">
                     <span className="font-medium block">{group.name}</span>
-                    <span className="text-xs text-gray-400">{group.province}</span>
+                    {group.code && <span className="text-xs text-gray-400">{group.code}</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    {scope === 'selected' ? (
+                      <input
+                        type="checkbox"
+                        checked={!!rule.available}
+                        onChange={(e) => updateRule(group._id, { available: e.target.checked })}
+                      />
+                    ) : (
+                      <span className="text-xs text-gray-400">
+                        {scope === 'all' ? 'All groups' : 'From category'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <input
                       type="checkbox"
-                      disabled={disabledAvailable}
-                      checked={scope === 'selected' ? !!rule.available : false}
-                      onChange={(e) => updateRule(group._id, { available: e.target.checked })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      disabled={!group.sameDayAvailable && !group.estimatedHours && group.estimatedDays?.min !== 0}
                       checked={!!rule.sameDay}
                       onChange={(e) => updateRule(group._id, { sameDay: e.target.checked })}
+                      title={
+                        sameDayCapable
+                          ? 'Enable same-day for this product in this group'
+                          : 'Enable same-day for this product (even if the group default is not same-day)'
+                      }
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -99,13 +119,13 @@ export default function DeliveryGroupRulesEditor({ groups, scope, onScopeChange,
                       type="number"
                       min="0"
                       className="input-field w-20 py-1 text-sm"
-                      placeholder={group.estimatedDays?.min ?? ''}
+                      placeholder={String(group.estimatedDays?.min ?? '')}
                       value={rule.estimatedDays?.min ?? ''}
                       onChange={(e) =>
                         updateRule(group._id, {
                           estimatedDays: {
                             ...rule.estimatedDays,
-                            min: e.target.value === '' ? undefined : Number(e.target.value),
+                            min: e.target.value === '' ? '' : Number(e.target.value),
                           },
                         })
                       }
@@ -116,21 +136,20 @@ export default function DeliveryGroupRulesEditor({ groups, scope, onScopeChange,
                       type="number"
                       min="0"
                       className="input-field w-20 py-1 text-sm"
-                      placeholder={group.estimatedDays?.max ?? ''}
+                      placeholder={String(group.estimatedDays?.max ?? '')}
                       value={rule.estimatedDays?.max ?? ''}
                       onChange={(e) =>
                         updateRule(group._id, {
                           estimatedDays: {
                             ...rule.estimatedDays,
-                            max: e.target.value === '' ? undefined : Number(e.target.value),
+                            max: e.target.value === '' ? '' : Number(e.target.value),
                           },
                         })
                       }
                     />
                   </td>
                   <td className="px-3 py-2 text-xs text-gray-400">
-                    {group.estimatedDays?.min ?? 1}–{group.estimatedDays?.max ?? 3} days
-                    {group.sameDayAvailable ? ' · same-day OK' : ''}
+                    {formatGroupDefaultLabel(group)}
                   </td>
                 </tr>
               );
@@ -227,7 +246,16 @@ export function CategoryDeliveryRulesEditor({ groups, category, onSave }) {
                     </td>
                   )}
                   <td className="px-3 py-2">
-                    <input type="checkbox" disabled={!(group.sameDayAvailable || group.estimatedHours || group.estimatedDays?.min === 0)} checked={!!rule.sameDay} onChange={(e) => updateRule(group._id, { sameDay: e.target.checked })} />
+                    <input
+                      type="checkbox"
+                      checked={!!rule.sameDay}
+                      onChange={(e) => updateRule(group._id, { sameDay: e.target.checked })}
+                      title={
+                        isGroupSameDayCapable(group)
+                          ? 'Enable same-day for this category in this group'
+                          : 'Enable same-day for this category (even if the group default is not same-day)'
+                      }
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <input type="number" min="0" className="input-field w-20 py-1 text-sm" value={rule.estimatedDays?.min ?? ''} onChange={(e) => updateRule(group._id, { estimatedDays: { ...rule.estimatedDays, min: e.target.value === '' ? undefined : Number(e.target.value) } })} />

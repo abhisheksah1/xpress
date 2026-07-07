@@ -2,27 +2,9 @@ import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
+import ImageSizeGuide from '../ImageSizeGuide.jsx';
 
 const ACCEPT = 'image/jpeg,image/jpg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif';
-
-const SIZE_HINTS = {
-  slides: {
-    title: 'Recommended slide size',
-    lines: [
-      '1920 × 840 px (16:7 widescreen — matches the storefront slider)',
-      'Minimum 1280 × 560 px for sharp display on desktop',
-      'JPEG or WebP format, under 500 KB per slide',
-      'Keep key content centered — edges may crop slightly on mobile',
-    ],
-  },
-  single: {
-    title: 'Recommended image size',
-    lines: [
-      '1600 × 900 px or larger',
-      'JPEG or WebP format, under 500 KB',
-    ],
-  },
-};
 
 const parseUrlInput = (input) =>
   input
@@ -59,6 +41,7 @@ async function uploadFiles(imageFiles) {
 
 export default function CmsImagePicker({
   mode = 'single',
+  guideKey,
   images = [],
   onChange,
   label = 'Images',
@@ -158,7 +141,7 @@ export default function CmsImagePicker({
   };
 
   const listTitle = mode === 'slides' ? 'Slider carousel slides list' : 'Image';
-  const sizeHint = SIZE_HINTS[mode === 'slides' ? 'slides' : 'single'];
+  const resolvedGuideKey = guideKey || (mode === 'slides' ? 'cmsSlide' : 'cmsContent');
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
@@ -183,14 +166,7 @@ export default function CmsImagePicker({
         </span>
       </div>
 
-      <div className="px-3 py-2 border-b border-slate-100 bg-blue-50/80">
-        <p className="text-xs font-semibold text-blue-900">{sizeHint.title}</p>
-        <ul className="mt-1 space-y-0.5 text-xs text-blue-800/90 list-disc list-inside">
-          {sizeHint.lines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </div>
+      <ImageSizeGuide guide={resolvedGuideKey} variant="admin" />
 
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

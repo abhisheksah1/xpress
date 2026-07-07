@@ -31,7 +31,7 @@ export default function AdminGuard({ children }) {
   }
 
   if (!localStorage.getItem('accessToken') || !isStaff()) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/admin/login" state={{ from: location.pathname }} replace />;
   }
 
   return children;

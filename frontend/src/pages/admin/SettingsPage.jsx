@@ -15,6 +15,7 @@ import {
   SmtpSection,
   CustomerAuthSection,
   ProductPageSection,
+  SeoSection,
 } from '../../components/admin/settings/sections.jsx';
 
 const TABS = [
@@ -27,6 +28,7 @@ const TABS = [
   { id: 'plugins', label: 'Plugins Config', icon: '🔌' },
   { id: 'branding', label: 'Branding & Layout', icon: '🎨' },
   { id: 'productpage', label: 'Product Page', icon: '📦' },
+  { id: 'seo', label: 'SEO & GEO', icon: '🔍' },
   { id: 'compliance', label: 'Compliance & Footer', icon: '🏢' },
   { id: 'timeslots', label: 'Delivery Time Slots', icon: '🕒' },
   { id: 'admin', label: 'Admin Credentials', icon: '🔒' },
@@ -54,6 +56,7 @@ export default function SettingsPage() {
       case 'plugins': return <PluginsSection {...props} />;
       case 'branding': return <BrandingSection {...props} />;
       case 'productpage': return <ProductPageSection {...props} />;
+      case 'seo': return <SeoSection {...props} />;
       case 'compliance': return <ComplianceSection {...props} />;
       case 'timeslots': return <TimeSlotsSection {...props} />;
       case 'admin': return <AdminCredentialsSection />;

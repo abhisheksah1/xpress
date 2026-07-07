@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../../api/admin.js';
 import { Field, SectionCard, Toggle, saveSection } from './shared.jsx';
 import PaymentGatewaysSetup from '../PaymentGatewaysSetup.jsx';
+import ImageSizeGuide from '../../ImageSizeGuide.jsx';
 
 const REGISTRY_KEYS = [
   'registry_company_name',
@@ -123,7 +124,7 @@ export function MaintenanceSection({ values, set }) {
         label="Enable Maintenance Mode"
         checked={values.maintenance_enabled}
         onChange={(v) => set('maintenance_enabled', v)}
-        hint="When enabled, customers see a maintenance page and checkout is blocked."
+        hint="When enabled, the customer website is hidden. Staff can still sign in at /admin/login and use the admin panel."
       />
       <Field label="Maintenance Message">
         <textarea
@@ -450,8 +451,14 @@ export function BrandingSection({ values, set }) {
   return (
     <SectionCard title="Branding & Layout Config" description="10 core visual settings for your storefront." onSave={() => saveSection(keys, values, setSaving)} saving={saving}>
       <div className="grid md:grid-cols-2 gap-4">
-        <Field label="Logo URL"><input className="input-field" value={values.logo_url || ''} onChange={(e) => set('logo_url', e.target.value)} /></Field>
-        <Field label="Favicon URL"><input className="input-field" value={values.favicon_url || ''} onChange={(e) => set('favicon_url', e.target.value)} /></Field>
+        <Field label="Logo URL">
+          <input className="input-field" value={values.logo_url || ''} onChange={(e) => set('logo_url', e.target.value)} />
+          <ImageSizeGuide guide="logo" variant="muted" compact className="mt-1.5" />
+        </Field>
+        <Field label="Favicon URL">
+          <input className="input-field" value={values.favicon_url || ''} onChange={(e) => set('favicon_url', e.target.value)} />
+          <ImageSizeGuide guide="favicon" variant="muted" compact className="mt-1.5" />
+        </Field>
         <Field label="Primary Color"><input type="color" className="h-10 w-full" value={values.primary_color || '#E11D48'} onChange={(e) => set('primary_color', e.target.value)} /></Field>
         <Field label="Secondary Color"><input type="color" className="h-10 w-full" value={values.secondary_color || '#1E293B'} onChange={(e) => set('secondary_color', e.target.value)} /></Field>
         <Field label="Accent Color"><input type="color" className="h-10 w-full" value={values.accent_color || '#F59E0B'} onChange={(e) => set('accent_color', e.target.value)} /></Field>
@@ -706,13 +713,14 @@ export function ProductPageSection({ values, set }) {
 
       <Field
         label="Delivery schedule footer note"
-        hint="Small print below the yellow delivery table on product pages."
+        hint="Small print below the yellow delivery table on product pages. Buy panel uses cut-off from the schedule when available."
       >
         <textarea
           className="input-field"
           rows={2}
           value={values.product_delivery_schedule_disclaimer || ''}
           onChange={(e) => set('product_delivery_schedule_disclaimer', e.target.value)}
+          placeholder="* Orders submitted beyond the cut-off times (4 PM NST) are queued and dispatched on the subsequent fulfillment cycle. All speeds verified by carriers."
         />
       </Field>
 
@@ -753,6 +761,84 @@ export function ProductPageSection({ values, set }) {
             onChange={(e) => set('product_whatsapp_help_button_text', e.target.value)}
           />
         </Field>
+      </div>
+    </SectionCard>
+  );
+}
+
+const SEO_KEYS = [
+  'site_url',
+  'meta_title',
+  'meta_description',
+  'meta_keywords',
+  'default_og_image',
+  'google_site_verification',
+  'bing_site_verification',
+  'business_name',
+  'geo_placename',
+  'geo_region',
+  'geo_country',
+  'geo_latitude',
+  'geo_longitude',
+];
+
+export function SeoSection({ values, set }) {
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <SectionCard
+      title="SEO, Social & GEO Defaults"
+      description="Site-wide defaults used when a page or blog post does not override SEO fields."
+      onSave={() => saveSection(SEO_KEYS, values, setSaving)}
+      saving={saving}
+    >
+      <div className="grid md:grid-cols-2 gap-4">
+        <Field label="Canonical site URL" hint="Used for absolute canonical and OG URLs.">
+          <input className="input-field" value={values.site_url || ''} onChange={(e) => set('site_url', e.target.value)} placeholder="https://koselixpress.com" />
+        </Field>
+        <Field label="Business name (schema)">
+          <input className="input-field" value={values.business_name || ''} onChange={(e) => set('business_name', e.target.value)} />
+        </Field>
+        <Field label="Default meta title">
+          <input className="input-field" value={values.meta_title || ''} onChange={(e) => set('meta_title', e.target.value)} />
+        </Field>
+        <Field label="Default meta description">
+          <textarea className="input-field" rows={2} value={values.meta_description || ''} onChange={(e) => set('meta_description', e.target.value)} />
+        </Field>
+        <Field label="Default meta keywords" className="md:col-span-2">
+          <input className="input-field" value={values.meta_keywords || ''} onChange={(e) => set('meta_keywords', e.target.value)} placeholder="gifts, flowers, Nepal" />
+        </Field>
+        <Field label="Default OG image URL" className="md:col-span-2">
+          <input className="input-field" value={values.default_og_image || ''} onChange={(e) => set('default_og_image', e.target.value)} placeholder="https://..." />
+          <ImageSizeGuide guide="og" variant="muted" compact className="mt-1.5" />
+        </Field>
+        <Field label="Google site verification">
+          <input className="input-field" value={values.google_site_verification || ''} onChange={(e) => set('google_site_verification', e.target.value)} />
+        </Field>
+        <Field label="Bing site verification">
+          <input className="input-field" value={values.bing_site_verification || ''} onChange={(e) => set('bing_site_verification', e.target.value)} />
+        </Field>
+      </div>
+
+      <div className="border-t border-gray-100 pt-4 mt-2">
+        <h4 className="text-sm font-semibold text-gray-800 mb-3">Default GEO tags</h4>
+        <div className="grid md:grid-cols-2 gap-4">
+          <Field label="Placename">
+            <input className="input-field" value={values.geo_placename || ''} onChange={(e) => set('geo_placename', e.target.value)} />
+          </Field>
+          <Field label="Region">
+            <input className="input-field" value={values.geo_region || ''} onChange={(e) => set('geo_region', e.target.value)} />
+          </Field>
+          <Field label="Country code">
+            <input className="input-field" value={values.geo_country || ''} onChange={(e) => set('geo_country', e.target.value)} />
+          </Field>
+          <Field label="Latitude">
+            <input className="input-field" value={values.geo_latitude || ''} onChange={(e) => set('geo_latitude', e.target.value)} />
+          </Field>
+          <Field label="Longitude">
+            <input className="input-field" value={values.geo_longitude || ''} onChange={(e) => set('geo_longitude', e.target.value)} />
+          </Field>
+        </div>
       </div>
     </SectionCard>
   );

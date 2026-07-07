@@ -119,6 +119,7 @@ export default function HeaderNavbarEditor({
         <h3 className="text-sm font-bold text-gray-900">Main header row</h3>
         <CmsImagePicker
           mode="single"
+          guideKey="logo"
           images={logoImages}
           onChange={(imgs) => {
             const first = imgs[0];

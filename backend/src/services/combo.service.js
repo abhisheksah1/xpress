@@ -65,7 +65,7 @@ export const validateComboItems = async (comboItems, productId = null) => {
     throw new ApiError(400, 'Combo product must include at least one item');
   }
 
-  const ids = comboItems.map((i) => String(i.product));
+  const ids = comboItems.map((i) => String(i.product?._id || i.product));
   if (productId && ids.includes(String(productId))) {
     throw new ApiError(400, 'A combo cannot include itself');
   }
@@ -84,13 +84,39 @@ export const validateComboItems = async (comboItems, productId = null) => {
   return components;
 };
 
+const stripHtml = (text) =>
+  String(text || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export const buildComboShortDescription = (components, comboItems) => {
+  const byId = new Map(components.map((c) => [String(c._id), c]));
+  const sorted = [...(comboItems || [])].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  const lines = [];
+
+  for (const item of sorted) {
+    const component = byId.get(String(item.product?._id || item.product));
+    if (!component?.name) continue;
+
+    const text = stripHtml(component.shortDescription || component.description || '');
+    if (!text) continue;
+
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    const qtyLabel = qty > 1 ? ` (×${qty})` : '';
+    lines.push(`${component.name}${qtyLabel}: ${text}`);
+  }
+
+  return lines.join('\n\n');
+};
+
 export const prepareComboProductData = async (data, productId = null) => {
   if (!data.isHamper) {
     return { ...data, comboItems: [] };
   }
 
   const comboItems = (data.comboItems || []).map((item, index) => ({
-    product: item.product,
+    product: String(item.product?._id || item.product),
     quantity: Math.max(1, Number(item.quantity) || 1),
     sortOrder: item.sortOrder ?? index,
   }));
@@ -98,12 +124,20 @@ export const prepareComboProductData = async (data, productId = null) => {
   const components = await validateComboItems(comboItems, productId);
   const stock = computeComboStock(comboItems, components);
   const images = mergeComboImages(data.images || [], components, comboItems);
+  const autoDescription = buildComboShortDescription(components, comboItems);
 
   return {
     ...data,
     comboItems,
     stock,
     images,
+    ...(autoDescription
+      ? {
+          description: autoDescription,
+          shortDescription: autoDescription.slice(0, 200),
+          shortDescriptionEnabled: true,
+        }
+      : {}),
   };
 };
 

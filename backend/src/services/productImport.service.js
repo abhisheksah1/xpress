@@ -114,10 +114,10 @@ export async function importProductRows(rows, userId) {
       if (existing) {
         if (!payload.images?.length) delete payload.images;
         if (!payload.sku) delete payload.sku;
-        // CSV import must not overwrite admin-written descriptions
+        // Keep admin short descriptions; only refresh long description when CSV provides it
         delete payload.description;
         delete payload.shortDescription;
-        delete payload.longDescription;
+        if (!mapped.longDescription) delete payload.longDescription;
         await Product.findByIdAndUpdate(existing._id, payload, { runValidators: true });
         results.updated += 1;
       } else {

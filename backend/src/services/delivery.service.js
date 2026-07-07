@@ -110,19 +110,21 @@ export const countProductsInGroup = async (group) => {
 export const productMatchesGroup = (product, category, group) => {
   const productId = idStr(product._id || product);
   const categoryId = idStr(product.category?._id || product.category || category?._id);
+  const extraCategoryIds = (product.categories || []).map((c) => idStr(c._id || c));
 
   if ((group.products || []).some((p) => idStr(p._id || p) === productId)) return true;
   if ((group.categories || []).some((c) => idStr(c._id || c) === categoryId)) return true;
-
-  const extraCategoryIds = (product.categories || []).map((c) => idStr(c._id || c));
   if ((group.categories || []).some((gc) => extraCategoryIds.includes(idStr(gc._id || gc)))) return true;
 
+  const scope = product.deliveryScope || 'inherit';
   const productRule = findRule(product.deliveryGroupRules, group._id);
-  if (product.deliveryScope === 'selected' && productRule?.available) return true;
-
   const categoryRule = category ? findRule(category.deliveryGroupRules, group._id) : null;
-  if (product.deliveryScope === 'inherit' && category?.deliveryScope === 'selected' && categoryRule?.available) {
-    return true;
+
+  if (scope === 'all') return true;
+  if (scope === 'selected') return !!productRule?.available;
+  if (scope === 'inherit') {
+    if (category?.deliveryScope === 'all') return true;
+    if (category?.deliveryScope === 'selected') return !!categoryRule?.available;
   }
 
   const legacyIds = (product.deliveryZones || product.deliveryGroups || []).map((z) => idStr(z._id || z));
@@ -148,14 +150,23 @@ export const resolveDeliveryForGroup = (product, category, group) => {
       ? categoryRule.estimatedDays
       : group.estimatedDays || { min: 1, max: 3 };
 
+  const resolvedDays = {
+    min: estimatedDays.min ?? group.estimatedDays?.min ?? 1,
+    max: estimatedDays.max ?? group.estimatedDays?.max ?? 3,
+  };
+
+  // If same-day is explicitly enabled (group/category/product), force min/max to 0
+  // so the rest of the system (checkout, labels, validation) treats it as same-day.
+  if (sameDay) {
+    resolvedDays.min = 0;
+    resolvedDays.max = 0;
+  }
+
   return {
     available,
     sameDay: !!sameDay,
     estimatedDeliveryLabel: group.estimatedDeliveryLabel,
-    estimatedDays: {
-      min: estimatedDays.min ?? group.estimatedDays?.min ?? 1,
-      max: estimatedDays.max ?? group.estimatedDays?.max ?? 3,
-    },
+    estimatedDays: resolvedDays,
     cutoffTime: group.cutoffTime,
     productRule,
     categoryRule,

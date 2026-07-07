@@ -544,6 +544,8 @@ export default function OrdersPage({ mode = 'orders' }) {
   const [loading, setLoading] = useState(true);
   const [detailId, setDetailId] = useState(null);
   const [deliverySort, setDeliverySort] = useState(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const params = useMemo(() => {
     const p = { page, limit: 25 };
@@ -553,13 +555,15 @@ export default function OrdersPage({ mode = 'orders' }) {
       p.excludeLeads = true;
     }
     if (status) p.status = status;
+    if (startDate) p.startDate = startDate;
+    if (endDate) p.endDate = endDate;
     if (search.trim()) p.search = search.trim();
     if (deliverySort) {
       p.sortBy = 'preferredDeliveryDate';
       p.sortOrder = deliverySort;
     }
     return p;
-  }, [page, status, search, isLeads, deliverySort]);
+  }, [page, status, search, isLeads, deliverySort, startDate, endDate]);
 
   const toggleDeliverySort = () => {
     setDeliverySort((prev) => {
@@ -580,6 +584,30 @@ export default function OrdersPage({ mode = 'orders' }) {
       toast.error(err.response?.data?.message || 'Failed to load orders');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const res = await adminApi.exportOrdersCsv({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        status: status || undefined,
+        lead: isLeads || undefined,
+      });
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const from = startDate || 'all';
+      const to = endDate || new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `orders-${from}-to-${to}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to export orders');
     }
   };
 
@@ -615,23 +643,50 @@ export default function OrdersPage({ mode = 'orders' }) {
       </div>
 
       <div className="card p-0 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex flex-wrap gap-3">
-          <input
-            className="input-field max-w-xs"
-            placeholder="Search order #, email, phone..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
-          <select
-            className="input-field max-w-[180px]"
-            value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-          >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
+        <div className="p-4 border-b border-gray-100 flex flex-wrap gap-3 items-center justify-between">
+          <div className="flex flex-wrap gap-3">
+            <input
+              className="input-field max-w-xs"
+              placeholder="Search order #, email, phone..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+            <select
+              className="input-field max-w-[180px]"
+              value={status}
+              onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            >
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <span>Date range:</span>
+              <input
+                type="date"
+                className="input-field text-xs py-1"
+                value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+              />
+              <span>to</span>
+              <input
+                type="date"
+                className="input-field text-xs py-1"
+                value={endDate}
+                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="btn-secondary text-xs"
+            >
+              Export CSV
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

@@ -48,6 +48,7 @@ export function mapCsvRowToProduct(row) {
   const statusRaw = pick(row, 'status', 'isactive', 'is_active');
   const sellAfterOos = pick(row, 'sell_after_out_of_stock', 'sell_after_outof_stock', 'allow_backorder');
   const imageUrls = splitImageUrls(pick(row, 'images', 'image', 'image_url'));
+  const longDescription = pick(row, 'product_description', 'description', 'long_description', 'longdescription');
 
   return {
     rowNumber: row._row,
@@ -73,6 +74,7 @@ export function mapCsvRowToProduct(row) {
       alt: name,
     })),
     tags: pick(row, 'tags') ? String(pick(row, 'tags')).split('|').map((t) => t.trim()).filter(Boolean) : [],
+    longDescription: longDescription || undefined,
   };
 }
 

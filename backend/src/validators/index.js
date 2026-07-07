@@ -1,4 +1,19 @@
 import { z } from 'zod';
+import { seoMetaZod } from '../utils/seoMeta.js';
+
+const toOptionalNumber = (val) => {
+  if (val === '' || val == null) return undefined;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const toRequiredNumber = (val) => {
+  if (val === '' || val == null) return val;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : val;
+};
+
+const toProductId = (val) => (val && typeof val === 'object' && val._id != null ? String(val._id) : val);
 
 export const registerSchema = z.object({
   body: z.object({
@@ -30,11 +45,11 @@ export const createProductSchema = z.object({
     category: z.string(),
     categories: z.array(z.string()).optional(),
     brand: z.string().optional(),
-    price: z.number().min(0),
-    compareAtPrice: z.number().min(0).optional(),
-    costPrice: z.number().min(0).optional(),
-    stock: z.number().min(0).optional(),
-    lowStockThreshold: z.number().min(0).optional(),
+    price: z.preprocess(toRequiredNumber, z.number().min(0)),
+    compareAtPrice: z.preprocess(toOptionalNumber, z.number().min(0).optional()),
+    costPrice: z.preprocess(toOptionalNumber, z.number().min(0).optional()),
+    stock: z.preprocess(toOptionalNumber, z.number().min(0).optional()),
+    lowStockThreshold: z.preprocess(toOptionalNumber, z.number().min(0).optional()),
     tags: z.array(z.string()).optional(),
     images: z.array(z.object({
       url: z.string(),
@@ -78,7 +93,7 @@ export const createProductSchema = z.object({
     allowBackorder: z.boolean().optional(),
     isHamper: z.boolean().optional(),
     comboItems: z.array(z.object({
-      product: z.string(),
+      product: z.preprocess(toProductId, z.string()),
       quantity: z.number().min(1).optional(),
       sortOrder: z.number().optional(),
     })).optional(),
@@ -227,7 +242,35 @@ export const createBlogSchema = z.object({
     content: z.string().min(10),
     excerpt: z.string().optional(),
     tags: z.array(z.string()).optional(),
+    category: z.string().optional(),
     isPublished: z.boolean().optional(),
+    featuredImage: z.object({
+      url: z.string().optional(),
+      publicId: z.string().optional(),
+      alt: z.string().optional(),
+    }).optional(),
+    metaTitle: z.string().max(160).optional(),
+    metaDescription: z.string().max(320).optional(),
+    seo: seoMetaZod,
+  }),
+});
+
+export const updateBlogSchema = z.object({
+  body: z.object({
+    title: z.string().min(3).optional(),
+    content: z.string().min(10).optional(),
+    excerpt: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    category: z.string().optional(),
+    isPublished: z.boolean().optional(),
+    featuredImage: z.object({
+      url: z.string().optional(),
+      publicId: z.string().optional(),
+      alt: z.string().optional(),
+    }).optional(),
+    metaTitle: z.string().max(160).optional(),
+    metaDescription: z.string().max(320).optional(),
+    seo: seoMetaZod,
   }),
 });
 
@@ -284,6 +327,43 @@ export const categoryDeliverySchema = z.object({
       }).optional(),
     })).optional(),
   }),
+});
+
+const categoryImageSchema = z.object({
+  url: z.string().optional(),
+  publicId: z.string().optional(),
+  alt: z.string().optional(),
+}).optional();
+
+const categoryBodySchema = z.object({
+  name: z.string().min(2).max(120),
+  slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers, and hyphens only').optional(),
+  description: z.string().max(2000).optional(),
+  image: categoryImageSchema,
+  parent: z.string().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().optional(),
+  metaTitle: z.string().max(160).optional(),
+  metaDescription: z.string().max(320).optional(),
+  seo: seoMetaZod,
+  deliveryScope: z.enum(['all', 'selected']).optional(),
+  deliveryGroupRules: z.array(z.object({
+    group: z.string(),
+    available: z.boolean().optional(),
+    sameDay: z.boolean().optional(),
+    estimatedDays: z.object({
+      min: z.number().min(0).optional(),
+      max: z.number().min(0).optional(),
+    }).optional(),
+  })).optional(),
+});
+
+export const createCategorySchema = z.object({
+  body: categoryBodySchema,
+});
+
+export const updateCategorySchema = z.object({
+  body: categoryBodySchema.partial(),
 });
 
 export const updateSettingsSchema = z.object({
@@ -399,7 +479,8 @@ export const createCmsPageSchema = z.object({
     pageType: cmsPageTypeSchema.default('custom'),
     isPublished: z.boolean().optional(),
     metaTitle: z.string().max(160).optional(),
-    metaDescription: z.string().max(300).optional(),
+    metaDescription: z.string().max(320).optional(),
+    seo: seoMetaZod,
   }),
 });
 
@@ -410,7 +491,8 @@ export const updateCmsPageSchema = z.object({
     pageType: cmsPageTypeSchema.optional(),
     isPublished: z.boolean().optional(),
     metaTitle: z.string().max(160).optional(),
-    metaDescription: z.string().max(300).optional(),
+    metaDescription: z.string().max(320).optional(),
+    seo: seoMetaZod,
   }),
 });
 

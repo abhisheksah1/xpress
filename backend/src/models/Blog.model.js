@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { generateSlug } from '../utils/helpers.js';
+import { seoMetaSchema, syncLegacySeoFields } from './schemas/seoMeta.schema.js';
 
 const blogSchema = new mongoose.Schema(
   {
@@ -19,6 +20,7 @@ const blogSchema = new mongoose.Schema(
     publishedAt: { type: Date },
     metaTitle: { type: String },
     metaDescription: { type: String },
+    seo: { type: seoMetaSchema, default: () => ({}) },
     viewCount: { type: Number, default: 0 },
   },
   { timestamps: true }
@@ -27,6 +29,11 @@ const blogSchema = new mongoose.Schema(
 blogSchema.pre('save', function (next) {
   if (!this.slug && this.title) this.slug = generateSlug(this.title);
   if (this.isPublished && !this.publishedAt) this.publishedAt = new Date();
+  syncLegacySeoFields(this);
+  if (!this.seo?.schemaType) {
+    if (!this.seo) this.seo = {};
+    this.seo.schemaType = 'BlogPosting';
+  }
   next();
 });
 

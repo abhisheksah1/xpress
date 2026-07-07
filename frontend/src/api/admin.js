@@ -52,6 +52,7 @@ export const adminApi = {
   updateOrderPayment: (id, data) => api.patch(`/admin/orders/${id}/payment`, data),
   confirmLeadOrder: (id, data) => api.post(`/admin/orders/${id}/confirm`, data),
   cancelLeadOrder: (id, data) => api.post(`/admin/orders/${id}/cancel-lead`, data),
+  exportOrdersCsv: (params) => api.get('/admin/orders/export/csv', { params, responseType: 'blob' }),
 
   adjustStock: (data) => api.post('/admin/inventory/adjust', data),
   getDeliveryLocations: (params) => api.get('/admin/delivery-locations', { params }),

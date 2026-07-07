@@ -6,6 +6,7 @@ import {
   mergeGatewayDefaults,
 } from '../../config/paymentGateways.js';
 import { getConfiguredCurrencyCodes } from '../../utils/currency.js';
+import ImageSizeGuide from '../ImageSizeGuide.jsx';
 
 function EnvToggle({ value, onChange }) {
   return (
@@ -136,6 +137,7 @@ function GatewayPanel({ gateway, onChange, onUploadLogo, currencyCodes }) {
                 return (
                   <div key={field.key} className="md:col-span-2">
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">{field.label}</label>
+                    <ImageSizeGuide guide="paymentLogo" variant="admin" className="rounded-lg border border-blue-100 mb-2" />
                     <div className="flex gap-2">
                       <input
                         className="input-field text-sm flex-1"
@@ -186,6 +188,7 @@ function GatewayPanel({ gateway, onChange, onUploadLogo, currencyCodes }) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Payment Logo / Icon or Image</label>
+            <ImageSizeGuide guide="paymentLogo" variant="admin" className="rounded-lg border border-blue-100 mb-2" />
             <div className="flex gap-2">
               <input
                 className="input-field text-sm flex-1"
