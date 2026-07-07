@@ -1,26 +1,35 @@
 import * as orderService from '../../services/order.service.js';
-import { normalizeItemPersonalization, toStoredMediaUrl } from '../../utils/mediaUrl.js';
+import { toStoredMediaUrl, enrichPersonalizationForClient, forClientMediaUrl, requestBaseUrl } from '../../utils/mediaUrl.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
-const enrichOrderMedia = (order) => {
+const enrichOrderMedia = (order, req) => {
   const obj = order.toObject ? order.toObject() : { ...order };
+  const baseUrl = requestBaseUrl(req);
   return {
     ...obj,
     items: (obj.items || []).map((item) => ({
       ...item,
-      image: item.image ? toStoredMediaUrl(item.image) : item.image,
-      personalization: normalizeItemPersonalization(item.personalization) ?? item.personalization,
+      image: item.image ? forClientMediaUrl(toStoredMediaUrl(item.image), baseUrl) : item.image,
+      customerPrintImageUrl: item.customerPrintImageUrl
+        ? forClientMediaUrl(toStoredMediaUrl(item.customerPrintImageUrl), baseUrl)
+        : item.customerPrintImageUrl,
+      personalization: enrichPersonalizationForClient(
+        item.personalization || (item.customerPrintImageUrl
+          ? { printImageUrl: item.customerPrintImageUrl, printImageName: item.customerPrintImageName }
+          : null),
+        baseUrl
+      ),
     })),
     serviceAddons: (obj.serviceAddons || []).map((addon) => ({
       ...addon,
-      photoUrl: addon.photoUrl ? toStoredMediaUrl(addon.photoUrl) : addon.photoUrl,
+      photoUrl: addon.photoUrl ? forClientMediaUrl(toStoredMediaUrl(addon.photoUrl), baseUrl) : addon.photoUrl,
     })),
   };
 };
 
-const withOrderMeta = (order) => ({
-  ...enrichOrderMedia(order),
+const withOrderMeta = (order, req) => ({
+  ...enrichOrderMedia(order, req),
   isLead: orderService.isLeadOrder(order),
 });
 
@@ -28,7 +37,7 @@ export const getOrders = asyncHandler(async (req, res) => {
   const result = await orderService.getOrders(req.query);
   res.json(new ApiResponse(200, {
     ...result,
-    orders: result.orders.map(withOrderMeta),
+    orders: result.orders.map((order) => withOrderMeta(order, req)),
   }));
 });
 
@@ -41,29 +50,29 @@ export const getOrder = asyncHandler(async (req, res) => {
   const order = await orderService.getOrderById(req.params.id);
   const trackingEmail = orderService.getTrackingEmail(order);
   res.json(new ApiResponse(200, {
-    ...withOrderMeta(order),
+    ...withOrderMeta(order, req),
     trackingEmail,
   }));
 });
 
 export const confirmLead = asyncHandler(async (req, res) => {
   const order = await orderService.confirmLeadOrder(req.params.id, req.validated.body, req.user._id);
-  res.json(new ApiResponse(200, withOrderMeta(order), 'Lead converted to confirmed order'));
+  res.json(new ApiResponse(200, withOrderMeta(order, req), 'Lead converted to confirmed order'));
 });
 
 export const cancelLead = asyncHandler(async (req, res) => {
   const order = await orderService.cancelLeadOrder(req.params.id, req.validated.body, req.user._id);
-  res.json(new ApiResponse(200, withOrderMeta(order), 'Lead order cancelled'));
+  res.json(new ApiResponse(200, withOrderMeta(order, req), 'Lead order cancelled'));
 });
 
 export const updateStatus = asyncHandler(async (req, res) => {
   const order = await orderService.updateOrderStatus(req.params.id, req.validated.body, req.user._id);
-  res.json(new ApiResponse(200, withOrderMeta(order), 'Order status updated'));
+  res.json(new ApiResponse(200, withOrderMeta(order, req), 'Order status updated'));
 });
 
 export const updatePayment = asyncHandler(async (req, res) => {
   const order = await orderService.updatePaymentStatus(req.params.id, req.validated.body, req.user._id);
-  res.json(new ApiResponse(200, withOrderMeta(order), 'Payment status updated'));
+  res.json(new ApiResponse(200, withOrderMeta(order, req), 'Payment status updated'));
 });
 
 export const getDeliveryZones = asyncHandler(async (req, res) => {

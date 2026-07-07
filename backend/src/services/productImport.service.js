@@ -69,6 +69,7 @@ function buildProductPayload(mapped, categoryIds, userId) {
     category: uniqueCategoryIds[0],
     categories: uniqueCategoryIds,
     tags: mapped.tags,
+    shortDescriptionEnabled: false,
     updatedBy: userId,
   };
 

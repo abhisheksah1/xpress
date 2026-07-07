@@ -9,17 +9,36 @@ import {
   emptyPersonalization,
   validatePersonalization,
   personalizationKey,
+  mergePersonalization,
 } from '../../utils/personalization.js';
 
 export { hasPersonalization, emptyPersonalization, validatePersonalization, personalizationKey };
 
-export default function ProductPersonalization({ personalizationFields, values, onChange }) {
+function extractUploadUrl(data) {
+  const payload = data?.data ?? data;
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload;
+  return payload.url || payload.image?.url || '';
+}
+
+export default function ProductPersonalization({ personalizationFields, values, onChange, onImageUploaded }) {
   const [uploading, setUploading] = useState(false);
   const fields = getActivePersonalizationFields(personalizationFields);
 
   if (!fields.length) return null;
 
-  const set = (key, val) => onChange({ ...values, [key]: val });
+  const applyChange = (updater) => {
+    if (typeof onChange !== 'function') return;
+    if (typeof updater === 'function') {
+      onChange((prev) => updater(prev && typeof prev === 'object' ? prev : {}));
+      return;
+    }
+    onChange(updater);
+  };
+
+  const set = (key, val) => {
+    applyChange((prev) => mergePersonalization(prev, { [key]: val }));
+  };
 
   const handleImageUpload = async (file) => {
     if (!file) return;
@@ -35,11 +54,20 @@ export default function ProductPersonalization({ personalizationFields, values, 
     setUploading(true);
     try {
       const { data } = await storeApi.uploadPersonalizationImage(file);
-      set('printImageUrl', resolveMediaUrl(data.data.url) || data.data.url);
-      set('printImageName', file.name);
+      const uploadedUrl = data?.data?.url || extractUploadUrl(data);
+      if (!uploadedUrl) {
+        throw new Error('Upload succeeded but no image URL was returned');
+      }
+      applyChange((prev) =>
+        mergePersonalization(prev, {
+          printImageUrl: uploadedUrl,
+          printImageName: file.name,
+        })
+      );
+      onImageUploaded?.({ printImageUrl: uploadedUrl, printImageName: file.name });
       toast.success('Image uploaded');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Image upload failed');
+      toast.error(err.response?.data?.message || err.message || 'Image upload failed');
     } finally {
       setUploading(false);
     }
@@ -64,7 +92,10 @@ export default function ProductPersonalization({ personalizationFields, values, 
                     accept="image/jpeg,image/png,image/jpg,image/webp"
                     className="hidden"
                     disabled={uploading}
-                    onChange={(e) => handleImageUpload(e.target.files?.[0])}
+                    onChange={(e) => {
+                      handleImageUpload(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
                   />
                 </label>
                 {values.printImageName && (

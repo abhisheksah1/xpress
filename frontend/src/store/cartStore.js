@@ -1,19 +1,59 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { personalizationKey } from '../utils/personalization.js';
+import { personalizationKey, resolveCartItemPersonalization, clearProductPrintUpload, clearAllProductPrintUploads, persistProductPrintUpload } from '../utils/personalization.js';
 
 const makeCartItemId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `cart_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+const resolvePersonalization = (productId, personalization, productUploads) => {
+  const pending = productUploads?.[productId];
+  return resolveCartItemPersonalization(
+    { productId, personalization },
+    { [productId]: pending }
+  );
+};
+
+const printFieldsFromPersonalization = (personalization) => ({
+  printImageUrl: personalization?.printImageUrl,
+  printImageName: personalization?.printImageName,
+});
+
 export const useCartStore = create(
   persist(
     (set, get) => ({
       items: [],
+      productUploads: {},
+      setProductUpload: (productId, upload) => {
+        if (!productId || !upload?.printImageUrl) return;
+        persistProductPrintUpload(productId, upload);
+        set((state) => ({
+          productUploads: {
+            ...state.productUploads,
+            [productId]: {
+              printImageUrl: upload.printImageUrl,
+              printImageName: upload.printImageName || '',
+            },
+          },
+        }));
+      },
+      clearProductUpload: (productId) => {
+        if (!productId) return;
+        set((state) => {
+          const next = { ...state.productUploads };
+          delete next[productId];
+          return { productUploads: next };
+        });
+      },
       addItem: (product, quantity = 1, personalization = null) => {
         const items = get().items;
-        const pKey = personalizationKey(personalization);
+        const normalizedPersonalization = resolvePersonalization(
+          product._id,
+          personalization,
+          get().productUploads
+        );
+        const pKey = personalizationKey(normalizedPersonalization);
         const oKey = product.optionsKey || '';
         const existing = items.find(
           (i) =>
@@ -23,17 +63,29 @@ export const useCartStore = create(
         );
 
         if (existing) {
-          set({
-            items: items.map((i) =>
+          set((state) => ({
+            items: state.items.map((i) =>
               i.cartItemId === existing.cartItemId
-                ? { ...i, quantity: i.quantity + quantity }
+                ? {
+                    ...i,
+                    quantity: i.quantity + quantity,
+                    personalization: normalizedPersonalization ?? i.personalization,
+                    personalizationKey: pKey,
+                    ...printFieldsFromPersonalization(normalizedPersonalization ?? i.personalization),
+                  }
                 : i
             ),
-          });
+            productUploads: (() => {
+              const next = { ...state.productUploads };
+              delete next[product._id];
+              return next;
+            })(),
+          }));
+          clearProductPrintUpload(product._id);
         } else {
-          set({
+          set((state) => ({
             items: [
-              ...items,
+              ...state.items,
               {
                 cartItemId: makeCartItemId(),
                 productId: product._id,
@@ -41,13 +93,20 @@ export const useCartStore = create(
                 price: product.price,
                 image: product.images?.find((img) => img.isPrimary)?.url || product.images?.[0]?.url,
                 quantity,
-                personalization: personalization || null,
+                personalization: normalizedPersonalization,
                 personalizationKey: pKey,
+                ...printFieldsFromPersonalization(normalizedPersonalization),
                 selectedOptions: product.selectedOptions || [],
                 optionsKey: oKey,
               },
             ],
-          });
+            productUploads: (() => {
+              const next = { ...state.productUploads };
+              delete next[product._id];
+              return next;
+            })(),
+          }));
+          clearProductPrintUpload(product._id);
         }
       },
       removeItem: (cartItemId) =>
@@ -58,7 +117,10 @@ export const useCartStore = create(
             i.cartItemId === cartItemId ? { ...i, quantity: Math.max(1, quantity) } : i
           ),
         }),
-      clearCart: () => set({ items: [], coupon: null }),
+      clearCart: () => {
+        clearAllProductPrintUploads();
+        set({ items: [], coupon: null, productUploads: {} });
+      },
       coupon: null,
       setCoupon: (coupon) => set({ coupon }),
       clearCoupon: () => set({ coupon: null }),
@@ -70,6 +132,6 @@ export const useCartStore = create(
       },
       count: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
     }),
-    { name: 'koseli-cart' }
+    { name: 'koseli-cart-v3' }
   )
 );

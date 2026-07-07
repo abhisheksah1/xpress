@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import {
   ProductDeliverySchedule,
   ProductWhatsappHelp,
 } from './ProductPageInfo.jsx';
 import ProductRichText from './ProductRichText.jsx';
+import { quickAddProductToCart } from '../../utils/quickAddProduct.js';
 
 function SectionHeading({ icon, children }) {
   return (
@@ -223,21 +223,5 @@ export function HamperProductInfoSections({
 }
 
 export function quickAddToBasket(addItem, product) {
-  if ((product.stock ?? 0) <= 0) {
-    toast.error('This item is out of stock');
-    return;
-  }
-  addItem(
-    {
-      _id: product._id,
-      name: product.name,
-      price: product.price,
-      images: product.images,
-      selectedOptions: [],
-      optionsKey: '',
-    },
-    1,
-    null
-  );
-  toast.success('Added to basket');
+  quickAddProductToCart(addItem, product);
 }

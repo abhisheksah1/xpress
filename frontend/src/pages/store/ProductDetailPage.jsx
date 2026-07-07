@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import { useCartStore } from '../../store/cartStore.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
-import ProductPersonalization, {
+import ProductPersonalization from '../../components/store/ProductPersonalization.jsx';
+import {
   emptyPersonalization,
   hasPersonalization,
   validatePersonalization,
-} from '../../components/store/ProductPersonalization.jsx';
+  serializePersonalization,
+  normalizePersonalizationFields,
+  mergePersonalization,
+  persistProductPrintUpload,
+} from '../../utils/personalization.js';
 import {
   ProductPageAlert,
   ProductDeliverySchedule,
@@ -130,6 +135,7 @@ function BuyPanel({
   fields,
   personalization,
   setPersonalization,
+  onImageUploaded,
   qty,
   setQty,
   onAddToCart,
@@ -141,6 +147,11 @@ function BuyPanel({
           <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-1">{product.brand}</p>
         )}
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">{product.name}</h1>
+        {product.shortDescriptionEnabled && (product.shortDescription || product.description) && (
+          <div className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
+            <ProductRichText content={product.shortDescription || product.description} />
+          </div>
+        )}
       </div>
 
       <div
@@ -211,6 +222,7 @@ function BuyPanel({
           personalizationFields={fields}
           values={personalization}
           onChange={setPersonalization}
+          onImageUploaded={onImageUploaded}
         />
       )}
 
@@ -286,6 +298,8 @@ export default function ProductDetailPage() {
   const { slug } = useParams();
   const { settings, formatPriceNpr } = useStore();
   const addItem = useCartStore((s) => s.addItem);
+  const setProductUpload = useCartStore((s) => s.setProductUpload);
+  const uploadedPrintRef = useRef(null);
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
   const [qty, setQty] = useState(1);
@@ -306,6 +320,7 @@ export default function ProductDetailPage() {
         const p = res.data.data;
         setProduct(p);
         setPersonalization(emptyPersonalization(p.personalizationFields || {}));
+        uploadedPrintRef.current = null;
         setActiveImage(0);
         setQty(1);
 
@@ -349,10 +364,22 @@ export default function ProductDetailPage() {
   const soldOut = (product?.stock ?? 0) <= 0;
 
   const handleAddToCart = () => {
+    const mergedPersonalization = mergePersonalization(
+      mergePersonalization(personalization, uploadedPrintRef.current),
+      useCartStore.getState().productUploads[product?._id]
+    );
+    const snapshot = serializePersonalization(mergedPersonalization);
+
     if (showPersonalization) {
-      const error = validatePersonalization(fields, personalization);
+      const error = validatePersonalization(fields, mergedPersonalization);
       if (error) {
         toast.error(error);
+        return;
+      }
+
+      const imageEnabled = normalizePersonalizationFields(fields).imagePrint?.enabled;
+      if (imageEnabled && mergedPersonalization.printImageName && !snapshot?.printImageUrl) {
+        toast.error('Image upload incomplete. Please upload the design image again.');
         return;
       }
     }
@@ -376,8 +403,9 @@ export default function ProductDetailPage() {
         optionsKey: optionsKey(optionsList),
       },
       qty,
-      showPersonalization ? personalization : null
+      showPersonalization ? snapshot : null
     );
+    uploadedPrintRef.current = null;
     toast.success('Added to basket');
   };
 
@@ -436,6 +464,13 @@ export default function ProductDetailPage() {
             fields={fields}
             personalization={personalization}
             setPersonalization={setPersonalization}
+            onImageUploaded={(upload) => {
+              uploadedPrintRef.current = upload;
+              if (product?._id) {
+                setProductUpload(product._id, upload);
+                persistProductPrintUpload(product._id, upload);
+              }
+            }}
             qty={qty}
             setQty={setQty}
             onAddToCart={handleAddToCart}
@@ -464,7 +499,7 @@ export default function ProductDetailPage() {
               <ProductShortTerms terms={settings.product_page_short_terms} />
             </section>
 
-            {(product.longDescription || product.description) && (
+            {(product.longDescription || (!product.shortDescriptionEnabled && product.description)) && (
               <section className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-rose-100/60 w-full min-w-0">
                 <h2 className="text-xs sm:text-sm font-black uppercase tracking-widest text-slate-800 mb-3 sm:mb-4">
                   Product details

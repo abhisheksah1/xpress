@@ -24,6 +24,7 @@ export const createProductSchema = z.object({
     sku: z.string().optional(),
     description: z.string().optional(),
     shortDescription: z.string().optional(),
+    shortDescriptionEnabled: z.boolean().optional(),
     longDescription: z.string().optional(),
     additionalNote: z.string().optional(),
     category: z.string(),
@@ -413,6 +414,15 @@ export const updateCmsPageSchema = z.object({
   }),
 });
 
+export const cloneCmsPageSchema = z.object({
+  body: z.object({
+    title: z.string().min(2).max(120).optional(),
+    slug: cmsSlugSchema.optional(),
+    pageType: cmsPageTypeSchema.optional(),
+    isPublished: z.boolean().optional(),
+  }),
+});
+
 export const fetchGoogleReviewsSchema = z.object({
   body: z.object({
     placeId: z.string().min(5).max(200),
@@ -515,4 +525,107 @@ export const updateApiPartnerSchema = z.object({
     ipWhitelist: z.array(z.string()).optional(),
     rateLimitPerMinute: z.number().min(10).max(1000).optional(),
   }),
+});
+
+const purchaseItemSchema = z.object({
+  product: z.string().optional(),
+  name: z.string().min(1),
+  sku: z.string().optional(),
+  quantity: z.number().min(1),
+  unitCost: z.number().min(0),
+});
+
+export const createVendorSchema = z.object({
+  body: z.object({
+    name: z.string().min(2).max(120),
+    companyName: z.string().optional(),
+    contactPerson: z.string().optional(),
+    email: z.string().email().optional().or(z.literal('')),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+    paymentTerms: z.string().optional(),
+    billType: z.enum(['pan', 'vat', 'normal']).optional(),
+    panNumber: z.string().optional(),
+    vatNumber: z.string().optional(),
+    notes: z.string().optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+  }),
+});
+
+export const updateVendorSchema = createVendorSchema;
+
+export const createPurchaseSchema = z.object({
+  body: z.object({
+    vendor: z.string().min(1),
+    purchaseDate: z.string().optional(),
+    purchaseType: z.enum(['vat_13', 'non_vat', 'zero_rated', 'pan_bill', 'normal_bill']).optional(),
+    items: z.array(purchaseItemSchema).min(1),
+    tax: z.number().min(0).optional(),
+    shipping: z.number().min(0).optional(),
+    paymentStatus: z.enum(['pending', 'paid', 'partial']).optional(),
+    paidAmount: z.number().min(0).optional(),
+    treasuryAccount: z.string().optional(),
+    invoiceRef: z.string().optional(),
+    notes: z.string().optional(),
+    stockReceived: z.boolean().optional(),
+  }),
+});
+
+export const createExpenseSchema = z.object({
+  body: z.object({
+    category: z.enum(['rent', 'utilities', 'salaries', 'marketing', 'logistics', 'maintenance', 'other']).optional(),
+    title: z.string().min(2).max(200),
+    description: z.string().optional(),
+    amount: z.number().min(0),
+    expenseDate: z.string().optional(),
+    paymentStatus: z.enum(['pending', 'paid']).optional(),
+    vendor: z.string().optional(),
+    treasuryAccount: z.string().optional(),
+    reference: z.string().optional(),
+    notes: z.string().optional(),
+  }),
+});
+
+export const createTreasuryAccountSchema = z.object({
+  body: z.object({
+    name: z.string().min(2).max(120),
+    type: z.enum(['cash', 'bank', 'mobile_wallet', 'other']).optional(),
+    bankName: z.string().optional(),
+    accountNumber: z.string().optional(),
+    openingBalance: z.number().optional(),
+    currency: z.string().optional(),
+    isActive: z.boolean().optional(),
+    notes: z.string().optional(),
+  }),
+});
+
+export const createTreasuryTransactionSchema = z.object({
+  body: z.object({
+    accountId: z.string().min(1),
+    type: z.enum(['deposit', 'withdrawal', 'transfer_in', 'transfer_out']),
+    amount: z.number().min(0.01),
+    description: z.string().optional(),
+    reference: z.string().optional(),
+    transactionDate: z.string().optional(),
+  }),
+});
+
+export const adjustTreasuryBalanceSchema = z.object({
+  body: z
+    .object({
+      mode: z.enum(['increase', 'decrease', 'set']),
+      amount: z.number().min(0.01).optional(),
+      newBalance: z.number().min(0).optional(),
+      reason: z.string().min(2).max(500),
+      transactionDate: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.mode === 'set') {
+        if (data.newBalance === undefined || data.newBalance === null) {
+          ctx.addIssue({ code: 'custom', message: 'New balance is required', path: ['newBalance'] });
+        }
+      } else if (!data.amount || data.amount <= 0) {
+        ctx.addIssue({ code: 'custom', message: 'Amount is required', path: ['amount'] });
+      }
+    }),
 });

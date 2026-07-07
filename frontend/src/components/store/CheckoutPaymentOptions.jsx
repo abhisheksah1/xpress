@@ -34,13 +34,13 @@ export function CheckoutCurrencyToggle({ currencies, value, onChange, selectedCu
           : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5';
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 w-full">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 w-full min-w-0">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
           <p className="text-sm sm:text-base font-bold text-slate-900">Display currency</p>
           {activeMeta && (
             <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
-              Prices shown in{' '}
+              Prices and payment options for{' '}
               <span className="font-semibold text-slate-700">
                 {activeMeta.name || activeMeta.code}
               </span>
@@ -58,7 +58,7 @@ export function CheckoutCurrencyToggle({ currencies, value, onChange, selectedCu
       </div>
 
       <div
-        className={`mt-3 grid ${gridClass} gap-1.5 sm:gap-2 w-full`}
+        className={`mt-3 grid ${gridClass} gap-2 w-full`}
         role="radiogroup"
         aria-label="Display currency"
       >
@@ -72,7 +72,7 @@ export function CheckoutCurrencyToggle({ currencies, value, onChange, selectedCu
               aria-checked={active}
               aria-label={`${c.name || c.code} (${c.code})`}
               onClick={() => onChange(c.code)}
-              className={`min-w-0 w-full px-2 py-2.5 sm:py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-colors border ${
+              className={`min-w-0 w-full min-h-[44px] px-2 py-2.5 sm:py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-colors border touch-manipulation ${
                 active
                   ? 'text-white border-transparent shadow-sm'
                   : 'text-slate-900 bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'

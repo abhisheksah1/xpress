@@ -19,6 +19,7 @@ import * as couponController from '../controllers/admin/coupon.controller.js';
 import * as reminderController from '../controllers/admin/reminder.controller.js';
 import * as apiPartnerController from '../controllers/admin/apiPartner.controller.js';
 import * as apiPartnerReportController from '../controllers/admin/apiPartnerReport.controller.js';
+import * as financeController from '../controllers/admin/finance.controller.js';
 import {
   createProductSchema,
   bulkPriceSchema,
@@ -35,9 +36,17 @@ import {
   cancelLeadOrderSchema,
   createCmsPageSchema,
   updateCmsPageSchema,
+  cloneCmsPageSchema,
   fetchGoogleReviewsSchema,
   createApiPartnerSchema,
   updateApiPartnerSchema,
+  createVendorSchema,
+  updateVendorSchema,
+  createPurchaseSchema,
+  createExpenseSchema,
+  createTreasuryAccountSchema,
+  createTreasuryTransactionSchema,
+  adjustTreasuryBalanceSchema,
 } from '../validators/index.js';
 
 const router = Router();
@@ -140,6 +149,7 @@ router.post('/cms/setup-home', hasPermission('cms:write'), cmsController.setupHo
 router.post('/cms/google-reviews/fetch', hasPermission('cms:write'), validate(fetchGoogleReviewsSchema), cmsController.fetchGoogleReviews);
 router.post('/cms', hasPermission('cms:write'), validate(createCmsPageSchema), cmsController.createPage);
 router.get('/cms/:id', hasPermission('cms:read'), cmsController.getPage);
+router.post('/cms/:id/clone', hasPermission('cms:write'), validate(cloneCmsPageSchema), cmsController.clonePage);
 router.patch('/cms/:id', hasPermission('cms:write'), validate(updateCmsPageSchema), cmsController.updatePage);
 router.patch('/cms/:id/blocks', hasPermission('cms:write'), cmsController.updateBlocks);
 router.delete('/cms/:id', hasPermission('cms:write'), cmsController.deletePage);
@@ -177,5 +187,40 @@ router.post('/api-partners/:id/reset-credentials', isAdmin, apiPartnerController
 router.get('/api-partners/:id/logs', isAdmin, apiPartnerController.getLogs);
 router.get('/api-partners/:id/documentation', isAdmin, apiPartnerController.downloadDocumentation);
 router.get('/api-partners/:id/documentation/preview', isAdmin, apiPartnerController.previewDocumentation);
+
+// Finance & accounting
+router.get('/finance/pnl', isAdmin, financeController.getProfitAndLoss);
+router.get('/finance/pnl/export', isAdmin, financeController.exportPnlCsv);
+router.get('/finance/stock', isAdmin, financeController.getStockReport);
+router.get('/finance/stock/export', isAdmin, financeController.exportStockReportCsv);
+router.get('/finance/vendors', isAdmin, financeController.listVendors);
+router.get('/finance/vendors/export', isAdmin, financeController.exportVendorsCsv);
+router.post('/finance/vendors', isAdmin, validate(createVendorSchema), financeController.createVendor);
+router.get('/finance/vendors/:id', isAdmin, financeController.getVendor);
+router.patch('/finance/vendors/:id', isAdmin, validate(updateVendorSchema), financeController.updateVendor);
+router.delete('/finance/vendors/:id', isAdmin, financeController.deleteVendor);
+router.get('/finance/purchases', isAdmin, financeController.listPurchases);
+router.get('/finance/purchases/report', isAdmin, financeController.getPurchaseReport);
+router.get('/finance/purchases/report/export', isAdmin, financeController.exportPurchaseReportCsv);
+router.post('/finance/purchases', isAdmin, validate(createPurchaseSchema), financeController.createPurchase);
+router.get('/finance/purchases/:id', isAdmin, financeController.getPurchase);
+router.delete('/finance/purchases/:id', isAdmin, financeController.deletePurchase);
+router.get('/finance/expenses', isAdmin, financeController.listExpenses);
+router.get('/finance/expenses/export', isAdmin, financeController.exportExpensesCsv);
+router.post('/finance/expenses', isAdmin, validate(createExpenseSchema), financeController.createExpense);
+router.patch('/finance/expenses/:id', isAdmin, financeController.updateExpense);
+router.delete('/finance/expenses/:id', isAdmin, financeController.deleteExpense);
+router.get('/finance/treasury/accounts', isAdmin, financeController.listTreasuryAccounts);
+router.post('/finance/treasury/accounts', isAdmin, validate(createTreasuryAccountSchema), financeController.createTreasuryAccount);
+router.patch('/finance/treasury/accounts/:id', isAdmin, financeController.updateTreasuryAccount);
+router.post(
+  '/finance/treasury/accounts/:id/adjust-balance',
+  isAdmin,
+  validate(adjustTreasuryBalanceSchema),
+  financeController.adjustTreasuryBalance
+);
+router.get('/finance/treasury/transactions', isAdmin, financeController.listTreasuryTransactions);
+router.get('/finance/treasury/transactions/export', isAdmin, financeController.exportTreasuryReportCsv);
+router.post('/finance/treasury/transactions', isAdmin, validate(createTreasuryTransactionSchema), financeController.createTreasuryTransaction);
 
 export default router;

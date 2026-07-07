@@ -21,15 +21,47 @@ export const toStoredMediaUrl = (url) => {
   return trimmed;
 };
 
+/** Resolve a stored media path to an absolute URL for API clients (admin, tracking, etc.). */
+export const forClientMediaUrl = (url, baseUrl = '') => {
+  const stored = toStoredMediaUrl(url);
+  if (!stored || typeof stored !== 'string') return stored;
+  if (/^https?:\/\//i.test(stored)) return stored;
+  if (!stored.startsWith('/')) return stored;
+  const base = String(baseUrl || '').replace(/\/$/, '');
+  return base ? `${base}${stored}` : stored;
+};
+
 export const normalizeItemPersonalization = (personalization) => {
   if (!personalization || typeof personalization !== 'object') return undefined;
 
   const cakeMessage = personalization.cakeMessage?.trim() || undefined;
   const giftMessage = personalization.giftMessage?.trim() || undefined;
-  const printImageUrl = toStoredMediaUrl(personalization.printImageUrl);
   const printImageName = personalization.printImageName?.trim() || undefined;
+  const rawPrintUrl = typeof personalization.printImageUrl === 'string'
+    ? personalization.printImageUrl.trim()
+    : '';
+  const printImageUrl = rawPrintUrl ? toStoredMediaUrl(rawPrintUrl) : undefined;
 
-  if (!cakeMessage && !giftMessage && !printImageUrl) return undefined;
+  if (!cakeMessage && !giftMessage && !printImageUrl && !printImageName) return undefined;
 
-  return { cakeMessage, giftMessage, printImageUrl, printImageName };
+  const safeName = printImageUrl ? printImageName : undefined;
+  return { cakeMessage, giftMessage, printImageUrl, printImageName: safeName };
+};
+
+export const enrichPersonalizationForClient = (personalization, baseUrl = '') => {
+  const normalized = normalizeItemPersonalization(personalization);
+  if (!normalized) return normalized;
+  if (!normalized.printImageUrl) return normalized;
+  return {
+    ...normalized,
+    printImageUrl: forClientMediaUrl(normalized.printImageUrl, baseUrl),
+  };
+};
+
+export const requestBaseUrl = (req) => {
+  if (!req) return '';
+  const host = req.get('x-forwarded-host') || req.get('host');
+  if (!host) return '';
+  const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+  return `${protocol}://${host}`;
 };

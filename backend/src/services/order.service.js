@@ -7,6 +7,10 @@ import { normalizeItemPersonalization, toStoredMediaUrl } from '../utils/mediaUr
 import { ApiError } from '../utils/ApiError.js';
 import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '../config/constants.js';
 
+/** COD and manual bank: regular orders with payment collected later (not checkout leads). */
+const isDirectCheckoutMethod = (method) =>
+  method === PAYMENT_METHODS.COD || method === PAYMENT_METHODS.MANUAL_BANK;
+
 const resolveCheckoutCurrency = async (code) => {
   const setting = await Settings.findOne({ key: 'multi_currencies' });
   const multi = setting?.value || { currencies: [] };
@@ -89,6 +93,12 @@ export const createOrder = async (data) => {
     if (personalizationError) throw new ApiError(400, personalizationError);
 
     const normalizedPersonalization = normalizeItemPersonalization(item.personalization);
+    if (item.personalization?.printImageName && !normalizedPersonalization?.printImageUrl) {
+      throw new ApiError(
+        400,
+        `Custom print image for ${product.name} did not upload correctly. Please re-upload the image and try again.`
+      );
+    }
 
     orderItems.push({
       product: product._id,
@@ -100,6 +110,8 @@ export const createOrder = async (data) => {
       quantity: item.quantity,
       giftWrap: item.giftWrap || false,
       giftMessage: item.giftMessage || normalizedPersonalization?.giftMessage || normalizedPersonalization?.cakeMessage,
+      customerPrintImageUrl: normalizedPersonalization?.printImageUrl,
+      customerPrintImageName: normalizedPersonalization?.printImageName,
       personalization: normalizedPersonalization,
     });
 
@@ -214,7 +226,7 @@ export const createOrder = async (data) => {
     total,
     payment: { method: data.paymentMethod, status: PAYMENT_STATUS.PENDING, amount: total },
     notes: data.notes,
-    isLead: data.paymentMethod !== PAYMENT_METHODS.COD,
+    isLead: !isDirectCheckoutMethod(data.paymentMethod),
     statusHistory: [{ status: ORDER_STATUS.PENDING, note: 'Order placed' }],
   });
 
@@ -227,11 +239,14 @@ export const createOrder = async (data) => {
 
 export const buildLeadFilter = () => ({
   $or: [
-    { isLead: true },
+    {
+      isLead: true,
+      'payment.method': { $nin: [PAYMENT_METHODS.COD, PAYMENT_METHODS.MANUAL_BANK] },
+    },
     {
       isLead: { $ne: false },
       'payment.status': { $in: [PAYMENT_STATUS.PENDING, PAYMENT_STATUS.FAILED] },
-      'payment.method': { $ne: PAYMENT_METHODS.COD },
+      'payment.method': { $nin: [PAYMENT_METHODS.COD, PAYMENT_METHODS.MANUAL_BANK] },
       status: ORDER_STATUS.PENDING,
     },
   ],
@@ -239,12 +254,14 @@ export const buildLeadFilter = () => ({
 
 export const isLeadOrder = (order) => {
   if (!order) return false;
+  if (isDirectCheckoutMethod(order.payment?.method)) return false;
   if (order.isLead === true) return true;
   if (order.isLead === false) return false;
   const method = order.payment?.method;
   const payStatus = order.payment?.status;
   return (
     method !== PAYMENT_METHODS.COD
+    && method !== PAYMENT_METHODS.MANUAL_BANK
     && [PAYMENT_STATUS.PENDING, PAYMENT_STATUS.FAILED].includes(payStatus)
     && order.status === ORDER_STATUS.PENDING
   );

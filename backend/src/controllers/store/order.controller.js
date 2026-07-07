@@ -20,6 +20,12 @@ export const createOrder = asyncHandler(async (req, res) => {
     return res.status(201).json(new ApiResponse(201, { order }, 'Order placed (COD)'));
   }
 
+  if (orderData.paymentMethod === PAYMENT_METHODS.MANUAL_BANK) {
+    return res.status(201).json(
+      new ApiResponse(201, { order }, 'Order placed — complete your bank transfer to pay')
+    );
+  }
+
   const payment = await paymentService.initiatePayment(order, orderData.paymentMethod);
   res.status(201).json(new ApiResponse(201, { order, payment }, 'Order created'));
 });

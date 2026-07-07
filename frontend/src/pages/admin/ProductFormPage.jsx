@@ -40,6 +40,7 @@ const defaultForm = () => ({
   deliveryScope: 'inherit',
   deliveryGroupRules: [],
   description: '',
+  shortDescriptionEnabled: false,
   longDescription: '',
   additionalNote: '',
   imageUrlInput: '',
@@ -165,6 +166,7 @@ export default function ProductFormPage() {
             estimatedDays: r.estimatedDays || { min: '', max: '' },
           })),
           description: p.description || '',
+          shortDescriptionEnabled: p.shortDescriptionEnabled === true,
           longDescription: p.longDescription || '',
           additionalNote: p.additionalNote || '',
           imageUrlInput: '',
@@ -339,7 +341,8 @@ export default function ProductFormPage() {
       slug: form.slug || slugify(form.name),
       sku: form.sku || undefined,
       description: form.description || undefined,
-      shortDescription: form.description?.slice(0, 200),
+      shortDescription: form.description?.slice(0, 200) || undefined,
+      shortDescriptionEnabled: Boolean(form.shortDescriptionEnabled),
       longDescription: form.longDescription || undefined,
       additionalNote: form.additionalNote || undefined,
       category: form.categoryIds[0],
@@ -548,8 +551,27 @@ export default function ProductFormPage() {
               CSV import leaves descriptions blank — add delivery details, HTML content, and notes here. Supports headings, lists, and links.
             </p>
             <div>
-              <FieldLabel>Product Description</FieldLabel>
-              <textarea className="input-field font-mono text-sm" rows={4} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Short summary or HTML content for the product page" />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <FieldLabel>Short description</FieldLabel>
+                <label className="flex items-center gap-2 text-sm text-gray-700 shrink-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.shortDescriptionEnabled}
+                    onChange={(e) => set('shortDescriptionEnabled', e.target.checked)}
+                  />
+                  Show on product page
+                </label>
+              </div>
+              <textarea
+                className="input-field font-mono text-sm"
+                rows={4}
+                value={form.description}
+                onChange={(e) => set('description', e.target.value)}
+                placeholder="Brief summary shown below the product title when enabled"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                CSV imports keep this hidden until you enable it here.
+              </p>
             </div>
             <div>
               <FieldLabel>Product Long Description (SEO Rich Paragraphs)</FieldLabel>

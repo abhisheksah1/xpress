@@ -2,6 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useCartStore } from '../../store/cartStore.js';
 import { PersonalizationSummary } from '../../components/store/ProductPersonalization.jsx';
+import { resolveCartItemPersonalization } from '../../utils/personalization.js';
 import { storeApi } from '../../api/store.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { useStore } from '../../context/StoreContext.jsx';
@@ -57,7 +58,9 @@ export default function CartPage() {
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Shopping Cart</h1>
       <div className="space-y-4">
-        {items.map((item) => (
+        {items.map((item) => {
+          const resolvedPersonalization = resolveCartItemPersonalization(item, useCartStore.getState().productUploads);
+          return (
           <div key={item.cartItemId || item.productId} className="card flex items-start gap-4">
             {item.image && <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded-lg shrink-0" />}
             <div className="flex-1 min-w-0">
@@ -68,10 +71,10 @@ export default function CartPage() {
                   {item.selectedOptions.map((o) => `${o.category}: ${o.label}`).join(' · ')}
                 </p>
               )}
-              <PersonalizationSummary personalization={item.personalization} className="mt-2" />
-              {item.personalization?.printImageUrl && (
+              <PersonalizationSummary personalization={resolvedPersonalization} className="mt-2" />
+              {resolvedPersonalization?.printImageUrl && (
                 <img
-                  src={resolveMediaUrl(item.personalization.printImageUrl)}
+                  src={resolveMediaUrl(resolvedPersonalization.printImageUrl)}
                   alt="Custom design"
                   className="mt-2 h-16 w-auto object-contain border rounded"
                 />
@@ -91,7 +94,8 @@ export default function CartPage() {
               Remove
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="card mt-6 space-y-4">

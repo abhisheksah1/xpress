@@ -30,6 +30,13 @@ import CustomersPage from './pages/admin/CustomersPage';
 import RemindersPage from './pages/store/RemindersPage';
 import ApiPartnersPage from './pages/admin/ApiPartnersPage';
 import PartnerReportsPage from './pages/admin/PartnerReportsPage';
+import FinanceLayout from './layouts/FinanceLayout';
+import FinancePnlPage from './pages/admin/finance/FinancePnlPage';
+import FinancePurchasesPage from './pages/admin/finance/FinancePurchasesPage';
+import FinanceExpensesPage from './pages/admin/finance/FinanceExpensesPage';
+import FinanceVendorsPage from './pages/admin/finance/FinanceVendorsPage';
+import FinanceStockPage from './pages/admin/finance/FinanceStockPage';
+import FinanceTreasuryPage from './pages/admin/finance/FinanceTreasuryPage';
 
 export default function App() {
   return (
@@ -75,6 +82,15 @@ export default function App() {
         <Route path="delivery" element={<DeliveryGroupsPage />} />
         <Route path="api-partners" element={<ApiPartnersPage />} />
         <Route path="api-partners/reports" element={<PartnerReportsPage />} />
+        <Route path="finance" element={<FinanceLayout />}>
+          <Route index element={<FinancePnlPage />} />
+          <Route path="pnl" element={<FinancePnlPage />} />
+          <Route path="purchases" element={<FinancePurchasesPage />} />
+          <Route path="expenses" element={<FinanceExpensesPage />} />
+          <Route path="vendors" element={<FinanceVendorsPage />} />
+          <Route path="stock" element={<FinanceStockPage />} />
+          <Route path="treasury" element={<FinanceTreasuryPage />} />
+        </Route>
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>

@@ -14,6 +14,7 @@ import {
 import { CheckoutCurrencyToggle, CheckoutPaymentGrid } from '../../components/store/CheckoutPaymentOptions.jsx';
 import { formatTimeSlotOption, formatTimeSlotSummary } from '../../utils/timeSlot.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
+import { resolveCartItemPersonalization } from '../../utils/personalization.js';
 
 function FormField({ id, label, required, optional, hint, children }) {
   return (
@@ -309,7 +310,7 @@ export default function CheckoutPage() {
     setAddonInput(addonId, 'photoError', '');
     try {
       const { data } = await storeApi.uploadPersonalizationImage(file);
-      const url = resolveMediaUrl(data.data?.url) || data.data?.url;
+      const url = data.data?.url || '';
       if (!url) throw new Error('No image URL returned');
       setAddonInputsBatch(addonId, { photoUrl: url, photoName: file.name, photoError: '' });
       toast.success('Photo uploaded');
@@ -367,6 +368,15 @@ export default function CheckoutPage() {
     const err = validateForm();
     if (err) return toast.error(err);
 
+    for (const item of items) {
+      const p = resolveCartItemPersonalization(item, useCartStore.getState().productUploads);
+      if (p?.printImageName && !p?.printImageUrl) {
+        return toast.error(`Custom image for "${item.name}" did not save correctly. Remove the item and add it again from the product page.`);
+      }
+    }
+
+    const productUploads = useCartStore.getState().productUploads;
+
     setPlacing(true);
     try {
       const payload = {
@@ -374,7 +384,7 @@ export default function CheckoutPage() {
           productId: i.productId,
           quantity: i.quantity,
           unitPrice: i.price,
-          personalization: i.personalization || undefined,
+          personalization: resolveCartItemPersonalization(i, productUploads),
         })),
         sender: {
           fullName: sender.fullName.trim(),
@@ -426,18 +436,6 @@ export default function CheckoutPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold text-slate-900">Checkout</h1>
           <p className="text-sm text-slate-500 mt-1">Enter sender & receiver details, choose add-ons and payment.</p>
-        </div>
-
-        <div className="mb-6">
-          <CheckoutCurrencyToggle
-            currencies={enabledCurrencies}
-            value={payoutCurrency}
-            selectedCurrency={selectedCurrency}
-            onChange={(code) => {
-              setPayoutCurrency(code);
-              setDisplayCurrencyCode(code);
-            }}
-          />
         </div>
 
         <div className="grid lg:grid-cols-12 gap-8">
@@ -733,8 +731,17 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Payment methods */}
+            {/* Currency & payment methods */}
             <div className="space-y-4">
+              <CheckoutCurrencyToggle
+                currencies={enabledCurrencies}
+                value={payoutCurrency}
+                selectedCurrency={selectedCurrency}
+                onChange={(code) => {
+                  setPayoutCurrency(code);
+                  setDisplayCurrencyCode(code);
+                }}
+              />
               <CheckoutPaymentGrid
                 gateways={gateways}
                 value={paymentMethod}

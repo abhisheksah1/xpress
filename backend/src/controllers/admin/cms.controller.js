@@ -33,6 +33,11 @@ export const deletePage = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, null, 'Page deleted'));
 });
 
+export const clonePage = asyncHandler(async (req, res) => {
+  const page = await cmsService.clonePage(req.params.id, req.body, req.user._id);
+  res.status(201).json(new ApiResponse(201, page, 'Page cloned'));
+});
+
 export const setupHomePage = asyncHandler(async (req, res) => {
   const { page, created, restored } = await cmsService.ensureDefaultHomePage(req.user._id);
   const message = created

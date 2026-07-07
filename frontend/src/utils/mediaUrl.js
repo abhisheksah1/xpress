@@ -5,6 +5,7 @@ export function resolveMediaUrl(url) {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
   if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.startsWith('/api/')) return trimmed;
 
   try {

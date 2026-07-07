@@ -46,6 +46,8 @@ const slugForType = (pageType, title) => {
   return slugify(title);
 };
 
+const suggestCloneSlug = (slug) => `${slugify(slug || 'page').replace(/-copy(-\d+)?$/, '')}-copy`;
+
 export default function CmsPageFormModal({
   open,
   mode = 'create',
@@ -60,6 +62,18 @@ export default function CmsPageFormModal({
 
   useEffect(() => {
     if (!open) return;
+    if (mode === 'clone' && initial) {
+      setForm({
+        title: `${initial.title || ''} (Copy)`.trim(),
+        slug: suggestCloneSlug(initial.slug),
+        pageType: SINGLETON_TYPES.has(initial.pageType) ? 'custom' : (initial.pageType || 'custom'),
+        isPublished: false,
+        metaTitle: initial.metaTitle || '',
+        metaDescription: initial.metaDescription || '',
+      });
+      setSlugTouched(true);
+      return;
+    }
     if (initial) {
       setForm({
         title: initial.title || '',
@@ -74,9 +88,11 @@ export default function CmsPageFormModal({
       setForm(defaultForm());
       setSlugTouched(false);
     }
-  }, [open, initial]);
+  }, [open, initial, mode]);
 
   if (!open) return null;
+
+  const isClone = mode === 'clone';
 
   const setField = (key, value) => {
     setForm((f) => {
@@ -95,7 +111,8 @@ export default function CmsPageFormModal({
   };
 
   const typeBlocked =
-    mode === 'create'
+    !isClone
+    && mode === 'create'
     && SINGLETON_TYPES.has(form.pageType)
     && takenTypes.includes(form.pageType);
 
@@ -110,7 +127,18 @@ export default function CmsPageFormModal({
         }}
         className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto"
       >
-        <h3 className="font-semibold text-lg">{mode === 'create' ? 'Create page' : 'Edit page'}</h3>
+        <h3 className="font-semibold text-lg">
+          {mode === 'create' ? 'Create page' : mode === 'clone' ? 'Clone page' : 'Edit page'}
+        </h3>
+
+        {isClone && (
+          <p className="text-sm text-gray-500">
+            Copies all content blocks from <strong>{initial?.title}</strong>. The clone starts as a draft.
+            {SINGLETON_TYPES.has(initial?.pageType) && (
+              <> Singleton page types (home, about, etc.) are saved as <strong>custom</strong> pages.</>
+            )}
+          </p>
+        )}
 
         <div>
           <label className="block text-sm font-medium mb-1">Title</label>
@@ -119,10 +147,19 @@ export default function CmsPageFormModal({
 
         <div>
           <label className="block text-sm font-medium mb-1">Page type</label>
-          <select className="input-field" value={form.pageType} onChange={(e) => setField('pageType', e.target.value)}>
+          <select
+            className="input-field"
+            value={form.pageType}
+            onChange={(e) => setField('pageType', e.target.value)}
+            disabled={isClone && SINGLETON_TYPES.has(initial?.pageType)}
+          >
             {PAGE_TYPES.map((t) => (
-              <option key={t.value} value={t.value} disabled={mode === 'create' && takenTypes.includes(t.value)}>
-                {t.label}{takenTypes.includes(t.value) && mode === 'create' ? ' (exists)' : ''}
+              <option
+                key={t.value}
+                value={t.value}
+                disabled={SINGLETON_TYPES.has(t.value) && takenTypes.includes(t.value) && mode !== 'edit'}
+              >
+                {t.label}{SINGLETON_TYPES.has(t.value) && takenTypes.includes(t.value) && mode !== 'edit' ? ' (exists)' : ''}
               </option>
             ))}
           </select>
@@ -164,7 +201,7 @@ export default function CmsPageFormModal({
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
           <button type="submit" disabled={saving || typeBlocked || !form.slug} className="btn-primary">
-            {saving ? 'Saving...' : mode === 'create' ? 'Create page' : 'Save changes'}
+            {saving ? 'Saving...' : mode === 'create' ? 'Create page' : mode === 'clone' ? 'Clone page' : 'Save changes'}
           </button>
         </div>
       </form>

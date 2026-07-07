@@ -63,7 +63,7 @@ export const getProducts = async ({
   const sortBy = resolveProductSort(sort);
   const isComboPicker = forComboPicker === 'true' || forComboPicker === true;
   const filter = {};
-  if (isActive !== undefined && !isComboPicker) {
+  if (isActive !== undefined && isActive !== '' && !isComboPicker) {
     filter.isActive = isActive === 'true' || isActive === true;
   }
   if (isFeatured !== undefined) filter.isFeatured = isFeatured === 'true' || isFeatured === true;
@@ -93,9 +93,18 @@ export const getProducts = async ({
     ];
   }
   if (search) {
-    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escaped, 'i');
-    const searchClause = { $or: [{ name: regex }, { sku: regex }] };
+    const terms = search.trim().split(/\s+/).filter(Boolean);
+    const termClause = (term) => {
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      return { $or: [{ name: regex }, { sku: regex }, { tags: regex }] };
+    };
+
+    const searchClause =
+      terms.length <= 1
+        ? termClause(terms[0] || search.trim())
+        : { $and: terms.map(termClause) };
+
     if (filter.$or) {
       filter.$and = [...(filter.$and || []), { $or: filter.$or }, searchClause];
       delete filter.$or;

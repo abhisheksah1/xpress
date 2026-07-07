@@ -216,6 +216,22 @@ export default function ContentPage() {
     }
   };
 
+  const handleClonePage = async (form) => {
+    if (!selected) return;
+    setPageSaving(true);
+    try {
+      const { data } = await adminApi.cloneCmsPage(selected._id, form);
+      toast.success('Page cloned');
+      setPageModal({ open: false, mode: 'create' });
+      await load();
+      if (data.data?._id) await selectPage(data.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to clone page');
+    } finally {
+      setPageSaving(false);
+    }
+  };
+
   const handleDeletePage = async () => {
     if (!selected) return;
     if (!window.confirm(`Delete "${selected.title}"? This cannot be undone.`)) return;
@@ -342,6 +358,9 @@ export default function ContentPage() {
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => setPageModal({ open: true, mode: 'edit' })} className="btn-secondary text-sm">
                     Edit page
+                  </button>
+                  <button type="button" onClick={() => setPageModal({ open: true, mode: 'clone' })} className="btn-secondary text-sm">
+                    Clone page
                   </button>
                   <button type="button" onClick={togglePublish} className="btn-secondary text-sm">
                     {selected.isPublished ? 'Unpublish' : 'Publish'}
@@ -696,10 +715,16 @@ export default function ContentPage() {
       <CmsPageFormModal
         open={pageModal.open}
         mode={pageModal.mode}
-        initial={pageModal.mode === 'edit' ? selected : null}
+        initial={pageModal.mode === 'edit' || pageModal.mode === 'clone' ? selected : null}
         takenTypes={takenPageTypes}
         onClose={() => setPageModal({ open: false, mode: 'create' })}
-        onSave={pageModal.mode === 'edit' ? handleUpdatePage : handleCreatePage}
+        onSave={
+          pageModal.mode === 'edit'
+            ? handleUpdatePage
+            : pageModal.mode === 'clone'
+              ? handleClonePage
+              : handleCreatePage
+        }
         saving={pageSaving}
       />
     </div>

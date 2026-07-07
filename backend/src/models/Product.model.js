@@ -43,6 +43,7 @@ const productSchema = new mongoose.Schema(
     sku: { type: String, unique: true },
     description: { type: String },
     shortDescription: { type: String },
+    shortDescriptionEnabled: { type: Boolean, default: false },
     longDescription: { type: String },
     additionalNote: { type: String },
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },

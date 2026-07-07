@@ -52,6 +52,62 @@ export const createPage = async (data, userId) => {
   });
 };
 
+const SINGLETON_PAGE_TYPES = [
+  CMS_PAGE_TYPES.HOME,
+  CMS_PAGE_TYPES.ABOUT,
+  CMS_PAGE_TYPES.CONTACT,
+  CMS_PAGE_TYPES.FAQ,
+  CMS_PAGE_TYPES.TERMS,
+  CMS_PAGE_TYPES.PRIVACY,
+];
+
+const suggestCloneSlug = async (baseSlug) => {
+  const root = String(baseSlug || 'page').replace(/-copy(-\d+)?$/, '');
+  let candidate = `${root}-copy`;
+  let n = 2;
+  while (await CMSPage.findOne({ slug: candidate })) {
+    candidate = `${root}-copy-${n}`;
+    n += 1;
+  }
+  return candidate;
+};
+
+const cloneBlocks = (blocks = []) =>
+  blocks.map((block) => {
+    const plain = typeof block.toObject === 'function' ? block.toObject() : { ...block };
+    const { _id, ...rest } = plain;
+    return rest;
+  });
+
+export const clonePage = async (id, data = {}, userId) => {
+  const source = await CMSPage.findById(id);
+  if (!source) throw new ApiError(404, 'Page not found');
+
+  let pageType = data.pageType || source.pageType;
+  if (SINGLETON_PAGE_TYPES.includes(pageType)) {
+    pageType = CMS_PAGE_TYPES.CUSTOM;
+  }
+
+  const slug = data.slug?.trim().toLowerCase() || await suggestCloneSlug(source.slug);
+  await assertUniqueSlug(slug, null, pageType);
+  if (SINGLETON_PAGE_TYPES.includes(pageType)) {
+    await assertUniquePageType(pageType);
+  }
+
+  const title = data.title?.trim() || `${source.title} (Copy)`;
+
+  return CMSPage.create({
+    title,
+    slug,
+    pageType,
+    blocks: cloneBlocks(source.blocks),
+    metaTitle: source.metaTitle,
+    metaDescription: source.metaDescription,
+    isPublished: data.isPublished === true,
+    updatedBy: userId,
+  });
+};
+
 export const getPages = async ({ pageType, isPublished }) => {
   const filter = {};
   if (pageType) filter.pageType = pageType;

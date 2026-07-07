@@ -262,6 +262,7 @@ export const getPublicSettings = async () => {
   const publicGroups = [
     'general', 'store', 'appearance', 'branding', 'social', 'seo', 'payment',
     'currency', 'addons', 'shipping', 'timeslots', 'compliance', 'auth', 'plugins', 'registry',
+    'product_page',
   ];
   const settings = await Settings.find({ group: { $in: publicGroups } });
   const result = settings.reduce((acc, s) => {

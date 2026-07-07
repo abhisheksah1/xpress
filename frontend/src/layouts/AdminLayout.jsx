@@ -17,6 +17,7 @@ const navItems = [
   { to: '/admin/delivery', label: 'Delivery' },
   { to: '/admin/api-partners', label: 'API Partners' },
   { to: '/admin/api-partners/reports', label: 'Partner Reports' },
+  { to: '/admin/finance', label: 'Finance' },
   { to: '/admin/settings', label: 'Settings' },
 ];
 

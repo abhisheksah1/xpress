@@ -14,3 +14,8 @@ export { default as Coupon } from './Coupon.model.js';
 export { default as Reminder } from './Reminder.model.js';
 export { default as ApiPartner } from './ApiPartner.model.js';
 export { default as ApiPartnerLog } from './ApiPartnerLog.model.js';
+export { default as Vendor } from './Vendor.model.js';
+export { default as SupplierPurchase } from './SupplierPurchase.model.js';
+export { default as OverheadExpense } from './OverheadExpense.model.js';
+export { default as TreasuryAccount } from './TreasuryAccount.model.js';
+export { default as TreasuryTransaction } from './TreasuryTransaction.model.js';

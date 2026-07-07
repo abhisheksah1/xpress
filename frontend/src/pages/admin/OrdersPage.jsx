@@ -395,6 +395,8 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                   {(order.items || []).map((item) => {
                     const img = itemImageUrl(item);
                     const p = item.personalization || {};
+                    const printImageUrl = p.printImageUrl || item.customerPrintImageUrl;
+                    const printImageName = p.printImageName || item.customerPrintImageName;
                     return (
                       <li key={item._id} className="border border-gray-100 rounded-lg p-3 flex gap-3">
                         <OrderImage src={img} alt={item.name} size="lg" />
@@ -419,13 +421,13 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                               {p.giftMessage && <p><span className="text-gray-500">Personalization:</span> {p.giftMessage}</p>}
                             </div>
                           )}
-                          {(p.printImageUrl || p.printImageName) && (
+                          {(printImageUrl || printImageName) && (
                             <div className="mt-2">
                               <p className="text-xs text-gray-500 mb-1">Customer print image</p>
-                              {p.printImageUrl ? (
-                                <OrderImage src={p.printImageUrl} alt={p.printImageName || 'Print'} size="md" />
+                              {printImageUrl ? (
+                                <OrderImage src={printImageUrl} alt={printImageName || 'Print'} size="md" />
                               ) : (
-                                <p className="text-xs text-amber-700">Image name: {p.printImageName} (file URL missing)</p>
+                                <p className="text-xs text-amber-700">Image name: {printImageName} (file URL missing)</p>
                               )}
                             </div>
                           )}
@@ -672,7 +674,14 @@ export default function OrdersPage({ mode = 'orders' }) {
                   return (
                     <tr key={order._id} className="hover:bg-gray-50 align-top">
                       <td className="px-4 py-3">
-                        <div className="font-mono font-semibold">{order.orderNumber}</div>
+                        <button
+                          type="button"
+                          onClick={() => setDetailId(order._id)}
+                          className="font-mono font-semibold text-primary-600 hover:text-primary-800 hover:underline text-left"
+                          title="View order details"
+                        >
+                          {order.orderNumber}
+                        </button>
                         {order.isLead && (
                           <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 mt-1 inline-block">Lead</span>
                         )}

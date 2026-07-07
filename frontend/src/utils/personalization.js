@@ -78,11 +78,104 @@ export function validatePersonalization(personalizationFields, values) {
       return `${config.label} must be ${config.maxLength} characters or less`;
     }
   }
+
+  if (values.printImageName && !values.printImageUrl) {
+    return 'Please wait for the image upload to finish, or upload the image again';
+  }
+
   return null;
 }
 
+export function mergePersonalization(prev, patch) {
+  const base = prev && typeof prev === 'object' ? prev : {};
+  return { ...base, ...patch };
+}
+
+/** Merge cart line personalization with top-level print fields, pending uploads, and session backup. */
+export function resolveCartItemPersonalization(item, productUploads = {}) {
+  if (!item) return undefined;
+
+  const pending = productUploads?.[item.productId];
+  const topLevel =
+    item.printImageUrl || item.printImageName
+      ? {
+          printImageUrl: item.printImageUrl,
+          printImageName: item.printImageName,
+        }
+      : null;
+
+  let sessionBackup = null;
+  if (typeof sessionStorage !== 'undefined' && item.productId) {
+    try {
+      const raw = sessionStorage.getItem(`koseli-print-${item.productId}`);
+      if (raw) sessionBackup = JSON.parse(raw);
+    } catch {
+      sessionBackup = null;
+    }
+  }
+
+  return (
+    serializePersonalization(
+      mergePersonalization(
+        mergePersonalization(mergePersonalization(item.personalization, topLevel), pending),
+        sessionBackup?.printImageUrl ? sessionBackup : null
+      )
+    ) || undefined
+  );
+}
+
+export function persistProductPrintUpload(productId, upload) {
+  if (typeof sessionStorage === 'undefined' || !productId || !upload?.printImageUrl) return;
+  try {
+    sessionStorage.setItem(`koseli-print-${productId}`, JSON.stringify({
+      printImageUrl: upload.printImageUrl,
+      printImageName: upload.printImageName || '',
+    }));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+export function clearProductPrintUpload(productId) {
+  if (typeof sessionStorage === 'undefined' || !productId) return;
+  try {
+    sessionStorage.removeItem(`koseli-print-${productId}`);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearAllProductPrintUploads() {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith('koseli-print-')) sessionStorage.removeItem(key);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function serializePersonalization(personalization) {
+  if (!personalization || typeof personalization !== 'object') return undefined;
+  const payload = {
+    cakeMessage: personalization.cakeMessage?.trim() || undefined,
+    giftMessage: personalization.giftMessage?.trim() || undefined,
+    printImageUrl: personalization.printImageUrl?.trim() || undefined,
+    printImageName: personalization.printImageName?.trim() || undefined,
+  };
+  if (payload.printImageName && !payload.printImageUrl) {
+    delete payload.printImageName;
+  }
+  if (!payload.cakeMessage && !payload.giftMessage && !payload.printImageUrl && !payload.printImageName) {
+    return undefined;
+  }
+  return payload;
+}
+
 export function personalizationKey(values) {
-  return JSON.stringify(values || {});
+  return JSON.stringify(serializePersonalization(values) || {});
 }
 
 export const ADMIN_PERSONALIZATION_OPTIONS = [

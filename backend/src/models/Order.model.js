@@ -3,6 +3,16 @@ import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '../config/constan
 import { generateOrderNumber } from '../utils/helpers.js';
 import Settings from './Settings.model.js';
 
+const orderItemPersonalizationSchema = new mongoose.Schema(
+  {
+    cakeMessage: { type: String },
+    giftMessage: { type: String },
+    printImageUrl: { type: String },
+    printImageName: { type: String },
+  },
+  { _id: false, minimize: false }
+);
+
 const orderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -14,12 +24,9 @@ const orderItemSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: 1 },
     giftWrap: { type: Boolean, default: false },
     giftMessage: { type: String },
-    personalization: {
-      cakeMessage: { type: String },
-      giftMessage: { type: String },
-      printImageUrl: { type: String },
-      printImageName: { type: String },
-    },
+    customerPrintImageUrl: { type: String },
+    customerPrintImageName: { type: String },
+    personalization: orderItemPersonalizationSchema,
   },
   { _id: true, minimize: false }
 );
