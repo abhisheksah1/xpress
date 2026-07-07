@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import SeoHead from '../../components/store/SeoHead.jsx';
-import { mergeEntitySeo } from '../../utils/seoMeta.js';
+import { categoryShopPath, mergeEntitySeo } from '../../utils/seoMeta.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
 const SORT_OPTIONS = [
@@ -16,6 +16,8 @@ const SORT_OPTIONS = [
 
 export default function ShopPage() {
   const { settings } = useStore();
+  const navigate = useNavigate();
+  const { categorySlug } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -23,29 +25,43 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get('search') || '');
 
-  const category = searchParams.get('category') || '';
+  const legacyCategoryId = searchParams.get('category') || '';
   const page = Number(searchParams.get('page') || 1);
   const sort = searchParams.get('sort') || 'newest';
 
-  const activeCategory = useMemo(
-    () => categories.find((cat) => cat._id === category),
-    [categories, category]
-  );
+  const activeCategory = useMemo(() => {
+    if (categorySlug) return categories.find((cat) => cat.slug === categorySlug);
+    if (legacyCategoryId) return categories.find((cat) => cat._id === legacyCategoryId);
+    return null;
+  }, [categories, categorySlug, legacyCategoryId]);
+
+  const resolvedCategoryId = activeCategory?._id || legacyCategoryId;
 
   useEffect(() => {
     storeApi.getCategories().then((res) => setCategories(res.data.data));
   }, []);
 
   useEffect(() => {
+    if (categorySlug || !legacyCategoryId || !categories.length) return;
+    const cat = categories.find((c) => c._id === legacyCategoryId);
+    if (cat?.slug) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('category');
+      const suffix = next.toString() ? `?${next}` : '';
+      navigate(`/shop/category/${cat.slug}${suffix}`, { replace: true });
+    }
+  }, [categorySlug, legacyCategoryId, categories, navigate, searchParams]);
+
+  useEffect(() => {
     setLoading(true);
     const params = { page, limit: 20, sort };
-    if (category) params.category = category;
+    if (resolvedCategoryId) params.category = resolvedCategoryId;
     if (search) params.search = search;
     storeApi.getProducts(params).then((res) => {
       setProducts(res.data.data.products);
       setPagination(res.data.data.pagination);
     }).finally(() => setLoading(false));
-  }, [category, page, search, sort]);
+  }, [resolvedCategoryId, page, search, sort]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -69,6 +85,7 @@ export default function ShopPage() {
   const pageTitle = activeCategory ? activeCategory.name : 'Shop Gifts';
   const pageDescription = activeCategory?.description
     || (activeCategory ? `Browse ${activeCategory.name} gifts and products at KoseliXpress Nepal.` : 'Browse gifts and products at KoseliXpress Nepal.');
+  const categoryPath = activeCategory ? categoryShopPath(activeCategory) : '/shop';
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -79,10 +96,10 @@ export default function ShopPage() {
           title: activeCategory ? `${activeCategory.name} | Shop Gifts` : 'Shop Gifts | KoseliXpress',
           description: pageDescription,
           image: activeCategory?.image?.url,
-          path: activeCategory ? `/shop?category=${activeCategory._id}` : '/shop',
-          schemaType: activeCategory ? 'CollectionPage' : 'CollectionPage',
+          path: categoryPath,
+          schemaType: 'CollectionPage',
         }}
-        jsonLdContext={{ title: pageTitle, path: activeCategory ? `/shop?category=${activeCategory._id}` : '/shop' }}
+        jsonLdContext={{ title: pageTitle, path: categoryPath }}
         jsonLdId="shop-json-ld"
       />
 
@@ -103,20 +120,20 @@ export default function ShopPage() {
       <div className="flex flex-col md:flex-row gap-8">
         <aside className="md:w-48 flex-shrink-0">
           <p className="text-xs font-semibold text-gray-400 uppercase mb-3">Categories</p>
-          <button
-            onClick={() => setSearchParams({})}
-            className={`block w-full text-left text-sm py-1.5 ${!category ? 'text-primary-600 font-medium' : 'text-gray-600'}`}
+          <Link
+            to="/shop"
+            className={`block w-full text-left text-sm py-1.5 ${!activeCategory ? 'text-primary-600 font-medium' : 'text-gray-600'}`}
           >
             All Products
-          </button>
+          </Link>
           {categories.map((cat) => (
-            <button
+            <Link
               key={cat._id}
-              onClick={() => setSearchParams({ category: cat._id })}
-              className={`block w-full text-left text-sm py-1.5 ${category === cat._id ? 'text-primary-600 font-medium' : 'text-gray-600'}`}
+              to={categoryShopPath(cat)}
+              className={`block w-full text-left text-sm py-1.5 ${activeCategory?._id === cat._id ? 'text-primary-600 font-medium' : 'text-gray-600'}`}
             >
               {cat.name}
-            </button>
+            </Link>
           ))}
         </aside>
 
@@ -163,6 +180,7 @@ export default function ShopPage() {
                   {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((p) => (
                     <button
                       key={p}
+                      type="button"
                       onClick={() => {
                         const next = new URLSearchParams(searchParams);
                         next.set('page', String(p));

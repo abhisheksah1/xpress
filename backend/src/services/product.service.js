@@ -34,6 +34,7 @@ export const createProduct = async (data, userId) => {
 };
 
 export const updateProduct = async (id, data, userId) => {
+  const existing = await Product.findById(id).select('isHamper');
   const prepared = await comboService.prepareComboProductData(withNormalizedPersonalization(data), id);
   const product = await Product.findByIdAndUpdate(
     id,
@@ -41,6 +42,9 @@ export const updateProduct = async (id, data, userId) => {
     { new: true, runValidators: true }
   );
   if (!product) throw new ApiError(404, 'Product not found');
+  if (existing && !existing.isHamper && !product.isHamper) {
+    await comboService.syncComboProductsContaining([product._id]);
+  }
   return Product.findById(product._id).populate('comboItems.product', 'name slug sku price stock images');
 };
 
@@ -138,7 +142,9 @@ export const getProducts = async ({
     Product.countDocuments(filter),
   ]);
 
-  return { products, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  const syncedProducts = await comboService.refreshHamperStocksInList(products);
+
+  return { products: syncedProducts, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
 };
 
 export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
@@ -152,6 +158,15 @@ export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
   const deliveryInfo = deliveryService.attachDeliveryInfo(product, product.category, groups);
 
   const doc = product.toObject();
+
+  if (product.isHamper && product.comboItems?.length) {
+    const stock = comboService.resolveEffectiveStock(product);
+    if (product.stock !== stock) {
+      await Product.updateOne({ _id: product._id }, { stock });
+    }
+    doc.stock = stock;
+  }
+
   doc.deliveryInfo = deliveryInfo;
 
   if (deliveryGroup) {

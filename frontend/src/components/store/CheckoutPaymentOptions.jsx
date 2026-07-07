@@ -30,8 +30,8 @@ export function CheckoutCurrencyToggle({ currencies, value, onChange, selectedCu
       : count <= 4
         ? 'grid-cols-2 sm:grid-cols-4'
         : count <= 6
-          ? 'grid-cols-3 sm:grid-cols-6'
-          : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5';
+          ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6'
+          : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 w-full min-w-0">
@@ -110,9 +110,9 @@ export function CheckoutPaymentGrid({ gateways, value, onChange }) {
   const sorted = [...gateways].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4 w-full min-w-0">
       <h3 className="text-sm sm:text-base font-bold text-slate-900">Choose payment method</h3>
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2.5 sm:gap-3">
         {sorted.map((g) => {
           const selected = value === g.id;
           const label = g.displayLabel || PAYMENT_DISPLAY_LABELS[g.id] || g.id;
@@ -122,7 +122,7 @@ export function CheckoutPaymentGrid({ gateways, value, onChange }) {
               key={g.id}
               type="button"
               onClick={() => onChange(g.id)}
-              className={`relative rounded-xl border-2 px-2 py-3 sm:px-4 sm:py-5 min-h-[6.5rem] sm:min-h-[7.5rem] flex flex-col items-center justify-center gap-2 sm:gap-3 text-center transition-colors ${
+              className={`relative rounded-xl border-2 px-3 py-3.5 sm:px-4 sm:py-5 min-h-[5.5rem] sm:min-h-[7.5rem] w-full min-w-0 flex flex-col items-center justify-center gap-2 sm:gap-3 text-center transition-colors touch-manipulation ${
                 selected
                   ? 'border-[var(--brand-primary,#e11d48)] bg-rose-50/60'
                   : 'border-slate-900 bg-white hover:bg-slate-50/80'
@@ -142,7 +142,7 @@ export function CheckoutPaymentGrid({ gateways, value, onChange }) {
               ) : (
                 <PaymentFallbackIcon id={g.id} />
               )}
-              <span className="text-[10px] sm:text-sm font-semibold text-slate-900 leading-snug px-0.5 sm:px-1">
+              <span className="text-xs sm:text-sm font-semibold text-slate-900 leading-snug px-1 break-words hyphens-auto max-w-full">
                 {label}
               </span>
               {g.environment === 'sandbox' && (

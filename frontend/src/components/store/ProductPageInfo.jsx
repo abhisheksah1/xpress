@@ -1,3 +1,6 @@
+import WhatsAppIcon from './WhatsAppIcon.jsx';
+import { buildWhatsAppChatUrl, resolveWhatsAppNumber } from '../../utils/whatsapp.js';
+
 function ScheduleField({ label, value, emphasize }) {
   return (
     <div>
@@ -135,17 +138,17 @@ export function ProductWhatsappHelp({ settings, className = '' }) {
   if (!enabled) return null;
 
   const plugins = settings.plugins_config || {};
-  const rawNumber = settings.registry_helpdesk_whatsapp
-    || plugins.whatsapp_number
-    || settings.store_phone;
+  const rawNumber = resolveWhatsAppNumber({ ...settings, plugins_config: plugins });
   if (!rawNumber) return null;
 
-  const waUrl = `https://wa.me/${String(rawNumber).replace(/\D/g, '')}`;
+  const waUrl = buildWhatsAppChatUrl(rawNumber);
 
   return (
     <div className={`w-full max-w-none min-w-0 rounded-xl border border-green-200 bg-green-50/80 p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 ${className}`.trim()}>
       <div className="flex gap-3 min-w-0 flex-1">
-        <span className="text-2xl shrink-0" aria-hidden>💬</span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white" aria-hidden>
+          <WhatsAppIcon className="h-6 w-6" />
+        </span>
         <div className="min-w-0 flex-1">
           <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
             {settings.product_whatsapp_help_title || 'WhatsApp Emergency Help & Customization'}
@@ -159,10 +162,10 @@ export function ProductWhatsappHelp({ settings, className = '' }) {
       <a
         href={waUrl}
         target="_blank"
-        rel="noreferrer"
-        className="inline-flex w-full lg:w-auto items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-sm shrink-0 transition-colors"
+        rel="noopener noreferrer"
+        className="inline-flex w-full lg:w-auto items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BD5A] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-sm shrink-0 transition-colors"
       >
-        <span aria-hidden>📞</span>
+        <WhatsAppIcon className="h-5 w-5" />
         {settings.product_whatsapp_help_button_text || 'WhatsApp Chat'}
       </a>
     </div>

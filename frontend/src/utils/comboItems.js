@@ -65,3 +65,51 @@ export function buildComboShortDescription(comboItems) {
 
   return lines.join('\n\n');
 }
+
+export function allowsBackorder(product) {
+  return product?.allowBackorder === true || product?.allowBackorder === 'true';
+}
+
+export function hasOutOfStockComboComponent(product) {
+  if (!product?.isHamper || !product.comboItems?.length) return false;
+  if (allowsBackorder(product)) return false;
+
+  return product.comboItems.some((item) => {
+    const component = getLinkedProductSummary(item);
+    if (!component || typeof component !== 'object') return true;
+    return (component.stock ?? 0) <= 0;
+  });
+}
+
+export function computeComboStockFromProduct(product) {
+  if (!product?.isHamper || !product.comboItems?.length) return product?.stock ?? 0;
+  if (hasOutOfStockComboComponent(product)) return 0;
+
+  let min = Infinity;
+  for (const item of product.comboItems) {
+    const component = getLinkedProductSummary(item);
+    if (!component || typeof component !== 'object') continue;
+    const qty = getComboItemQuantity(item);
+    const bundles = Math.floor((component.stock ?? 0) / qty);
+    min = Math.min(min, bundles);
+  }
+
+  return min === Infinity ? 0 : Math.max(0, min);
+}
+
+export function resolveProductStock(product) {
+  if (!product) return 0;
+  if (product.isHamper) return computeComboStockFromProduct(product);
+  return product.stock ?? 0;
+}
+
+export function isProductSoldOut(product) {
+  if (allowsBackorder(product)) return false;
+  return resolveProductStock(product) <= 0;
+}
+
+/** Max quantity selectable on product page (backorder allows ordering above stock). */
+export function resolveOrderableQuantity(product) {
+  if (allowsBackorder(product)) return 99;
+  return Math.max(1, resolveProductStock(product));
+}

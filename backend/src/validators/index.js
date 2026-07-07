@@ -162,7 +162,12 @@ export const createOrderSchema = z.object({
           productId: z.string(),
           variantId: z.string().optional(),
           quantity: z.number().min(1),
-          unitPrice: z.number().min(0).optional(),
+          selectedOptions: z.array(z.object({
+            category: z.string().optional(),
+            categoryId: z.string().optional(),
+            label: z.string(),
+            priceAdjustment: z.number().optional(),
+          })).optional(),
           giftWrap: z.boolean().optional(),
           giftMessage: z.string().optional(),
           personalization: z.object({
@@ -214,6 +219,21 @@ export const createOrderSchema = z.object({
         path: ['deliveryLocationId'],
       });
     }
+  }),
+});
+
+export const verifyPaymentSchema = z.object({
+  body: z.object({
+    orderId: z.string().min(1),
+    method: z.enum(['khalti', 'esewa', 'imepay', 'fonepay', 'card', 'hbl']),
+    token: z.string().optional(),
+    productCode: z.string().optional(),
+    totalAmount: z.union([z.string(), z.number()]).optional(),
+    transactionUuid: z.string().optional(),
+    prn: z.string().optional(),
+    amount: z.union([z.string(), z.number()]).optional(),
+    statusCode: z.string().optional(),
+    paymentIntentId: z.string().optional(),
   }),
 });
 

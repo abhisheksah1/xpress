@@ -39,6 +39,13 @@ export const initiatePayment = async (order, method) => {
 };
 
 export const verifyAndCompletePayment = async (orderId, method, verificationData) => {
+  const order = await Order.findById(orderId);
+  if (!order) throw new ApiError(404, 'Order not found');
+  if (order.payment?.status === 'paid') return order;
+  if (order.payment?.method && order.payment.method !== method) {
+    throw new ApiError(400, 'Payment method does not match the order');
+  }
+
   const gateway = await paymentGatewayService.getGatewayRuntimeCredentials(method);
   const creds = gateway?.credentials || {};
 
@@ -48,7 +55,11 @@ export const verifyAndCompletePayment = async (orderId, method, verificationData
   let result;
   switch (method) {
     case PAYMENT_METHODS.KHALTI:
-      result = await khaltiService.verifyPayment(verificationData.token, verificationData.amount, creds);
+      result = await khaltiService.verifyPayment(
+        verificationData.token,
+        Math.round(order.total * 100),
+        creds
+      );
       break;
     case PAYMENT_METHODS.ESEWA:
       result = await esewaService.verifyPayment(
@@ -57,6 +68,9 @@ export const verifyAndCompletePayment = async (orderId, method, verificationData
         verificationData.transactionUuid,
         creds
       );
+      if (Number(verificationData.totalAmount) !== Number(order.total.toFixed(2))) {
+        throw new ApiError(400, 'eSewa payment amount does not match order total');
+      }
       break;
     case PAYMENT_METHODS.FONEPAY:
       result = await fonepayService.verifyPayment(verificationData);

@@ -17,6 +17,7 @@ export const storeApi = {
   validateCoupon: (data) => api.post('/store/coupons/validate', data),
   checkoutQuote: (data) => api.post('/store/checkout/quote', data),
   createOrder: (data) => api.post('/store/orders', data),
+  verifyPayment: (data) => api.post('/store/orders/verify-payment', data),
   trackOrder: (params) => api.get('/store/orders/track', { params }),
   getMyReminders: () => api.get('/store/reminders/my'),
   createReminder: (data) => api.post('/store/reminders', data),

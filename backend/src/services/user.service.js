@@ -34,7 +34,15 @@ export const getUserById = async (id) => {
 };
 
 export const updateUser = async (id, data) => {
-  const user = await User.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+  const allowed = ['name', 'phone', 'countryCode', 'isActive', 'address'];
+  const patch = {};
+  for (const key of allowed) {
+    if (data[key] !== undefined) patch[key] = data[key];
+  }
+  if (!Object.keys(patch).length) {
+    throw new ApiError(400, 'No valid fields to update');
+  }
+  const user = await User.findByIdAndUpdate(id, patch, { new: true, runValidators: true });
   if (!user) throw new ApiError(404, 'User not found');
   return user.toSafeObject();
 };

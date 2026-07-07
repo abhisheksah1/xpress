@@ -17,6 +17,10 @@ const seedSuperAdmin = async () => {
     return;
   }
 
+  if (process.env.NODE_ENV === 'production' && config.superAdmin.password === 'ChangeMe@123') {
+    throw new Error('Set SUPER_ADMIN_PASSWORD in production before seeding — default password is not allowed.');
+  }
+
   await User.create({
     name: config.superAdmin.name,
     email: config.superAdmin.email,

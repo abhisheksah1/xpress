@@ -37,6 +37,7 @@ import FinanceExpensesPage from './pages/admin/finance/FinanceExpensesPage';
 import FinanceVendorsPage from './pages/admin/finance/FinanceVendorsPage';
 import FinanceStockPage from './pages/admin/finance/FinanceStockPage';
 import FinanceTreasuryPage from './pages/admin/finance/FinanceTreasuryPage';
+import PaymentCallbackPage from './pages/store/PaymentCallbackPage';
 
 export default function App() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
       <Route path="/" element={<StoreLayout />}>
         <Route index element={<HomePage />} />
         <Route path="shop" element={<ShopPage />} />
+        <Route path="shop/category/:categorySlug" element={<ShopPage />} />
         <Route path="shop/:slug" element={<ProductDetailPage />} />
         <Route path="about" element={<CmsPageView pageType="about" />} />
         <Route path="contact" element={<CmsPageView pageType="contact" />} />
@@ -54,6 +56,10 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
+        <Route path="checkout/khalti/callback" element={<PaymentCallbackPage mode="khalti" />} />
+        <Route path="checkout/esewa/success" element={<PaymentCallbackPage mode="esewa" />} />
+        <Route path="checkout/esewa/failure" element={<PaymentCallbackPage mode="esewa-failure" />} />
+        <Route path="checkout/fonepay/callback" element={<PaymentCallbackPage mode="fonepay" />} />
         <Route path="orders" element={<OrderHistoryPage />} />
         <Route path="track" element={<TrackOrderPage />} />
         <Route path="reminders" element={<RemindersPage />} />

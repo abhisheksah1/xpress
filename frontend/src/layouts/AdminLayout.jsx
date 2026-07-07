@@ -21,8 +21,10 @@ const navItems = [
   { to: '/admin/settings', label: 'Settings' },
 ];
 
+const adminOnlyNav = new Set(['/admin/coupons', '/admin/api-partners', '/admin/api-partners/reports', '/admin/finance', '/admin/settings']);
+
 export default function AdminLayout() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAdmin } = useAuthStore();
   const [leadCount, setLeadCount] = useState(0);
 
   const refreshLeadCount = () => {
@@ -53,7 +55,7 @@ export default function AdminLayout() {
           <p className="text-xs text-gray-400 mt-1">Admin Panel</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => (
+          {navItems.filter((item) => isAdmin() || !adminOnlyNav.has(item.to)).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

@@ -11,6 +11,7 @@ export const useAuthStore = create(
       accessToken: null,
 
       isStaff: () => STAFF_ROLES.includes(get().user?.role),
+      isAdmin: () => ['super_admin', 'admin'].includes(get().user?.role),
 
       login: async (email, password) => {
         const { data } = await api.post('/auth/login', { email, password });

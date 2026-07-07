@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast';
+import { isProductSoldOut, resolveProductStock } from './comboItems.js';
 import { normalizePersonalizationFields } from './personalization.js';
 
 export function optionsKey(selectedOptions) {
@@ -38,7 +39,7 @@ export function hasRequiredPersonalization(personalizationFields = {}) {
 
 export function canQuickAddProduct(product) {
   if (!product) return false;
-  if ((product.stock ?? 0) <= 0) return false;
+  if (isProductSoldOut(product)) return false;
   if (product.variants?.length > 0) return false;
   if (hasRequiredPersonalization(product.personalizationFields)) return false;
   return true;
@@ -47,7 +48,7 @@ export function canQuickAddProduct(product) {
 export function quickAddProductToCart(addItem, product) {
   if (!product) return false;
 
-  if ((product.stock ?? 0) <= 0) {
+  if (isProductSoldOut(product)) {
     toast.error('This item is out of stock');
     return false;
   }

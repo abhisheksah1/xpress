@@ -4,6 +4,9 @@ import toast from 'react-hot-toast';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import { useCartStore } from '../../store/cartStore.js';
+import SeoHead from '../../components/store/SeoHead.jsx';
+import { categoryShopPath, mergeProductSeo } from '../../utils/seoMeta.js';
+import { isProductSoldOut, resolveOrderableQuantity } from '../../utils/comboItems.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import ProductPersonalization from '../../components/store/ProductPersonalization.jsx';
 import {
@@ -188,6 +191,7 @@ function BuyPanel({
   hasDiscount,
   discountPct,
   soldOut,
+  availableStock,
   formatPriceNpr,
   selectedOptions,
   setSelectedOptions,
@@ -298,16 +302,16 @@ function BuyPanel({
           <input
             type="number"
             min="1"
-            max={product.stock || 1}
+            max={availableStock || 1}
             value={qty}
-            onChange={(e) => setQty(Math.max(1, Math.min(product.stock || 1, Number(e.target.value) || 1)))}
+            onChange={(e) => setQty(Math.max(1, Math.min(availableStock || 1, Number(e.target.value) || 1)))}
             className="w-16 sm:w-12 text-center text-sm font-bold border-x border-slate-200 py-3 outline-none"
             disabled={soldOut}
           />
           <button
             type="button"
             className="px-3 py-3 text-slate-500 hover:bg-slate-50 font-bold"
-            onClick={() => setQty((q) => Math.min(product.stock || 1, q + 1))}
+            onClick={() => setQty((q) => Math.min(availableStock || 1, q + 1))}
             disabled={soldOut}
           >
             +
@@ -419,7 +423,8 @@ export default function ProductDetailPage() {
   const unitPrice = basePrice + optionAdjustment;
   const displayCompare = hasDiscount ? comparePrice + optionAdjustment : null;
   const discountPct = hasDiscount ? Math.round(((comparePrice - basePrice) / comparePrice) * 100) : 0;
-  const soldOut = (product?.stock ?? 0) <= 0;
+  const availableStock = resolveOrderableQuantity(product);
+  const soldOut = isProductSoldOut(product);
 
   const handleAddToCart = () => {
     const mergedPersonalization = mergePersonalization(
@@ -479,6 +484,27 @@ export default function ProductDetailPage() {
 
   return (
     <div className="bg-[#FCF9F9] min-h-screen">
+      <SeoHead
+        seo={mergeProductSeo(product)}
+        siteSettings={settings}
+        fallbacks={{
+          title: `${product.name} | Buy Online | KoseliXpress`,
+          description: product.shortDescription || product.description,
+          image: gallery[0],
+          imageAlt: product.name,
+          path: `/shop/${product.slug}`,
+          schemaType: 'Product',
+        }}
+        jsonLdContext={{
+          title: product.name,
+          path: `/shop/${product.slug}`,
+          product,
+          price: unitPrice,
+          priceCurrency: 'NPR',
+          ogType: 'product',
+        }}
+        jsonLdId="product-json-ld"
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <nav className="text-xs text-gray-500 mb-6 flex flex-wrap items-center gap-1.5">
           <Link to="/" className="hover:text-primary-600">Home</Link>
@@ -488,7 +514,7 @@ export default function ProductDetailPage() {
             <>
               <span>/</span>
               <Link
-                to={`/shop?category=${product.category._id || product.category}`}
+                to={categoryShopPath(product.category)}
                 className="hover:text-primary-600"
               >
                 {product.category.name}
@@ -515,6 +541,7 @@ export default function ProductDetailPage() {
             hasDiscount={hasDiscount}
             discountPct={discountPct}
             soldOut={soldOut}
+            availableStock={availableStock}
             formatPriceNpr={formatPriceNpr}
             selectedOptions={selectedOptions}
             setSelectedOptions={setSelectedOptions}

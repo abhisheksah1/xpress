@@ -157,7 +157,7 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
           onChange={(seo) => setField('seo', seo)}
           pageTitle={form.name}
           pageDescription={form.description}
-          canonicalPreview={`/shop?category=${category._id}`}
+          canonicalPreview={category.slug ? `/shop/category/${category.slug}` : `/shop?category=${category._id}`}
           defaultSchemaType="CollectionPage"
           onUploadImage={async (file) => {
             const { data } = await adminApi.uploadImage(file);

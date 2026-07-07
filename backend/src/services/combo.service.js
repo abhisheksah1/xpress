@@ -1,5 +1,6 @@
 import { Product, InventoryLog } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
+import { allowsBackorder } from '../utils/productStock.js';
 
 export const computeComboStock = (comboItems, components) => {
   if (!comboItems?.length) return 0;
@@ -10,11 +11,72 @@ export const computeComboStock = (comboItems, components) => {
     const component = byId.get(String(item.product?._id || item.product));
     if (!component) continue;
     const qty = Math.max(1, item.quantity || 1);
+    if ((component.stock ?? 0) <= 0) return 0;
     const bundles = Math.floor((component.stock || 0) / qty);
     min = Math.min(min, bundles);
   }
 
   return min === Infinity ? 0 : Math.max(0, min);
+};
+
+export const hasOutOfStockComboComponent = (product) => {
+  if (!product?.isHamper || !product.comboItems?.length) return false;
+
+  return product.comboItems.some((item) => {
+    const component = item.product;
+    if (!component || typeof component !== 'object') return true;
+    return (component.stock ?? 0) <= 0;
+  });
+};
+
+export const resolveEffectiveStock = (product) => {
+  if (!product?.isHamper) return product?.stock ?? 0;
+  if (!product.comboItems?.length) return 0;
+  if (hasOutOfStockComboComponent(product)) return 0;
+
+  const components = product.comboItems
+    .map((i) => i.product)
+    .filter((p) => p && typeof p === 'object');
+  if (!components.length) return product.stock ?? 0;
+
+  return computeComboStock(product.comboItems, components);
+};
+
+export const syncHamperStockRecord = async (hamperProduct) => {
+  const stock = resolveEffectiveStock(hamperProduct);
+  if (hamperProduct.stock !== stock) {
+    hamperProduct.stock = stock;
+    await hamperProduct.save();
+  }
+  return stock;
+};
+
+export const refreshHamperStocksInList = async (products) => {
+  const hampers = products.filter((p) => p.isHamper);
+  if (!hampers.length) return products;
+
+  const populated = await Product.find({ _id: { $in: hampers.map((p) => p._id) } }).populate(
+    'comboItems.product',
+    'stock'
+  );
+
+  const stockById = new Map();
+  for (const hamper of populated) {
+    const stock = await syncHamperStockRecord(hamper);
+    stockById.set(String(hamper._id), stock);
+  }
+
+  return products.map((p) => {
+    if (!p.isHamper) return p;
+    const stock = stockById.get(String(p._id));
+    if (stock == null) return p;
+    if (typeof p.toObject === 'function') {
+      const obj = p.toObject();
+      obj.stock = stock;
+      return obj;
+    }
+    return { ...p, stock };
+  });
 };
 
 export const mergeComboImages = (existingImages = [], components = [], comboItems = []) => {
@@ -149,15 +211,26 @@ export const getComboAvailableStock = async (product) => {
   let populated = product;
   const first = product.comboItems[0]?.product;
   if (!first || typeof first !== 'object' || first.stock == null) {
-    populated = await Product.findById(product._id).populate('comboItems.product');
+    populated = await Product.findById(product._id).populate('comboItems.product', 'stock');
   }
 
-  const components = populated.comboItems.map((i) => i.product).filter((p) => p && p.stock != null);
-  return computeComboStock(populated.comboItems, components);
+  return resolveEffectiveStock(populated);
 };
 
 export const assertComboStock = async (product, orderQty) => {
-  const available = await getComboAvailableStock(product, orderQty);
+  if (allowsBackorder(product)) return orderQty;
+
+  let populated = product;
+  const first = product.comboItems?.[0]?.product;
+  if (product.isHamper && product.comboItems?.length && (!first || typeof first !== 'object' || first.stock == null)) {
+    populated = await Product.findById(product._id).populate('comboItems.product', 'stock');
+  }
+
+  if (populated.isHamper && hasOutOfStockComboComponent(populated)) {
+    throw new ApiError(400, `${product.name} is out of stock`);
+  }
+
+  const available = await getComboAvailableStock(populated);
   if (available < orderQty) {
     throw new ApiError(400, `Insufficient stock for combo ${product.name}`);
   }

@@ -1,4 +1,5 @@
 import * as comboService from './combo.service.js';
+import { allowsBackorder } from '../utils/productStock.js';
 import * as couponService from './coupon.service.js';
 import * as deliveryService from './delivery.service.js';
 import { Product, Order, Settings } from '../models/index.js';
@@ -11,6 +12,27 @@ import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '../config/constan
 /** COD and manual bank: regular orders with payment collected later (not checkout leads). */
 const isDirectCheckoutMethod = (method) =>
   method === PAYMENT_METHODS.COD || method === PAYMENT_METHODS.MANUAL_BANK;
+
+const resolveProductUnitPrice = (product, item) => {
+  if (item.variantId) {
+    const variant = product.variants.id(item.variantId);
+    if (!variant || !variant.isActive) throw new ApiError(400, 'Variant not found');
+    return variant.price;
+  }
+
+  let price = product.price;
+  const selections = item.selectedOptions || [];
+  if (selections.length && product.optionCategories?.length) {
+    for (const sel of selections) {
+      const category = product.optionCategories.find(
+        (cat) => cat.name === sel.category || String(cat._id) === String(sel.categoryId)
+      );
+      const option = category?.options?.find((opt) => opt.label === sel.label);
+      if (option) price += Number(option.priceAdjustment) || 0;
+    }
+  }
+  return price;
+};
 
 const resolveCheckoutCurrency = async (code) => {
   const setting = await Settings.findOne({ key: 'multi_currencies' });
@@ -63,31 +85,33 @@ export const createOrder = async (data) => {
   let subtotal = 0;
 
   for (const item of items) {
-    const product = await Product.findById(item.productId);
+    let product = await Product.findById(item.productId);
     if (!product || !product.isActive) {
       throw new ApiError(400, `Product not found: ${item.productId}`);
     }
 
-    let price = product.price;
+    if (product.isHamper && product.comboItems?.length) {
+      product = await Product.findById(item.productId).populate('comboItems.product', 'stock');
+    }
+
+    let price = resolveProductUnitPrice(product, item);
     let stock = product.stock;
     let sku = product.sku;
     let image = product.images?.find((i) => i.isPrimary)?.url || product.images?.[0]?.url;
 
     if (item.variantId) {
       const variant = product.variants.id(item.variantId);
-      if (!variant || !variant.isActive) throw new ApiError(400, 'Variant not found');
-      price = variant.price;
       stock = variant.stock;
       sku = variant.sku;
       if (variant.image?.url) image = variant.image.url;
-    } else if (item.unitPrice != null) {
-      price = Number(item.unitPrice);
     }
 
-    if (product.isHamper && product.comboItems?.length) {
-      await comboService.assertComboStock(product, item.quantity);
-    } else if (stock < item.quantity) {
-      throw new ApiError(400, `Insufficient stock for ${product.name}`);
+    if (!allowsBackorder(product)) {
+      if (product.isHamper && product.comboItems?.length) {
+        await comboService.assertComboStock(product, item.quantity);
+      } else if (stock < item.quantity) {
+        throw new ApiError(400, `Insufficient stock for ${product.name}`);
+      }
     }
 
     const personalizationError = validateOrderPersonalization(product, item.personalization);

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext.jsx';
 import { useCartStore } from '../../store/cartStore.js';
 import { canQuickAddProduct, quickAddProductToCart } from '../../utils/quickAddProduct.js';
+import { isProductSoldOut } from '../../utils/comboItems.js';
 
 export default function ProductCard({ product, currency, priceNpr, showQuickAdd = true }) {
   const { formatPriceNpr } = useStore();
@@ -13,7 +14,7 @@ export default function ProductCard({ product, currency, priceNpr, showQuickAdd 
     ? `${currency} ${Number(npr).toLocaleString('en-NP')}`
     : formatPriceNpr(npr);
 
-  const soldOut = (product.stock ?? 0) <= 0;
+  const soldOut = isProductSoldOut(product);
   const quickAdd = showQuickAdd && canQuickAddProduct(product);
   const productUrl = `/shop/${product.slug}`;
 

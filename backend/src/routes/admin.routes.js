@@ -130,7 +130,7 @@ router.delete('/delivery-zones/:id', isAdmin, deliveryController.deleteDeliveryZ
 // Users
 router.get('/users', hasPermission('users:read'), userController.getUsers);
 router.get('/users/:id', hasPermission('users:read'), userController.getUser);
-router.patch('/users/:id', hasPermission('users:read'), userController.updateUser);
+router.patch('/users/:id', hasPermission('users:write'), userController.updateUser);
 router.patch('/users/:id/toggle-status', isAdmin, userController.toggleStatus);
 router.delete('/users/:id', isAdmin, userController.deleteUser);
 

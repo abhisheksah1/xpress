@@ -5,7 +5,7 @@ import {
 } from './ProductPageInfo.jsx';
 import ProductRichText from './ProductRichText.jsx';
 import { quickAddProductToCart } from '../../utils/quickAddProduct.js';
-import { getComboItemQuantity } from '../../utils/comboItems.js';
+import { getComboItemQuantity, isProductSoldOut } from '../../utils/comboItems.js';
 
 function SectionHeading({ icon, children }) {
   return (
@@ -28,6 +28,8 @@ export function HamperComboIncludes({ comboItems }) {
         {comboItems.map((item, index) => {
           const p = item.product;
           const desc = p?.shortDescription || p?.description || '';
+          const component = item.product;
+          const outOfStock = !component || (component.stock ?? 0) <= 0;
           const qty = getComboItemQuantity(item);
           const qtyLabel = qty > 1 ? ` ×${qty}` : '';
 
@@ -40,6 +42,9 @@ export function HamperComboIncludes({ comboItems }) {
                 <p className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
                   {p?.name || 'Product'}
                   {qtyLabel}
+                  {outOfStock && (
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-rose-600">Out of stock</span>
+                  )}
                 </p>
                 {desc && (
                   <div className="text-xs sm:text-sm mt-1.5">
@@ -112,7 +117,7 @@ export function HamperComplementsList({ products, formatPriceNpr, onAddToBasket 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {products.map((p) => {
           const img = p.images?.find((i) => i.isPrimary)?.url || p.images?.[0]?.url;
-          const soldOut = (p.stock ?? 0) <= 0;
+          const soldOut = isProductSoldOut(p);
 
           return (
             <div

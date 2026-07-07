@@ -4,6 +4,7 @@ import { generateSlug } from '../utils/helpers.js';
 import { parseCsv } from '../utils/csvParser.js';
 import { mapCsvRowToProduct } from '../utils/productCsvMapper.js';
 import { dedupeCategoryIds } from '../utils/productCategories.js';
+import * as comboService from './combo.service.js';
 
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -119,6 +120,9 @@ export async function importProductRows(rows, userId) {
         delete payload.shortDescription;
         if (!mapped.longDescription) delete payload.longDescription;
         await Product.findByIdAndUpdate(existing._id, payload, { runValidators: true });
+        if (payload.stock !== undefined) {
+          await comboService.syncComboProductsContaining([existing._id]);
+        }
         results.updated += 1;
       } else {
         await Product.create({ ...payload, createdBy: userId });

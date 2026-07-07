@@ -11,7 +11,7 @@ import { authenticate, optionalAuth } from '../middlewares/auth.middleware.js';
 import { authorize } from '../middlewares/role.middleware.js';
 import { ROLES } from '../config/constants.js';
 import { validate } from '../middlewares/validate.middleware.js';
-import { createOrderSchema, validateCouponSchema, createReminderSchema, updateReminderSchema } from '../validators/index.js';
+import { createOrderSchema, validateCouponSchema, createReminderSchema, updateReminderSchema, verifyPaymentSchema } from '../validators/index.js';
 import { maintenanceGate } from '../middlewares/maintenance.middleware.js';
 import { uploadSingle } from '../middlewares/upload.middleware.js';
 
@@ -42,7 +42,7 @@ router.get('/delivery-zones', orderController.getDeliveryZones);
 router.post('/coupons/validate', optionalAuth, validate(validateCouponSchema), couponController.validateCoupon);
 router.post('/checkout/quote', optionalAuth, validate(validateCouponSchema), couponController.checkoutQuote);
 router.post('/orders', optionalAuth, validate(createOrderSchema), orderController.createOrder);
-router.post('/orders/verify-payment', orderController.verifyPayment);
+router.post('/orders/verify-payment', validate(verifyPaymentSchema), orderController.verifyPayment);
 router.get('/orders/track', orderController.trackOrder);
 router.get('/orders/my', authenticate, orderController.getMyOrders);
 router.get('/orders/my/:id', authenticate, orderController.getMyOrder);

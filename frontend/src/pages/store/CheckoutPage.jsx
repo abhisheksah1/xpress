@@ -13,6 +13,7 @@ import {
 } from '../../utils/countryCodes.js';
 import { CheckoutCurrencyToggle, CheckoutPaymentGrid } from '../../components/store/CheckoutPaymentOptions.jsx';
 import ImageSizeGuide from '../../components/ImageSizeGuide.jsx';
+import { clearPendingPayment, redirectToPayment, savePendingPayment } from '../../utils/checkoutPayment.js';
 import { formatTimeSlotOption, formatTimeSlotSummary } from '../../utils/timeSlot.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { resolveCartItemPersonalization } from '../../utils/personalization.js';
@@ -44,7 +45,9 @@ function FormField({ id, label, required, optional, hint, children }) {
 
 function SummaryMoney({ amount, className = '' }) {
   return (
-    <span className={`shrink-0 text-right tabular-nums whitespace-nowrap ${className}`}>{amount}</span>
+    <span className={`shrink-0 max-w-[48%] text-right tabular-nums leading-snug break-words sm:max-w-none sm:whitespace-nowrap ${className}`}>
+      {amount}
+    </span>
   );
 }
 
@@ -415,7 +418,7 @@ export default function CheckoutPage() {
         items: items.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
-          unitPrice: i.price,
+          selectedOptions: i.selectedOptions || [],
           personalization: resolveCartItemPersonalization(i, productUploads),
         })),
         sender: {
@@ -441,7 +444,43 @@ export default function CheckoutPage() {
       };
 
       const { data } = await storeApi.createOrder(payload);
-      toast.success(data.message || 'Order created');
+      const order = data.data?.order;
+      const payment = data.data?.payment;
+      const method = paymentMethod;
+
+      if (method === 'cod' || method === 'manual_bank') {
+        toast.success(data.message || 'Order placed');
+        clearCart();
+        clearPendingPayment();
+        navigate('/orders');
+        return;
+      }
+
+      if (!order?._id) {
+        throw new Error('Order was created but no order reference was returned');
+      }
+
+      savePendingPayment({
+        orderId: order._id,
+        method,
+        orderNumber: order.orderNumber,
+        total: order.total,
+      });
+
+      const redirected = redirectToPayment(method, payment);
+      if (redirected) {
+        clearCart();
+        return;
+      }
+
+      if (method === 'card' && payment?.clientSecret) {
+        clearCart();
+        toast('Complete card payment on the next screen.');
+        navigate(`/checkout/card?orderId=${order._id}`, { state: { payment } });
+        return;
+      }
+
+      toast.success('Order created — complete payment to confirm.');
       clearCart();
       navigate('/orders');
     } catch (err) {
@@ -463,15 +502,15 @@ export default function CheckoutPage() {
   const showNprDisclaimer = selectedCurrency?.code && selectedCurrency.code !== 'NPR';
 
   return (
-    <div className="bg-[#FCF9F9] min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900">Checkout</h1>
+    <div className="bg-[#FCF9F9] min-h-screen overflow-x-hidden">
+      <div className="max-w-7xl mx-auto w-full min-w-0 px-3 sm:px-6 py-6 sm:py-10 pb-28 lg:pb-10">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Checkout</h1>
           <p className="text-sm text-slate-500 mt-1">Enter sender & receiver details, choose add-ons and payment.</p>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-7 space-y-6">
+        <div className="grid lg:grid-cols-12 gap-6 lg:gap-8">
+          <div className="lg:col-span-7 space-y-5 sm:space-y-6 min-w-0">
             {/* Sender */}
             <div className="card space-y-4">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Sender details</h2>
@@ -497,10 +536,10 @@ export default function CheckoutPage() {
                 />
               </FormField>
               <FormField id="sender-phone" label="Mobile number" required>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     id="sender-country-code"
-                    className="input-field w-44 sm:w-52 shrink-0 text-sm"
+                    className="input-field w-full sm:w-36 md:w-44 shrink-0 text-sm"
                     aria-label="Country calling code"
                     value={sender.countryCode}
                     onChange={(e) => setSenderField('countryCode', e.target.value)}
@@ -513,7 +552,7 @@ export default function CheckoutPage() {
                   </select>
                   <input
                     id="sender-phone"
-                    className="input-field flex-1"
+                    className="input-field w-full flex-1 min-w-0"
                     type="tel"
                     autoComplete="tel-national"
                     placeholder={
@@ -548,10 +587,10 @@ export default function CheckoutPage() {
                 />
               </FormField>
               <FormField id="receiver-phone" label="Contact number" required>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     id="receiver-country-code"
-                    className="input-field w-44 sm:w-52 shrink-0 text-sm"
+                    className="input-field w-full sm:w-36 md:w-44 shrink-0 text-sm"
                     aria-label="Country calling code"
                     value={receiver.countryCode}
                     onChange={(e) => setReceiverField('countryCode', e.target.value)}
@@ -564,7 +603,7 @@ export default function CheckoutPage() {
                   </select>
                   <input
                     id="receiver-phone"
-                    className="input-field flex-1"
+                    className="input-field w-full flex-1 min-w-0"
                     type="tel"
                     autoComplete="tel-national"
                     placeholder={
@@ -639,7 +678,6 @@ export default function CheckoutPage() {
                       id="time-slot"
                       label="Preferred time slot"
                       optional
-                      hint={`Only slots at least ${DELIVERY_PREP_HOURS} hours from now are shown.`}
                     >
                       <select
                         id="time-slot"
@@ -655,11 +693,6 @@ export default function CheckoutPage() {
                         ))}
                       </select>
                     </FormField>
-                    {availableTimeSlots.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-1.5">
-                        No time slots are available for the selected date. Choose a later date or delivery time.
-                      </p>
-                    )}
                     {timeSlotId && (
                       <p className="text-xs text-slate-500 mt-1.5">
                         {(() => {
@@ -694,18 +727,18 @@ export default function CheckoutPage() {
                         key={addon.id}
                         className={`p-3 border rounded-xl bg-white ${selected ? 'border-primary-400 ring-2 ring-primary-500/20' : 'border-gray-200'}`}
                       >
-                        <label className="flex items-start gap-3 cursor-pointer">
+                        <label className="flex flex-wrap items-start gap-x-3 gap-y-2 cursor-pointer">
                           <input
                             type="checkbox"
-                            className="mt-1"
+                            className="mt-1 shrink-0"
                             checked={selected}
                             onChange={() => toggleAddon(addon.id)}
                           />
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 basis-[calc(100%-2rem)] sm:basis-auto">
                             <p className="text-sm font-semibold text-slate-900">{addon.name}</p>
                             {addon.description && <p className="text-xs text-slate-500 mt-0.5">{addon.description}</p>}
                           </div>
-                          <span className="text-sm font-bold text-slate-800 shrink-0">
+                          <span className="text-sm font-bold text-slate-800 shrink-0 ml-auto sm:ml-0">
                             Rs. {Number(addon.price || 0).toLocaleString('en-NP')}
                           </span>
                         </label>
@@ -802,7 +835,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Summary */}
-          <div className="lg:col-span-5 space-y-6">
+          <div className="lg:col-span-5 space-y-5 sm:space-y-6 min-w-0">
             <div className="card space-y-4 lg:sticky lg:top-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Payment summary</h2>
@@ -847,15 +880,15 @@ export default function CheckoutPage() {
 
               <form onSubmit={applyCoupon} className="pt-3 border-t border-gray-100 space-y-2">
                 <FormField id="coupon-code" label="Coupon code">
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       id="coupon-code"
-                      className="input-field uppercase flex-1"
+                      className="input-field uppercase w-full min-w-0 flex-1"
                       placeholder="Enter coupon code"
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                     />
-                    <button type="submit" className="btn-secondary shrink-0" disabled={couponApplying}>
+                    <button type="submit" className="btn-secondary w-full sm:w-auto shrink-0" disabled={couponApplying}>
                       {couponApplying ? '...' : 'Apply'}
                     </button>
                   </div>
@@ -921,14 +954,44 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              <button type="button" onClick={placeOrder} disabled={placing || !gateways.length} className="btn-primary w-full">
+              <button
+                type="button"
+                onClick={placeOrder}
+                disabled={placing || !gateways.length}
+                className="btn-primary w-full hidden lg:inline-flex justify-center"
+              >
                 {placing ? 'Processing...' : 'Proceed to pay'}
               </button>
-              <p className="text-xs text-slate-400 text-center">
+              <p className="text-xs text-slate-400 text-center hidden lg:block">
                 By proceeding you agree to our terms and delivery policy.
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-sm px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total</p>
+            <p className="text-lg font-extrabold text-slate-900 truncate">{fmt(totalsNpr.total)}</p>
+            {showNprDisclaimer && (
+              <p className="text-[10px] text-slate-500 truncate">
+                NPR Rs. {Number(totalsNpr.total).toLocaleString('en-NP')}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={placeOrder}
+            disabled={placing || !gateways.length}
+            className="btn-primary shrink-0 px-5 py-3 text-sm font-bold min-h-[44px]"
+          >
+            {placing ? 'Processing...' : 'Pay now'}
+          </button>
         </div>
       </div>
     </div>

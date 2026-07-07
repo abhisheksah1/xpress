@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import config from './config/index.js';
 import routes from './routes/index.js';
+import * as seoController from './controllers/seo.controller.js';
 import { errorHandler, notFound } from './middlewares/error.middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -50,6 +51,9 @@ app.use(
   },
   express.static(path.join(__dirname, '../uploads'), { maxAge: config.env === 'production' ? '7d' : 0 })
 );
+
+app.get('/robots.txt', seoController.robotsTxt);
+app.get('/sitemap.xml', seoController.sitemapXml);
 
 app.use(`/api/${config.apiVersion}`, routes);
 

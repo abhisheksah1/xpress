@@ -60,8 +60,14 @@ const resolveLineItems = async (items = []) => {
       const variant = product.variants.id(item.variantId);
       if (!variant || !variant.isActive) throw new ApiError(400, 'Variant not found');
       price = variant.price;
-    } else if (item.unitPrice != null) {
-      price = Number(item.unitPrice);
+    } else if (item.selectedOptions?.length && product.optionCategories?.length) {
+      for (const sel of item.selectedOptions) {
+        const category = product.optionCategories.find(
+          (cat) => cat.name === sel.category || String(cat._id) === String(sel.categoryId)
+        );
+        const option = category?.options?.find((opt) => opt.label === sel.label);
+        if (option) price += Number(option.priceAdjustment) || 0;
+      }
     }
 
     const qty = Math.max(1, Number(item.quantity) || 1);
