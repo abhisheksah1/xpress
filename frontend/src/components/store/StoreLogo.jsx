@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
 const VARIANTS = {
@@ -13,10 +14,11 @@ export default function StoreLogo({
   tile = false,
   className = '',
 }) {
+  const [failed, setFailed] = useState(false);
   const logoUrl = resolveMediaUrl(src || '');
   const sizeClass = VARIANTS[variant] || VARIANTS.header;
 
-  if (!logoUrl) {
+  if (!logoUrl || failed) {
     return (
       <span className={`text-lg sm:text-2xl font-bold text-primary-600 text-center leading-tight ${className}`}>
         {storeName}
@@ -31,6 +33,8 @@ export default function StoreLogo({
       className={`${sizeClass} ${className}`.trim()}
       loading="lazy"
       decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
     />
   );
 

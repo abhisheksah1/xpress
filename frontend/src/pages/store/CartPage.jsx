@@ -62,7 +62,14 @@ export default function CartPage() {
           const resolvedPersonalization = resolveCartItemPersonalization(item, useCartStore.getState().productUploads);
           return (
           <div key={item.cartItemId || item.productId} className="card flex items-start gap-4">
-            {item.image && <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded-lg shrink-0" />}
+            {item.image && (
+              <img
+                src={resolveMediaUrl(item.image)}
+                alt={item.name}
+                className="w-20 h-20 object-cover rounded-lg shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            )}
             <div className="flex-1 min-w-0">
               <h3 className="font-medium">{item.name}</h3>
               <p className="text-primary-600 font-semibold">{formatPriceNpr(item.price)}</p>

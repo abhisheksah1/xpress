@@ -31,7 +31,7 @@ function HeroBlock({ block }) {
 }
 
 function BannerBlock({ block }) {
-  const src = block.image?.url || block.images?.[0]?.url;
+  const src = resolveMediaUrl(block.image?.url || block.images?.[0]?.url);
   return (
     <section className="cms-section-tight">
       <div className="relative rounded-xl sm:rounded-2xl overflow-hidden border border-gray-100 bg-slate-900 min-h-[240px] sm:min-h-[300px] md:min-h-[360px]">
@@ -40,6 +40,8 @@ function BannerBlock({ block }) {
             src={src}
             alt={block.image?.alt || block.title || ''}
             className="absolute inset-0 w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+            loading="lazy"
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-900/30" />
@@ -77,13 +79,13 @@ function SliderBlock({ block }) {
 
   if (!slides.length) return null;
   const active = slides[idx];
-  const url = active.url || active;
+  const url = resolveMediaUrl(active.url || active);
 
   return (
     <section className="cms-section-tight">
       <div className="rounded-xl sm:rounded-2xl overflow-hidden border border-gray-100 bg-white relative">
         <div className="aspect-[4/3] sm:aspect-[16/9] md:aspect-[16/7] bg-gray-100">
-          <img src={url} alt={active.alt || block.title || ''} className="w-full h-full object-cover" />
+          <img src={url} alt={active.alt || block.title || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
         </div>
         {(block.title || block.content) && (
           <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-slate-900/80 via-slate-900/40 to-transparent flex items-end">
@@ -159,7 +161,7 @@ function CategoriesGridBlock({ block }) {
               className="card text-center py-4 sm:py-6 px-2 sm:px-3 hover:border-primary-300 transition-colors flex flex-col items-center gap-2 sm:gap-3 min-h-[100px] sm:min-h-[120px] justify-center"
             >
               {imageUrl ? (
-                <img src={imageUrl} alt={cat.image?.alt || cat.name} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg" />
+                <img src={imageUrl} alt={cat.image?.alt || cat.name} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg" referrerPolicy="no-referrer" loading="lazy" />
               ) : null}
               <span className="font-medium text-xs sm:text-sm leading-snug">{cat.name}</span>
             </Link>
@@ -246,7 +248,7 @@ function ImageContentBlock({ block }) {
   const imageEl = (
     <div className="rounded-xl sm:rounded-2xl overflow-hidden bg-gray-100 border border-gray-100">
       {src ? (
-        <img src={src} alt={block.image?.alt || block.title || ''} className="w-full h-full object-cover min-h-[180px] sm:min-h-[220px]" />
+        <img src={src} alt={block.image?.alt || block.title || ''} className="w-full h-full object-cover min-h-[180px] sm:min-h-[220px]" referrerPolicy="no-referrer" loading="lazy" />
       ) : (
         <div className="aspect-video min-h-[180px] sm:min-h-[220px]" />
       )}
@@ -272,7 +274,7 @@ function ImageContentBlock({ block }) {
       <section className="cms-section">
         <div className="relative rounded-xl sm:rounded-2xl overflow-hidden min-h-[280px] sm:min-h-[340px] md:min-h-[420px] border border-gray-100">
           {src ? (
-            <img src={src} alt={block.image?.alt || block.title || ''} className="absolute inset-0 w-full h-full object-cover" />
+            <img src={src} alt={block.image?.alt || block.title || ''} className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
           ) : (
             <div className="absolute inset-0 bg-gray-200" />
           )}
@@ -718,11 +720,11 @@ function FaqBlock({ block }) {
 }
 
 function ImageBlock({ block }) {
-  const src = block.image?.url || block.images?.[0]?.url;
+  const src = resolveMediaUrl(block.image?.url || block.images?.[0]?.url);
   if (!src) return null;
   return (
     <section className="cms-section-medium">
-      <img src={src} alt={block.image?.alt || block.title || ''} className="w-full h-auto rounded-lg sm:rounded-xl" />
+      <img src={src} alt={block.image?.alt || block.title || ''} className="w-full h-auto rounded-lg sm:rounded-xl" referrerPolicy="no-referrer" loading="lazy" />
     </section>
   );
 }

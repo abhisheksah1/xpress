@@ -28,7 +28,13 @@ export function splitImageUrls(raw) {
   return String(raw)
     .split(/[,|]/)
     .map((url) => url.trim())
-    .filter((url) => /^https?:\/\//i.test(url));
+    .filter(Boolean)
+    .map((url) => {
+      if (/^https?:\/\//i.test(url)) return url;
+      if (url.startsWith('//')) return `https:${url}`;
+      return '';
+    })
+    .filter(Boolean);
 }
 
 /** Map a normalized CSV row to internal product import shape. */

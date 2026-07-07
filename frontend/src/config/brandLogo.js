@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from '../utils/mediaUrl.js';
+
 export const DEFAULT_BRAND_LOGO_URL =
   'https://cdn2.blanxer.com/6655e348b68197ea3687aa1d/brand_logo/69ed931a4ef88edb4455819c.webp';
 
@@ -9,12 +11,12 @@ export const DEFAULT_BRAND_LOGO = {
 };
 
 export function resolveBrandLogoUrl({ footerNav, headerNav, settings } = {}) {
-  return (
+  const raw =
     footerNav?.logo?.url ||
     headerNav?.logo?.url ||
     settings?.logo_url ||
-    DEFAULT_BRAND_LOGO_URL
-  );
+    DEFAULT_BRAND_LOGO_URL;
+  return resolveMediaUrl(raw);
 }
 
 export function resolveBrandLogoAlt({ footerNav, headerNav, settings } = {}) {

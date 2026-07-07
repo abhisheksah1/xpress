@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { personalizationKey, resolveCartItemPersonalization, clearProductPrintUpload, clearAllProductPrintUploads, persistProductPrintUpload } from '../utils/personalization.js';
+import { resolveProductImageUrl } from '../utils/mediaUrl.js';
 
 const makeCartItemId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
@@ -91,7 +92,7 @@ export const useCartStore = create(
                 productId: product._id,
                 name: product.name,
                 price: product.price,
-                image: product.images?.find((img) => img.isPrimary)?.url || product.images?.[0]?.url,
+                image: resolveProductImageUrl(product),
                 quantity,
                 personalization: normalizedPersonalization,
                 personalizationKey: pKey,

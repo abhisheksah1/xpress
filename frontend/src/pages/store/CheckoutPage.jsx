@@ -850,7 +850,12 @@ export default function CheckoutPage() {
                 {items.map((i) => (
                   <div key={i.cartItemId} className="flex gap-2 sm:gap-3">
                     {i.image ? (
-                      <img src={i.image} alt="" className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-100 shrink-0" />
+                      <img
+                        src={resolveMediaUrl(i.image)}
+                        alt=""
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-100 shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
                     ) : (
                       <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 shrink-0" />
                     )}

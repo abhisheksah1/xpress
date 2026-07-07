@@ -29,19 +29,24 @@ import {
 } from '../../components/store/HamperProductSections.jsx';
 import ProductAssociatedCategories from '../../components/store/ProductAssociatedCategories.jsx';
 import ProductRichText from '../../components/store/ProductRichText.jsx';
+import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
 function buildGallery(product, comboComponents) {
   const base = product?.images?.length
-    ? [...product.images].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((i) => i.url)
+    ? [...product.images]
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((i) => resolveMediaUrl(i.url))
+        .filter(Boolean)
     : [];
   if (!product?.isHamper || !comboComponents.length) return base;
 
   const urls = new Set(base);
   for (const p of comboComponents) {
     const img = p?.images?.find((i) => i.isPrimary) || p?.images?.[0];
-    if (img?.url && !urls.has(img.url)) {
-      base.push(img.url);
-      urls.add(img.url);
+    const resolved = img?.url ? resolveMediaUrl(img.url) : '';
+    if (resolved && !urls.has(resolved)) {
+      base.push(resolved);
+      urls.add(resolved);
     }
   }
   return base;

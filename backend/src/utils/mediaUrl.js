@@ -9,9 +9,21 @@ export const toStoredMediaUrl = (url) => {
   if (!trimmed) return trimmed;
   if (trimmed.startsWith('/api/')) return trimmed;
 
+  if (trimmed.startsWith('/uploads/')) {
+    return `${apiUploadsPrefix()}${trimmed.replace(/^\/uploads\//, '')}`;
+  }
+
+  if (trimmed.startsWith('uploads/')) {
+    return `${apiUploadsPrefix()}${trimmed.replace(/^uploads\//, '')}`;
+  }
+
+  if (/^[\w.-]+\.(jpg|jpeg|png|webp|gif|svg)$/i.test(trimmed)) {
+    return `${apiUploadsPrefix()}${trimmed}`;
+  }
+
   try {
     const parsed = new URL(trimmed);
-    if (parsed.pathname.startsWith(apiUploadsPrefix())) {
+    if (parsed.pathname.startsWith('/api/') && parsed.pathname.includes('/uploads/')) {
       return parsed.pathname;
     }
   } catch {
@@ -19,6 +31,27 @@ export const toStoredMediaUrl = (url) => {
   }
 
   return trimmed;
+};
+
+export const enrichProductMedia = (product) => {
+  if (!product) return product;
+  const doc = typeof product.toObject === 'function' ? product.toObject() : { ...product };
+
+  if (Array.isArray(doc.images)) {
+    doc.images = doc.images.map((img) => ({
+      ...img,
+      url: toStoredMediaUrl(img?.url) || img?.url,
+    }));
+  }
+
+  if (Array.isArray(doc.comboItems)) {
+    doc.comboItems = doc.comboItems.map((item) => {
+      if (!item?.product || typeof item.product !== 'object') return item;
+      return { ...item, product: enrichProductMedia(item.product) };
+    });
+  }
+
+  return doc;
 };
 
 /** Resolve a stored media path to an absolute URL for API clients (admin, tracking, etc.). */

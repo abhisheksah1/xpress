@@ -5,6 +5,7 @@ import * as deliveryService from './delivery.service.js';
 import * as comboService from './combo.service.js';
 import * as productImportService from './productImport.service.js';
 import { productInCategoryFilter } from '../utils/productCategories.js';
+import { enrichProductMedia } from '../utils/mediaUrl.js';
 
 const PRODUCT_SORT_MAP = {
   newest: '-createdAt',
@@ -144,7 +145,10 @@ export const getProducts = async ({
 
   const syncedProducts = await comboService.refreshHamperStocksInList(products);
 
-  return { products: syncedProducts, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  return {
+    products: syncedProducts.map((p) => enrichProductMedia(p)),
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  };
 };
 
 export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
@@ -176,7 +180,7 @@ export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
     }
   }
 
-  return doc;
+  return enrichProductMedia(doc);
 };
 
 export const getProductById = async (id) => {

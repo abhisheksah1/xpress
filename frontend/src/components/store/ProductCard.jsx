@@ -3,12 +3,13 @@ import { useStore } from '../../context/StoreContext.jsx';
 import { useCartStore } from '../../store/cartStore.js';
 import { canQuickAddProduct, quickAddProductToCart } from '../../utils/quickAddProduct.js';
 import { isProductSoldOut } from '../../utils/comboItems.js';
+import { resolveProductImageUrl } from '../../utils/mediaUrl.js';
 
 export default function ProductCard({ product, currency, priceNpr, showQuickAdd = true }) {
   const { formatPriceNpr } = useStore();
   const addItem = useCartStore((s) => s.addItem);
 
-  const image = product.images?.find((i) => i.isPrimary)?.url || product.images?.[0]?.url;
+  const image = resolveProductImageUrl(product);
   const npr = priceNpr != null ? priceNpr : product.price;
   const priceLabel = currency
     ? `${currency} ${Number(npr).toLocaleString('en-NP')}`
@@ -33,6 +34,8 @@ export default function ProductCard({ product, currency, priceNpr, showQuickAdd 
               src={image}
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              referrerPolicy="no-referrer"
+              loading="lazy"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">No image</div>
