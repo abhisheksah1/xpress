@@ -4,12 +4,12 @@ import { ApiError } from '../../utils/ApiError.js';
 
 const API_BASE = {
   sandbox: 'https://apisandbox.nepalpayment.com',
-  production: 'https://api.nepalpayment.com',
+  production: 'https://apigateway.nepalpayment.com',
 };
 
 const GATEWAY_URL = {
   sandbox: 'https://gatewaysandbox.nepalpayment.com/Payment/Index',
-  production: 'https://gateway.nepalpayment.com/Payment/Index',
+  production: 'https://gateway.nepalpayment.com/payment/index',
 };
 
 /** HMAC-SHA512 signature: alphabetical keys → concatenated values → hex digest. */

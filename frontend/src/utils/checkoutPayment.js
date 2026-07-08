@@ -80,7 +80,7 @@ export function submitNpsForm(payment) {
   form.enctype = 'multipart/form-data';
   form.action = payment.paymentUrl
     || (payment.environment === 'production'
-      ? 'https://gateway.nepalpayment.com/Payment/Index'
+      ? 'https://gateway.nepalpayment.com/payment/index'
       : 'https://gatewaysandbox.nepalpayment.com/Payment/Index');
   form.style.display = 'none';
 
