@@ -84,6 +84,12 @@ export const adminApi = {
   getCustomer: (id) => api.get(`/admin/users/${id}`),
   toggleCustomerStatus: (id) => api.patch(`/admin/users/${id}/toggle-status`),
 
+  getStaffMeta: () => api.get('/admin/staff/meta'),
+  getStaff: (params) => api.get('/admin/staff', { params }),
+  createStaff: (data) => api.post('/admin/staff', data),
+  updateStaff: (id, data) => api.patch(`/admin/staff/${id}`, data),
+  deleteStaff: (id) => api.delete(`/admin/staff/${id}`),
+
   getProfile: () => api.get('/auth/me'),
   updateProfile: (data) => api.patch('/auth/me', data),
   changePassword: (data) => api.post('/auth/change-password', data),

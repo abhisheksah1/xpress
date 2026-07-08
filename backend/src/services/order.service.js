@@ -9,6 +9,33 @@ import { ApiError } from '../utils/ApiError.js';
 import { assertPreferredDeliverySelection } from '../utils/deliveryScheduling.js';
 import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '../config/constants.js';
 
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const emailRegex = (email) => new RegExp(`^${escapeRegex(String(email || '').trim())}$`, 'i');
+
+/** Attach guest orders placed with the same email to the customer account. */
+export const linkGuestOrdersToUser = async (userId, email) => {
+  if (!userId || !email?.trim()) return { modifiedCount: 0 };
+
+  const result = await Order.updateMany(
+    {
+      $and: [
+        { $or: [{ user: null }, { user: { $exists: false } }] },
+        {
+          $or: [
+            { guestEmail: emailRegex(email) },
+            { 'sender.email': emailRegex(email) },
+            { 'shippingAddress.email': emailRegex(email) },
+          ],
+        },
+      ],
+    },
+    { $set: { user: userId, isGuest: false } }
+  );
+
+  return { modifiedCount: result.modifiedCount };
+};
+
 /** COD and manual bank: regular orders with payment collected later (not checkout leads). */
 const isDirectCheckoutMethod = (method) =>
   method === PAYMENT_METHODS.COD || method === PAYMENT_METHODS.MANUAL_BANK;
@@ -271,6 +298,13 @@ export const createOrder = async (data) => {
 
   if (couponSnapshot?.couponId) {
     await couponService.recordCouponRedemption(couponSnapshot);
+  }
+
+  try {
+    const { sendOrderConfirmationEmail } = await import('./orderEmail.service.js');
+    await sendOrderConfirmationEmail(order);
+  } catch (err) {
+    console.error(`[orderEmail] Confirmation email failed for ${order.orderNumber}:`, err.message);
   }
 
   return order;

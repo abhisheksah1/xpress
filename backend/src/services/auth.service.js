@@ -4,6 +4,7 @@ import { User } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ROLES } from '../config/constants.js';
 import { validatePhoneForCountry } from '../utils/phone.js';
+import { linkGuestOrdersToUser } from './order.service.js';
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, config.jwt.accessSecret, {
@@ -43,6 +44,8 @@ export const register = async ({ name, email, countryCode = '+977', phone, passw
   user.refreshToken = tokens.refreshToken;
   await user.save({ validateBeforeSave: false });
 
+  await linkGuestOrdersToUser(user._id, user.email);
+
   return { user: user.toSafeObject(), ...tokens };
 };
 
@@ -57,6 +60,8 @@ export const login = async ({ email, password }) => {
   user.refreshToken = tokens.refreshToken;
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
+
+  await linkGuestOrdersToUser(user._id, user.email);
 
   return { user: user.toSafeObject(), ...tokens };
 };

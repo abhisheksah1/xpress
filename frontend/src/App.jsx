@@ -38,6 +38,7 @@ import FinanceVendorsPage from './pages/admin/finance/FinanceVendorsPage';
 import FinanceStockPage from './pages/admin/finance/FinanceStockPage';
 import FinanceTreasuryPage from './pages/admin/finance/FinanceTreasuryPage';
 import PaymentCallbackPage from './pages/store/PaymentCallbackPage';
+import StaffPage from './pages/admin/StaffPage';
 
 export default function App() {
   return (
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="treasury" element={<FinanceTreasuryPage />} />
         </Route>
         <Route path="settings" element={<AdminSettings />} />
+        <Route path="staff" element={<StaffPage />} />
       </Route>
     </Routes>
   );

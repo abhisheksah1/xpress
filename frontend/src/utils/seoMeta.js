@@ -122,6 +122,7 @@ export function normalizeSeoMeta(seo = {}, fallbacks = {}) {
   const ogImageUrl = seo.ogImage?.url
     || fallbacks.image
     || site.default_og_image
+    || site.logo_url
     || '';
 
   const canonical = seo.canonicalUrl?.trim()

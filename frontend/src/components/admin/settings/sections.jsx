@@ -4,6 +4,7 @@ import { adminApi } from '../../../api/admin.js';
 import { Field, SectionCard, Toggle, saveSection } from './shared.jsx';
 import PaymentGatewaysSetup from '../PaymentGatewaysSetup.jsx';
 import ImageSizeGuide from '../../ImageSizeGuide.jsx';
+import CmsImagePicker from '../CmsImagePicker.jsx';
 
 const REGISTRY_KEYS = [
   'registry_company_name',
@@ -448,17 +449,34 @@ export function BrandingSection({ values, set }) {
   const [saving, setSaving] = useState(false);
   const keys = ['logo_url', 'favicon_url', 'primary_color', 'secondary_color', 'accent_color', 'font_family', 'header_style', 'button_style', 'store_layout', 'hero_style'];
 
+  const logoImages = values.logo_url ? [{ url: values.logo_url, alt: 'Store logo' }] : [];
+  const faviconImages = values.favicon_url ? [{ url: values.favicon_url, alt: 'Favicon' }] : [];
+
   return (
     <SectionCard title="Branding & Layout Config" description="10 core visual settings for your storefront." onSave={() => saveSection(keys, values, setSaving)} saving={saving}>
       <div className="grid md:grid-cols-2 gap-4">
-        <Field label="Logo URL">
-          <input className="input-field" value={values.logo_url || ''} onChange={(e) => set('logo_url', e.target.value)} />
-          <ImageSizeGuide guide="logo" variant="muted" compact className="mt-1.5" />
-        </Field>
-        <Field label="Favicon URL">
-          <input className="input-field" value={values.favicon_url || ''} onChange={(e) => set('favicon_url', e.target.value)} />
-          <ImageSizeGuide guide="favicon" variant="muted" compact className="mt-1.5" />
-        </Field>
+        <div className="md:col-span-2">
+          <Field label="Logo" hint="Site-wide logo for header, footer, and SEO fallbacks. Saved here overrides navbar logo URLs.">
+            <CmsImagePicker
+              mode="single"
+              guideKey="logo"
+              images={logoImages}
+              onChange={(imgs) => set('logo_url', imgs[0]?.url || '')}
+              alt="Store logo"
+            />
+          </Field>
+        </div>
+        <div className="md:col-span-2">
+          <Field label="Favicon" hint="Browser tab icon. Square PNG or ICO works best.">
+            <CmsImagePicker
+              mode="single"
+              guideKey="favicon"
+              images={faviconImages}
+              onChange={(imgs) => set('favicon_url', imgs[0]?.url || '')}
+              alt="Favicon"
+            />
+          </Field>
+        </div>
         <Field label="Primary Color"><input type="color" className="h-10 w-full" value={values.primary_color || '#E11D48'} onChange={(e) => set('primary_color', e.target.value)} /></Field>
         <Field label="Secondary Color"><input type="color" className="h-10 w-full" value={values.secondary_color || '#1E293B'} onChange={(e) => set('secondary_color', e.target.value)} /></Field>
         <Field label="Accent Color"><input type="color" className="h-10 w-full" value={values.accent_color || '#F59E0B'} onChange={(e) => set('accent_color', e.target.value)} /></Field>
@@ -631,7 +649,7 @@ export function SmtpSection({ values, set }) {
           <button type="button" onClick={sendTest} disabled={testing} className="btn-secondary mb-0">{testing ? 'Sending...' : 'Send Test'}</button>
         </div>
       </SectionCard>
-      <SectionCard title="Email Templates" description="Use {{customer_name}}, {{order_number}}, {{total}}, {{reset_link}} as placeholders." onSave={() => saveSection(['email_templates'], values, setSaving)} saving={saving}>
+      <SectionCard title="Email Templates" description="Order confirmation placeholders: {{customer_name}}, {{order_number}}, {{total}}, {{tracking_url}}, {{payment_pending_note}}, {{payment_instructions}}, {{support_email}}, {{support_whatsapp}}. Also {{reset_link}} for password reset." onSave={() => saveSection(['email_templates'], values, setSaving)} saving={saving}>
         {Object.entries(templates).map(([key, tpl]) => (
           <div key={key} className="border border-gray-100 rounded-lg p-4 space-y-2">
             <p className="text-sm font-semibold capitalize">{key.replace(/_/g, ' ')}</p>

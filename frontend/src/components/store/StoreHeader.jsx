@@ -113,22 +113,126 @@ function MenuDropdown({ item, onNavigate }) {
   );
 }
 
-function HeaderIconLink({ to, label, children }) {
+function HeaderIconLink({ to, label, children, className = '' }) {
   return (
-    <Link to={to} className="p-2 text-gray-800 hover:text-primary-600 transition-colors" aria-label={label}>
+    <Link to={to} className={`p-2 text-gray-800 hover:text-primary-600 transition-colors ${className}`.trim()} aria-label={label}>
       {children}
     </Link>
   );
 }
 
-function LogoMark({ logoUrl, storeName, alt }) {
+function UserIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  );
+}
+
+const accountBtnClass =
+  'inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-gray-800 border border-gray-200 bg-white hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors whitespace-nowrap';
+
+const accountBtnCompactClass =
+  'inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-800 border border-gray-200 bg-white hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors shrink-0';
+
+function AccountNavControl({ user, onNavigate, compact = false }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const close = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const closeMenu = () => {
+    setOpen(false);
+    onNavigate?.();
+  };
+
+  const handleLogout = async () => {
+    closeMenu();
+    await logout();
+    navigate('/');
+  };
+
+  if (!user) {
+    if (compact) {
+      return (
+        <Link to="/login" className={accountBtnCompactClass} onClick={onNavigate} aria-label="Login">
+          <UserIcon className="w-5 h-5" />
+        </Link>
+      );
+    }
+    return (
+      <Link to="/login" className={accountBtnClass} onClick={onNavigate}>
+        <UserIcon />
+        <span>Login</span>
+      </Link>
+    );
+  }
+
+  const displayName = user.name?.trim().split(/\s+/)[0] || 'Account';
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        className={compact ? accountBtnCompactClass : accountBtnClass}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={compact ? displayName : undefined}
+      >
+        <UserIcon className={compact ? 'w-5 h-5' : undefined} />
+        {!compact && (
+          <>
+            <span className="max-w-[5.5rem] truncate">{displayName}</span>
+            <svg className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+          </>
+        )}
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1.5 min-w-[9.5rem] rounded-lg border border-gray-100 bg-white shadow-lg py-1 z-50"
+          role="menu"
+        >
+          <Link
+            to="/orders"
+            className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary-600"
+            onClick={closeMenu}
+            role="menuitem"
+          >
+            My orders
+          </Link>
+          <button
+            type="button"
+            className="block w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+            onClick={handleLogout}
+            role="menuitem"
+          >
+            Log out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LogoMark({ logoUrl, storeName, alt, compact = false }) {
   return (
     <StoreLogo
       src={logoUrl}
       alt={alt}
       storeName={storeName}
       variant="header"
-      tile
+      tile={!compact}
     />
   );
 }
@@ -136,6 +240,7 @@ function LogoMark({ logoUrl, storeName, alt }) {
 export default function StoreHeader() {
   const count = useCartStore((s) => s.count());
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const { settings, headerNav } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -146,7 +251,7 @@ export default function StoreHeader() {
   const searchRef = useRef(null);
 
   const storeName = settings.registry_company_name || settings.store_name || 'KoseliXpress';
-  const logoUrl = resolveBrandLogoUrl({ headerNav, footerNav: null, settings });
+  const logoUrl = resolveBrandLogoUrl({ headerNav, footerNav: null, settings, placement: 'header' });
   const logoAlt = resolveBrandLogoAlt({ headerNav, settings });
   const announcement = { ...DEFAULT_ANNOUNCEMENT, ...(headerNav?.announcement || {}) };
   const headerOptions = { ...DEFAULT_HEADER_OPTIONS, ...(headerNav?.headerOptions || {}) };
@@ -186,6 +291,12 @@ export default function StoreHeader() {
     setMobileOpen(false);
   };
 
+  const handleMobileLogout = async () => {
+    setMobileOpen(false);
+    await logout();
+    navigate('/');
+  };
+
   return (
     <header className="sticky top-0 z-50 shadow-sm">
       {announcement.enabled && announcement.text && (
@@ -198,21 +309,21 @@ export default function StoreHeader() {
       )}
 
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-3 items-center h-14 sm:h-16">
-            <div className="flex items-center justify-start gap-2">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2 min-w-0">
+            <div className={`flex items-center justify-start shrink-0 min-w-[40px] ${searchOpen ? 'flex-1 sm:flex-none' : ''}`}>
               {headerOptions.showSearch && (
                 <div className="relative">
                   {searchOpen ? (
                     <form onSubmit={submitSearch} className="flex items-center gap-1">
                       <input
                         ref={searchRef}
-                        className="input-field text-sm py-1.5 w-36 sm:w-48"
+                        className="input-field text-sm py-1.5 w-[calc(100vw-5.5rem)] max-w-[9rem] sm:max-w-[12rem] sm:w-48"
                         placeholder={headerOptions.searchPlaceholder}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
-                      <button type="button" className="p-2 text-gray-500" onClick={() => setSearchOpen(false)} aria-label="Close search">✕</button>
+                      <button type="button" className="p-2 text-gray-500 shrink-0" onClick={() => setSearchOpen(false)} aria-label="Close search">✕</button>
                     </form>
                   ) : (
                     <button
@@ -230,37 +341,45 @@ export default function StoreHeader() {
               )}
             </div>
 
-            <div className="flex justify-center min-w-0">
+            <div className={`flex justify-center min-w-0 flex-1 px-1 overflow-hidden ${searchOpen ? 'hidden sm:flex' : ''}`}>
               {headerOptions.showLogo !== false && (
-                <a href="/" onClick={goToHome} className="inline-flex items-center justify-center" aria-label={`${storeName} — home`}>
-                  <LogoMark logoUrl={logoUrl} storeName={storeName} alt={logoAlt} />
+                <a href="/" onClick={goToHome} className="inline-flex items-center justify-center max-w-full" aria-label={`${storeName} — home`}>
+                  <span className="md:hidden">
+                    <LogoMark logoUrl={logoUrl} storeName={storeName} alt={logoAlt} compact />
+                  </span>
+                  <span className="hidden md:inline-flex">
+                    <LogoMark logoUrl={logoUrl} storeName={storeName} alt={logoAlt} />
+                  </span>
                 </a>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+            <div className="flex items-center justify-end shrink-0 gap-0 min-w-0">
               {headerOptions.showCurrency && (
                 <div className="hidden lg:block">
                   <NavbarCurrencySelect />
                 </div>
               )}
               {headerOptions.showReminders !== false && (
-                <HeaderIconLink to="/reminders" label="Reminders">
+                <HeaderIconLink to="/reminders" label="Reminders" className="hidden md:inline-flex">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
                 </HeaderIconLink>
               )}
               {headerOptions.showLogin !== false && (
-                <HeaderIconLink to={user ? '/orders' : '/login'} label={user ? 'My account' : 'Login'}>
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </HeaderIconLink>
+                <>
+                  <span className="md:hidden">
+                    <AccountNavControl user={user} compact />
+                  </span>
+                  <span className="hidden md:inline-flex">
+                    <AccountNavControl user={user} />
+                  </span>
+                </>
               )}
               {headerOptions.showCart && (
-                <Link to="/cart" className="relative p-2 text-gray-800 hover:text-primary-600" aria-label="Shopping cart">
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <Link to="/cart" className="relative p-2 text-gray-800 hover:text-primary-600 shrink-0" aria-label="Shopping cart">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6h15l-1.5 9H8L6 6zm0 0L5 3H2M9 20a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
                   </svg>
                   {count > 0 && (
@@ -272,7 +391,7 @@ export default function StoreHeader() {
               )}
               <button
                 type="button"
-                className="p-2 text-gray-800 hover:text-primary-600 md:hidden"
+                className="p-2 text-gray-800 hover:text-primary-600 md:hidden shrink-0"
                 aria-label="Open menu"
                 onClick={() => setMobileOpen(true)}
               >
@@ -348,9 +467,32 @@ export default function StoreHeader() {
                   </div>
                 );
               })}
-              <Link to="/orders" className="block py-2 text-gray-700" onClick={() => setMobileOpen(false)}>My Orders</Link>
               <Link to="/reminders" className="block py-2 text-gray-700" onClick={() => setMobileOpen(false)}>Reminders</Link>
-              <Link to="/login" className="block py-2 text-gray-700" onClick={() => setMobileOpen(false)}>Login</Link>
+              {headerOptions.showLogin !== false && (
+                user ? (
+                  <div className="pt-2 border-t border-gray-100 mt-2">
+                    <p className="text-xs text-gray-400 mb-1">Signed in as</p>
+                    <p className="text-sm font-semibold text-gray-900 mb-2">{user.name || user.email}</p>
+                    <Link to="/orders" className="block py-2 text-gray-700" onClick={() => setMobileOpen(false)}>My orders</Link>
+                    <button
+                      type="button"
+                      className="block w-full text-left py-2 text-red-600 font-medium"
+                      onClick={handleMobileLogout}
+                    >
+                      Log out
+                    </button>
+                  </div>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center gap-2 mt-1 px-3 py-2 rounded-lg text-sm font-semibold text-primary-600 border border-primary-200 bg-primary-50"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <UserIcon />
+                    Login
+                  </Link>
+                )
+              )}
             </nav>
           </div>
         </div>

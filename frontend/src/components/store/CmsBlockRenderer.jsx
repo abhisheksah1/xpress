@@ -527,6 +527,7 @@ function DeliveryCountdownBlock({ block }) {
     phase: state.phase,
   });
   const bgImage = block.image?.url || block.images?.[0]?.url;
+  const overlayOpacity = Math.min(90, Math.max(0, Number(cfg.backgroundOverlayOpacity ?? 55)));
 
   return (
     <section className="cms-section-tight">
@@ -539,8 +540,14 @@ function DeliveryCountdownBlock({ block }) {
               src={resolveMediaUrl(bgImage)}
               alt={block.image?.alt || block.title || ''}
               className="absolute inset-0 w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              loading="lazy"
             />
-            <div className="absolute inset-0 bg-slate-900/55" />
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: `rgba(15, 23, 42, ${overlayOpacity / 100})` }}
+              aria-hidden
+            />
           </>
         )}
         <div className={`relative z-10 ${bgImage ? 'flex flex-col justify-center min-h-[280px] sm:min-h-[320px] p-5 sm:p-8 md:p-10 text-white' : ''}`}>

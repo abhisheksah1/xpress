@@ -5,7 +5,6 @@ import * as orderService from './order.service.js';
 import * as comboService from './combo.service.js';
 import { allowsBackorder } from '../utils/productStock.js';
 import * as paymentGatewayService from './paymentGateway.service.js';
-import { renderTemplate, sendEmail } from './email.service.js';
 import { getSettings } from './settings.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import {
@@ -255,8 +254,6 @@ export const createPartnerOrder = async (partner, payload) => {
 
   const trackingUrl = `${config.clientUrl}/track?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(order.guestEmail || order.sender?.email || '')}`;
 
-  await sendPartnerOrderEmails(order, trackingUrl);
-
   return {
     orderId: order._id,
     orderNumber: order.orderNumber,
@@ -350,41 +347,4 @@ export const getManualPaymentInstructions = async () => {
     instructions: manual?.credentials?.instruction || '',
     csrWhatsApp: map.registry_helpdesk_whatsapp || map.plugins_config?.whatsapp_number || '',
   };
-};
-
-const sendPartnerOrderEmails = async (order, trackingUrl) => {
-  try {
-    const emailSettings = await getSettings('email');
-    const map = emailSettings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
-    const tpl = map.email_templates?.order_confirmation || {
-      subject: 'Order {{order_number}} — Pending Payment',
-      body: 'Hi {{customer_name}},\n\nYour order {{order_number}} has been received. Total: NPR {{total}}.\nTrack: {{tracking_url}}\n\n{{payment_instructions}}',
-    };
-
-    const manual = await getManualPaymentInstructions();
-    const paymentInstructions = [
-      manual.bankName && `Bank: ${manual.bankName}`,
-      manual.accountName && `Account: ${manual.accountName}`,
-      manual.accountNumber && `A/C No: ${manual.accountNumber}`,
-      manual.instructions,
-      manual.csrWhatsApp && `WhatsApp: ${manual.csrWhatsApp}`,
-    ].filter(Boolean).join('\n');
-
-    const vars = {
-      customer_name: order.sender?.fullName || order.shippingAddress?.fullName || 'Customer',
-      order_number: order.orderNumber,
-      total: Number(order.total).toLocaleString('en-NP'),
-      tracking_url: trackingUrl,
-      payment_instructions: paymentInstructions,
-    };
-
-    const to = order.guestEmail || order.sender?.email;
-    if (!to) return;
-
-    const subject = renderTemplate(tpl.subject, vars);
-    const body = renderTemplate(tpl.body, vars);
-    await sendEmail({ to, subject, text: body, html: body.replace(/\n/g, '<br>') });
-  } catch {
-    /* email optional */
-  }
 };

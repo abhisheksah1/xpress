@@ -6,6 +6,7 @@ import {
   getCheckoutDisplayCurrencies,
   getDefaultCurrency,
 } from '../utils/currency.js';
+import { resolveFaviconUrl } from '../config/brandLogo.js';
 
 const DISPLAY_CURRENCY_KEY = 'koseli-display-currency';
 
@@ -55,6 +56,25 @@ export function StoreProvider({ children }) {
     root.style.setProperty('--brand-primary', primary);
     root.style.setProperty('--brand-secondary', secondary);
   }, [settings.primary_color, settings.secondary_color]);
+
+  useEffect(() => {
+    const href = resolveFaviconUrl(settings);
+    const iconLinks = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
+    iconLinks.forEach((el) => {
+      if (href) {
+        el.setAttribute('href', href);
+      } else if (el.getAttribute('rel') === 'icon') {
+        el.setAttribute('href', '/vite.svg');
+      }
+    });
+
+    if (href && !document.querySelector('link[rel="apple-touch-icon"]')) {
+      const apple = document.createElement('link');
+      apple.setAttribute('rel', 'apple-touch-icon');
+      apple.setAttribute('href', href);
+      document.head.appendChild(apple);
+    }
+  }, [settings.favicon_url, settings.logo_url]);
 
   useEffect(() => {
     if (loading || !currencies.length) return;

@@ -131,14 +131,15 @@ router.delete('/delivery-zones/:id', isAdmin, deliveryController.deleteDeliveryZ
 router.get('/users', hasPermission('users:read'), userController.getUsers);
 router.get('/users/:id', hasPermission('users:read'), userController.getUser);
 router.patch('/users/:id', hasPermission('users:write'), userController.updateUser);
-router.patch('/users/:id/toggle-status', isAdmin, userController.toggleStatus);
+router.patch('/users/:id/toggle-status', hasPermission('users:write'), userController.toggleStatus);
 router.delete('/users/:id', isAdmin, userController.deleteUser);
 
-// Staff
+// Staff / team roles
+router.get('/staff/meta', isAdmin, staffController.getStaffMeta);
 router.get('/staff', isAdmin, staffController.getStaff);
 router.post('/staff', isAdmin, validate(createStaffSchema), staffController.createStaff);
 router.patch('/staff/:id', isAdmin, staffController.updateStaff);
-router.delete('/staff/:id', isSuperAdmin, staffController.deleteStaff);
+router.delete('/staff/:id', isAdmin, staffController.deleteStaff);
 
 // Blog
 router.get('/blogs', hasPermission('blog:read'), blogController.getBlogs);

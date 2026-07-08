@@ -94,9 +94,8 @@ export const IMAGE_SIZE_GUIDES = {
   },
   customerPhoto: {
     title: 'Photo upload guide',
-    compact: '800 × 800 px or larger · JPG/PNG · max 5 MB',
+    compact: 'JPG or PNG format, maximum 5 MB. Use a clear, well-lit photo.',
     lines: [
-      '800 × 800 px or larger',
       'JPG or PNG format, maximum 5 MB',
       'Use a clear, well-lit photo',
     ],

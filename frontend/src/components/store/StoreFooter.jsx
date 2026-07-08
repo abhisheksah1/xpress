@@ -25,7 +25,7 @@ function FooterLink({ item, textColor }) {
 export default function StoreFooter() {
   const { settings, footerNav, headerNav } = useStore();
   const storeName = settings.registry_company_name || settings.store_name || 'KoseliXpress';
-  const logoUrl = resolveBrandLogoUrl({ footerNav, headerNav, settings });
+  const logoUrl = resolveBrandLogoUrl({ footerNav, headerNav, settings, placement: 'footer' });
   const logoAlt = resolveBrandLogoAlt({ footerNav, headerNav, settings });
   const opts = resolveFooterOptions(footerNav?.footerOptions);
   const layout = resolveFooterLayout(footerNav);

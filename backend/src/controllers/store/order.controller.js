@@ -37,11 +37,17 @@ export const verifyPayment = asyncHandler(async (req, res) => {
 });
 
 export const getMyOrders = asyncHandler(async (req, res) => {
-  const result = await orderService.getOrders({ ...req.query, userId: req.user._id });
+  await orderService.linkGuestOrdersToUser(req.user._id, req.user.email);
+  const result = await orderService.getOrders({
+    ...req.query,
+    userId: req.user._id,
+    excludeLeads: true,
+  });
   res.json(new ApiResponse(200, result));
 });
 
 export const getMyOrder = asyncHandler(async (req, res) => {
+  await orderService.linkGuestOrdersToUser(req.user._id, req.user.email);
   const order = await orderService.getOrderById(req.params.id, req.user._id);
   res.json(new ApiResponse(200, order));
 });

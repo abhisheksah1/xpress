@@ -635,6 +635,50 @@ export default function ContentPage() {
                         <strong>Delivery cycle:</strong> From midnight NST until cut-off → &quot;today&quot; title and countdown to cut-off.
                         After cut-off until midnight NST → title switches to &quot;Tomorrow&quot; (auto from same-day title if next-day title is blank).
                       </p>
+                      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase text-gray-500">Background image</p>
+                        <CmsImagePicker
+                          mode="single"
+                          guideKey="cmsSlide"
+                          images={
+                            block.images?.length
+                              ? block.images
+                              : block.image?.url
+                                ? [{ url: block.image.url, alt: block.image.alt || '' }]
+                                : []
+                          }
+                          onChange={(imgs) => updateBlockImages(i, imgs)}
+                          alt={block.image?.alt || block.title || 'Delivery countdown background'}
+                        />
+                        <div>
+                          <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Image alt text</label>
+                          <input
+                            className="input-field"
+                            placeholder="Describe the background image"
+                            value={block.image?.alt || ''}
+                            onChange={(e) => updateBlockImageAlt(i, e.target.value)}
+                          />
+                        </div>
+                        {block.image?.url && (
+                          <div>
+                            <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">
+                              Overlay darkness — {block.settings?.backgroundOverlayOpacity ?? 55}%
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={90}
+                              step={5}
+                              className="w-full accent-rose-600"
+                              value={block.settings?.backgroundOverlayOpacity ?? 55}
+                              onChange={(e) => updateBlockSetting(i, 'backgroundOverlayOpacity', Number(e.target.value))}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                              Lower = background image shows through more. Higher = darker overlay for clearer text.
+                            </p>
+                          </div>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Same-day cut-off (HH:MM)</label>

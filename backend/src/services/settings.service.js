@@ -1,4 +1,4 @@
-import { Settings } from '../models/index.js';
+import { Settings, Navbar } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { syncLegacyPaymentFlags } from './paymentGateway.service.js';
 import { getDefaultPaymentGateways } from '../config/paymentGatewayDefaults.js';
@@ -200,8 +200,8 @@ const DEFAULT_SETTINGS = [
     label: 'Email Templates',
     value: {
       order_confirmation: {
-        subject: 'Order Confirmed – {{order_number}}',
-        body: 'Hi {{customer_name}},\n\nYour order {{order_number}} has been confirmed. Total: {{total}}.\n\nThank you for shopping with KoseliXpress!',
+        subject: 'Order received – {{order_number}} | Koseli Xpress',
+        body: 'Hi {{customer_name}},\n\nThank you for ordering with Koseli Xpress.\n\nOrder number: {{order_number}}\nTotal: {{total}}\n\nTrack your order anytime:\n{{tracking_url}}\n\n{{payment_pending_note}}\n\n{{payment_instructions}}\n\nIf you need help, contact us at {{support_email}} or WhatsApp: {{support_whatsapp}}.\n\nThank you,\nKoseli Xpress',
       },
       welcome: {
         subject: 'Welcome to KoseliXpress!',
@@ -306,6 +306,19 @@ export const getPublicSettings = async () => {
   return result;
 };
 
+const syncBrandingLogoToNavbars = async (logoUrl, userId) => {
+  const trimmed = typeof logoUrl === 'string' ? logoUrl.trim() : '';
+  if (!trimmed) return;
+
+  const companySetting = await Settings.findOne({ key: 'registry_company_name' });
+  const alt = companySetting?.value || 'Koseli Xpress';
+
+  await Navbar.updateMany(
+    { location: { $in: ['header', 'footer'] } },
+    { $set: { logo: { url: trimmed, alt }, updatedBy: userId } }
+  );
+};
+
 export const updateSetting = async (key, value, userId) => {
   const setting = await Settings.findOneAndUpdate(
     { key },
@@ -313,6 +326,9 @@ export const updateSetting = async (key, value, userId) => {
     { new: true, runValidators: true }
   );
   if (!setting) throw new ApiError(404, 'Setting not found');
+  if (key === 'logo_url' && value) {
+    await syncBrandingLogoToNavbars(value, userId);
+  }
   return setting;
 };
 
@@ -333,6 +349,9 @@ export const bulkUpdateSettings = async (settings, userId) => {
     if (setting) results.push(setting);
     if (key === 'payment_gateways' && value) {
       await syncLegacyPaymentFlags(value);
+    }
+    if (key === 'logo_url' && value) {
+      await syncBrandingLogoToNavbars(value, userId);
     }
   }
   return results;

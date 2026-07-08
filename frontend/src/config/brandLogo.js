@@ -10,13 +10,28 @@ export const DEFAULT_BRAND_LOGO = {
   alt: DEFAULT_BRAND_LOGO_ALT,
 };
 
-export function resolveBrandLogoUrl({ footerNav, headerNav, settings } = {}) {
-  const raw =
-    footerNav?.logo?.url ||
-    headerNav?.logo?.url ||
-    settings?.logo_url ||
-    DEFAULT_BRAND_LOGO_URL;
-  return resolveMediaUrl(raw);
+/**
+ * Resolve the storefront logo URL.
+ * Branding settings (logo_url) is the site-wide source of truth; navbar logos are fallbacks.
+ */
+export function resolveBrandLogoUrl({ footerNav, headerNav, settings, placement } = {}) {
+  const branding = settings?.logo_url?.trim();
+  const headerLogo = headerNav?.logo?.url?.trim();
+  const footerLogo = footerNav?.logo?.url?.trim();
+
+  if (branding) {
+    return resolveMediaUrl(branding);
+  }
+
+  if (placement === 'footer') {
+    return resolveMediaUrl(footerLogo || headerLogo || DEFAULT_BRAND_LOGO_URL);
+  }
+
+  if (placement === 'header') {
+    return resolveMediaUrl(headerLogo || footerLogo || DEFAULT_BRAND_LOGO_URL);
+  }
+
+  return resolveMediaUrl(headerLogo || footerLogo || DEFAULT_BRAND_LOGO_URL);
 }
 
 export function resolveBrandLogoAlt({ footerNav, headerNav, settings } = {}) {
@@ -27,4 +42,13 @@ export function resolveBrandLogoAlt({ footerNav, headerNav, settings } = {}) {
     settings?.store_name ||
     DEFAULT_BRAND_LOGO_ALT
   );
+}
+
+/** Favicon from branding settings, falling back to the site logo. */
+export function resolveFaviconUrl(settings = {}) {
+  const favicon = settings.favicon_url?.trim();
+  if (favicon) return resolveMediaUrl(favicon);
+  const logo = settings.logo_url?.trim();
+  if (logo) return resolveMediaUrl(logo);
+  return '';
 }

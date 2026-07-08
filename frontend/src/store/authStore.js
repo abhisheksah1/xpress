@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '../api/client.js';
+import {
+  hasStaffPermission,
+  isAdminUser,
+  isSuperAdminUser,
+} from '../utils/adminPermissions.js';
 
 const STAFF_ROLES = ['super_admin', 'admin', 'staff'];
 
@@ -11,7 +16,9 @@ export const useAuthStore = create(
       accessToken: null,
 
       isStaff: () => STAFF_ROLES.includes(get().user?.role),
-      isAdmin: () => ['super_admin', 'admin'].includes(get().user?.role),
+      isAdmin: () => isAdminUser(get().user),
+      isSuperAdmin: () => isSuperAdminUser(get().user),
+      hasPermission: (permission) => hasStaffPermission(get().user, permission),
 
       login: async (email, password) => {
         const { data } = await api.post('/auth/login', { email, password });
