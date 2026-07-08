@@ -1,9 +1,10 @@
+import { Order } from '../models/index.js';
 import { PAYMENT_METHODS } from '../config/constants.js';
 import { ApiError } from '../utils/ApiError.js';
 import * as khaltiService from './payments/khalti.service.js';
 import * as esewaService from './payments/esewa.service.js';
 import * as fonepayService from './payments/fonepay.service.js';
-import * as stripeService from './payments/stripe.service.js';
+import * as npsService from './payments/nps.service.js';
 import * as imepayService from './payments/imepay.service.js';
 import * as hblService from './payments/hbl.service.js';
 import * as orderService from './order.service.js';
@@ -14,7 +15,7 @@ const paymentServices = {
   [PAYMENT_METHODS.ESEWA]: esewaService,
   [PAYMENT_METHODS.IMEPAY]: imepayService,
   [PAYMENT_METHODS.FONEPAY]: fonepayService,
-  [PAYMENT_METHODS.CARD]: stripeService,
+  [PAYMENT_METHODS.CARD]: npsService,
   [PAYMENT_METHODS.HBL]: hblService,
 };
 
@@ -32,9 +33,6 @@ export const initiatePayment = async (order, method) => {
   const creds = gateway.credentials || {};
   const env = gateway.environment;
 
-  if (method === PAYMENT_METHODS.CARD) {
-    return stripeService.createPaymentIntent(order, creds, env);
-  }
   return service.initiatePayment(order, creds, env);
 };
 
@@ -48,6 +46,7 @@ export const verifyAndCompletePayment = async (orderId, method, verificationData
 
   const gateway = await paymentGatewayService.getGatewayRuntimeCredentials(method);
   const creds = gateway?.credentials || {};
+  const env = gateway?.environment || 'sandbox';
 
   const service = paymentServices[method];
   if (!service) throw new ApiError(400, 'Unsupported payment method');
@@ -82,11 +81,43 @@ export const verifyAndCompletePayment = async (orderId, method, verificationData
       result = await hblService.verifyPayment(verificationData);
       break;
     case PAYMENT_METHODS.CARD:
-      result = await stripeService.verifyPaymentIntent(verificationData.paymentIntentId, creds);
+      result = await npsService.verifyPayment(
+        {
+          merchantTxnId: verificationData.merchantTxnId || order.orderNumber,
+          gatewayTxnId: verificationData.gatewayTxnId,
+        },
+        creds,
+        env
+      );
       break;
     default:
       throw new ApiError(400, 'Unsupported payment method');
   }
 
   return orderService.markPaymentPaid(orderId, result.transactionId, result.gatewayResponse);
+};
+
+/** NPS OnePG server-to-server notification (webhook). */
+export const handleNpsNotification = async ({ merchantTxnId, gatewayTxnId }) => {
+  if (!merchantTxnId) return { body: 'error', status: 400 };
+
+  const order = await Order.findOne({ orderNumber: String(merchantTxnId) });
+  if (!order) return { body: 'error', status: 404 };
+
+  if (order.payment?.status === 'paid') {
+    return { body: 'already received', status: 200 };
+  }
+
+  const gateway = await paymentGatewayService.getGatewayRuntimeCredentials(PAYMENT_METHODS.CARD);
+  const creds = gateway?.credentials || {};
+  const env = gateway?.environment || 'sandbox';
+
+  const result = await npsService.verifyPayment(
+    { merchantTxnId, gatewayTxnId },
+    creds,
+    env
+  );
+
+  await orderService.markPaymentPaid(order._id, result.transactionId, result.gatewayResponse);
+  return { body: 'received', status: 200 };
 };

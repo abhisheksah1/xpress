@@ -36,6 +36,14 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, order, 'Payment verified'));
 });
 
+/** NPS OnePG server webhook — respond with plain text "received" / "already received". */
+export const npsNotification = asyncHandler(async (req, res) => {
+  const merchantTxnId = req.query.MerchantTxnId || req.query.merchantTxnId;
+  const gatewayTxnId = req.query.GatewayTxnId || req.query.gatewayTxnId;
+  const result = await paymentService.handleNpsNotification({ merchantTxnId, gatewayTxnId });
+  res.status(result.status).type('text/plain').send(result.body);
+});
+
 export const getMyOrders = asyncHandler(async (req, res) => {
   await orderService.linkGuestOrdersToUser(req.user._id, req.user.email);
   const result = await orderService.getOrders({

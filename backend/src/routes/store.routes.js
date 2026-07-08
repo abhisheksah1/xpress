@@ -20,7 +20,7 @@ const router = Router();
 // Maintenance mode: allow browsing, block checkout/actions
 router.use(
   maintenanceGate({
-    allowPaths: ['/settings', '/navbar', '/pages', '/products', '/categories', '/blogs', '/delivery-zones', '/delivery-locations', '/payment-gateways', '/upload/personalization', '/coupons'],
+    allowPaths: ['/settings', '/navbar', '/pages', '/products', '/categories', '/blogs', '/delivery-zones', '/delivery-locations', '/payment-gateways', '/upload/personalization', '/coupons', '/payments/nps/notify'],
     allowMethods: ['GET', 'HEAD', 'OPTIONS'],
   })
 );
@@ -43,6 +43,7 @@ router.post('/coupons/validate', optionalAuth, validate(validateCouponSchema), c
 router.post('/checkout/quote', optionalAuth, validate(validateCouponSchema), couponController.checkoutQuote);
 router.post('/orders', optionalAuth, validate(createOrderSchema), orderController.createOrder);
 router.post('/orders/verify-payment', validate(verifyPaymentSchema), orderController.verifyPayment);
+router.get('/payments/nps/notify', orderController.npsNotification);
 router.get('/orders/track', orderController.trackOrder);
 router.get('/orders/my', authenticate, orderController.getMyOrders);
 router.get('/orders/my/:id', authenticate, orderController.getMyOrder);

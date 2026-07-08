@@ -63,14 +63,15 @@ export const getDefaultPaymentGateways = () => [
     type: GATEWAY_TYPES.CARD,
     sortOrder: 5,
     enabled: true,
-    displayLabel: 'Visa Card & Master Card',
-    currencies: ['INR', 'AUD', 'USD', 'EUR'],
+    displayLabel: 'Visa / Mastercard (NPS OnePG)',
+    currencies: ['NPR', 'INR', 'AUD', 'USD', 'EUR'],
     credentials: {
-      merchantEmail: '',
+      merchantName: '',
       merchantId: '',
       secretKey: '',
       apiUsername: '',
       apiPassword: '',
+      instrumentCode: '',
     },
   }),
   base({
@@ -129,11 +130,12 @@ export const GATEWAY_CREDENTIAL_FIELDS = {
     { key: 'secretKey', label: 'Fonepay Secret Key', secret: true },
   ],
   card: [
-    { key: 'merchantEmail', label: 'Merchant Email', secret: false },
     { key: 'merchantId', label: 'Merchant ID', secret: false },
-    { key: 'secretKey', label: 'Secret Key', secret: true },
+    { key: 'merchantName', label: 'Merchant Name', secret: false },
     { key: 'apiUsername', label: 'API Username', secret: false },
     { key: 'apiPassword', label: 'API Password', secret: true },
+    { key: 'secretKey', label: 'Gateway API Secret Key', secret: true },
+    { key: 'instrumentCode', label: 'Instrument Code (optional — leave blank for UAT)', secret: false },
   ],
   hbl: [
     { key: 'merchantId', label: 'HBL Merchant ID', secret: false },

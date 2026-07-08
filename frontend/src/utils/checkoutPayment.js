@@ -73,6 +73,41 @@ export function submitFonepayForm(payment) {
   form.submit();
 }
 
+/** NPS OnePG card gateway — multipart/form POST per Gateway 2025 docs. */
+export function submitNpsForm(payment) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.enctype = 'multipart/form-data';
+  form.action = payment.paymentUrl
+    || (payment.environment === 'production'
+      ? 'https://gateway.nepalpayment.com/Payment/Index'
+      : 'https://gatewaysandbox.nepalpayment.com/Payment/Index');
+  form.style.display = 'none';
+
+  const fields = {
+    MerchantId: payment.MerchantId,
+    MerchantName: payment.MerchantName,
+    Amount: payment.Amount,
+    MerchantTxnId: payment.MerchantTxnId,
+    ProcessId: payment.ProcessId,
+    InstrumentCode: payment.InstrumentCode ?? '',
+    TransactionRemarks: payment.TransactionRemarks || '',
+    ResponseUrl: payment.ResponseUrl || '',
+  };
+
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value == null) return;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = String(value);
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
 export function redirectToPayment(method, payment) {
   if (!payment) return false;
 
@@ -84,6 +119,13 @@ export function redirectToPayment(method, payment) {
   if (method === 'fonepay') {
     submitFonepayForm(payment);
     return true;
+  }
+
+  if (method === 'card' || payment.type === 'nps_onepg') {
+    if (payment.ProcessId && payment.MerchantTxnId) {
+      submitNpsForm(payment);
+      return true;
+    }
   }
 
   if (method === 'khalti') {

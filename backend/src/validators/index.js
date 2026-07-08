@@ -234,6 +234,8 @@ export const verifyPaymentSchema = z.object({
     amount: z.union([z.string(), z.number()]).optional(),
     statusCode: z.string().optional(),
     paymentIntentId: z.string().optional(),
+    merchantTxnId: z.string().optional(),
+    gatewayTxnId: z.string().optional(),
   }),
 });
 

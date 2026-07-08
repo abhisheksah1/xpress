@@ -473,13 +473,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      if (method === 'card' && payment?.clientSecret) {
-        clearCart();
-        toast('Complete card payment on the next screen.');
-        navigate(`/checkout/card?orderId=${order._id}`, { state: { payment } });
-        return;
-      }
-
       toast.success('Order created — complete payment to confirm.');
       clearCart();
       navigate('/orders');

@@ -61,6 +61,7 @@ export default function App() {
         <Route path="checkout/esewa/success" element={<PaymentCallbackPage mode="esewa" />} />
         <Route path="checkout/esewa/failure" element={<PaymentCallbackPage mode="esewa-failure" />} />
         <Route path="checkout/fonepay/callback" element={<PaymentCallbackPage mode="fonepay" />} />
+        <Route path="checkout/card/callback" element={<PaymentCallbackPage mode="card" />} />
         <Route path="orders" element={<OrderHistoryPage />} />
         <Route path="track" element={<TrackOrderPage />} />
         <Route path="reminders" element={<RemindersPage />} />

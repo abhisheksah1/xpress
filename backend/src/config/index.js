@@ -63,6 +63,14 @@ const config = {
       webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
       currency: process.env.STRIPE_CURRENCY || 'npr',
     },
+    nps: {
+      merchantId: process.env.NPS_MERCHANT_ID,
+      merchantName: process.env.NPS_MERCHANT_NAME,
+      secretKey: process.env.NPS_SECRET_KEY,
+      apiUsername: process.env.NPS_API_USERNAME,
+      apiPassword: process.env.NPS_API_PASSWORD,
+      instrumentCode: process.env.NPS_INSTRUMENT_CODE || '',
+    },
   },
 
   email: {

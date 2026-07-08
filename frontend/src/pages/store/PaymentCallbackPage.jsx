@@ -58,9 +58,16 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
             statusCode: params.get('RC') || params.get('statusCode') || 'success',
           };
         } else if (pending.method === 'card') {
-          const paymentIntentId = params.get('payment_intent') || params.get('paymentIntentId');
-          if (!paymentIntentId) throw new Error('Card payment reference missing');
-          verification = { ...verification, paymentIntentId };
+          const merchantTxnId =
+            params.get('MerchantTxnId')
+            || params.get('merchantTxnId')
+            || pending.orderNumber;
+          const gatewayTxnId =
+            params.get('GatewayTxnId')
+            || params.get('gatewayTxnId')
+            || '';
+          if (!merchantTxnId) throw new Error('Card payment reference missing');
+          verification = { ...verification, merchantTxnId, gatewayTxnId };
         } else {
           throw new Error('Unsupported payment callback');
         }
