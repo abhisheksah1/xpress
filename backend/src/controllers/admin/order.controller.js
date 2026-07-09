@@ -1,4 +1,5 @@
 import * as orderService from '../../services/order.service.js';
+import * as paymentService from '../../services/payment.service.js';
 import { toStoredMediaUrl, enrichPersonalizationForClient, forClientMediaUrl, requestBaseUrl } from '../../utils/mediaUrl.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
@@ -133,6 +134,11 @@ export const getOrder = asyncHandler(async (req, res) => {
     ...withOrderMeta(order, req),
     trackingEmail,
   }));
+});
+
+export const syncPayment = asyncHandler(async (req, res) => {
+  const order = await paymentService.syncOrderPaymentStatus(req.params.id);
+  res.json(new ApiResponse(200, withOrderMeta(order, req), 'Payment synced from gateway'));
 });
 
 export const confirmLead = asyncHandler(async (req, res) => {

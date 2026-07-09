@@ -8,20 +8,76 @@ import {
   parseEsewaCallback,
 } from '../../utils/checkoutPayment.js';
 
+function resolveCardCallback(params, pending) {
+  const merchantTxnId =
+    params.get('MerchantTxnId')
+    || params.get('merchantTxnId')
+    || pending?.orderNumber;
+  const gatewayTxnId =
+    params.get('GatewayTxnId')
+    || params.get('gatewayTxnId')
+    || '';
+
+  if (!merchantTxnId) return null;
+
+  return {
+    orderId: pending?.orderId,
+    method: 'card',
+    merchantTxnId,
+    gatewayTxnId,
+  };
+}
+
 export default function PaymentCallbackPage({ mode = 'khalti' }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [status, setStatus] = useState('processing');
-  const [message, setMessage] = useState('Confirming your payment...');
+  const [message, setMessage] = useState('Confirming your payment with the bank...');
 
   useEffect(() => {
     let cancelled = false;
 
     const finish = async () => {
-      const pending = loadPendingPayment();
       const params = new URLSearchParams(location.search);
 
-      if (!pending?.orderId || !pending?.method) {
+      // Server already processed NPS return and redirected here
+      if (mode === 'card' && params.get('payment')) {
+        const paymentResult = params.get('payment');
+        const serverMessage = params.get('message') || '';
+        clearPendingPayment();
+
+        if (paymentResult === 'success') {
+          if (!cancelled) {
+            setStatus('success');
+            setMessage('Payment confirmed. Thank you for your order!');
+            toast.success('Payment successful');
+            setTimeout(() => navigate('/orders', { replace: true }), 1500);
+          }
+          return;
+        }
+
+        if (paymentResult === 'failed') {
+          if (!cancelled) {
+            setStatus('error');
+            setMessage(serverMessage || 'Payment failed. Your order is saved — you can retry checkout or contact support.');
+            toast.error('Payment failed');
+          }
+          return;
+        }
+
+        if (paymentResult === 'pending' || paymentResult === 'error') {
+          // Fall through to client verification below
+        }
+      }
+
+      let pending = loadPendingPayment();
+
+      if ((!pending?.orderId || !pending?.method) && mode === 'card') {
+        const cardPayload = resolveCardCallback(params, pending);
+        if (cardPayload) pending = cardPayload;
+      }
+
+      if (!pending?.method) {
         if (!cancelled) {
           setStatus('error');
           setMessage('Payment session expired. Check your orders or contact support.');
@@ -29,7 +85,7 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
         return;
       }
 
-      try {
+      const verifyOnce = async () => {
         let verification = { orderId: pending.orderId, method: pending.method };
 
         if (pending.method === 'khalti') {
@@ -58,34 +114,78 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
             statusCode: params.get('RC') || params.get('statusCode') || 'success',
           };
         } else if (pending.method === 'card') {
-          const merchantTxnId =
-            params.get('MerchantTxnId')
-            || params.get('merchantTxnId')
-            || pending.orderNumber;
-          const gatewayTxnId =
-            params.get('GatewayTxnId')
-            || params.get('gatewayTxnId')
-            || '';
-          if (!merchantTxnId) throw new Error('Card payment reference missing');
-          verification = { ...verification, merchantTxnId, gatewayTxnId };
+          const cardPayload = resolveCardCallback(params, pending);
+          if (!cardPayload) throw new Error('Card payment reference missing');
+          verification = cardPayload;
         } else {
           throw new Error('Unsupported payment callback');
         }
 
-        await storeApi.verifyPayment(verification);
+        const { data } = await storeApi.verifyPayment(verification);
+        return data;
+      };
+
+      try {
+        const data = await verifyOnce();
         clearPendingPayment();
         if (!cancelled) {
           setStatus('success');
-          setMessage('Payment confirmed. Thank you for your order!');
+          setMessage(data.message || 'Payment confirmed. Thank you for your order!');
           toast.success('Payment successful');
           setTimeout(() => navigate('/orders', { replace: true }), 1500);
         }
       } catch (err) {
-        clearPendingPayment();
+        const statusCode = err.response?.status;
+        const errMsg = err.response?.data?.message || err.message || 'Payment verification failed';
+        const isPending = statusCode === 202 || /pending/i.test(errMsg);
+        const isFailed = statusCode === 400 && !isPending;
+
+        if (isFailed || !isPending) clearPendingPayment();
+
         if (!cancelled) {
-          setStatus('error');
-          setMessage(err.response?.data?.message || err.message || 'Payment verification failed');
-          toast.error('Payment could not be verified');
+          if (isFailed) {
+            setStatus('error');
+            setMessage(errMsg || 'Payment failed. Your order remains in pending leads.');
+            toast.error('Payment failed');
+            return;
+          }
+
+          setStatus(isPending ? 'processing' : 'error');
+          setMessage(
+            isPending
+              ? 'Waiting for bank confirmation...'
+              : errMsg
+          );
+          if (!isPending) toast.error('Payment could not be verified');
+        }
+
+        if (isPending && pending.method === 'card') {
+          for (let i = 0; i < 5 && !cancelled; i++) {
+            await new Promise((r) => setTimeout(r, 3000));
+            try {
+              const data = await verifyOnce();
+              clearPendingPayment();
+              if (!cancelled) {
+                setStatus('success');
+                setMessage(data.message || 'Payment confirmed. Thank you for your order!');
+                toast.success('Payment successful');
+                setTimeout(() => navigate('/orders', { replace: true }), 1500);
+              }
+              return;
+            } catch (retryErr) {
+              const retryPending = retryErr.response?.status === 202
+                || /pending/i.test(retryErr.response?.data?.message || '');
+              if (!retryPending) {
+                clearPendingPayment();
+                if (!cancelled) {
+                  setStatus('error');
+                  setMessage(retryErr.response?.data?.message || 'Payment failed');
+                  toast.error('Payment failed');
+                }
+                return;
+              }
+            }
+          }
         }
       }
     };
@@ -111,7 +211,7 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
       <p className="text-slate-600 mb-6">{message}</p>
       {status === 'error' && (
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link to="/orders" className="btn-primary">View orders</Link>
+          <Link to="/shop" className="btn-primary">Try again</Link>
           <Link to="/track" className="btn-secondary">Track order</Link>
         </div>
       )}

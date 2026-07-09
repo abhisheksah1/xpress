@@ -1,23 +1,42 @@
 const PENDING_KEY = 'koseli_pending_payment';
 
+function writePending(payload) {
+  const raw = JSON.stringify(payload);
+  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PENDING_KEY, raw);
+  if (typeof localStorage !== 'undefined') localStorage.setItem(PENDING_KEY, raw);
+}
+
+function readPending() {
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      const raw = sessionStorage.getItem(PENDING_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      /* fall through */
+    }
+  }
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(PENDING_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export function savePendingPayment(payload) {
-  if (typeof sessionStorage === 'undefined') return;
-  sessionStorage.setItem(PENDING_KEY, JSON.stringify(payload));
+  writePending(payload);
 }
 
 export function loadPendingPayment() {
-  if (typeof sessionStorage === 'undefined') return null;
-  try {
-    const raw = sessionStorage.getItem(PENDING_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readPending();
 }
 
 export function clearPendingPayment() {
-  if (typeof sessionStorage === 'undefined') return;
-  sessionStorage.removeItem(PENDING_KEY);
+  if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(PENDING_KEY);
+  if (typeof localStorage !== 'undefined') localStorage.removeItem(PENDING_KEY);
 }
 
 export function submitEsewaForm(payment) {

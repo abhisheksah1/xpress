@@ -16,6 +16,7 @@ const config = {
   apiVersion: process.env.API_VERSION || 'v1',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   adminUrl: process.env.ADMIN_URL || 'http://localhost:5173/admin',
+  serverUrl: process.env.SERVER_URL || `http://localhost:${parseInt(process.env.PORT, 10) || 5000}`,
 
   db: {
     uri: process.env.MONGODB_URI,

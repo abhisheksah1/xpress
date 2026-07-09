@@ -106,6 +106,7 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
   const [savingPayment, setSavingPayment] = useState(false);
   const [confirmingLead, setConfirmingLead] = useState(false);
   const [cancellingLead, setCancellingLead] = useState(false);
+  const [syncingPayment, setSyncingPayment] = useState(false);
 
   const loadOrder = () => {
     if (!orderId) return;
@@ -170,6 +171,21 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
       toast.success('Tracking link copied');
     } catch {
       toast.error('Could not copy link');
+    }
+  };
+
+  const syncPaymentFromGateway = async () => {
+    setSyncingPayment(true);
+    try {
+      const { data } = await adminApi.syncOrderPayment(orderId);
+      setOrder(data.data);
+      toast.success('Payment synced — order confirmed');
+      onUpdated(true);
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not sync payment from gateway');
+    } finally {
+      setSyncingPayment(false);
     }
   };
 
@@ -251,10 +267,20 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                   <div>
                     <p className="text-sm font-semibold text-orange-900">Unpaid checkout lead</p>
                     <p className="text-xs text-orange-800 mt-1">
-                      Payment was not completed. Contact the sender using the details below, then confirm the order
-                      after payment is arranged or cancel if the customer does not proceed.
+                      Payment was not confirmed in the system yet. For card payments, try syncing from NPS gateway first.
+                      Otherwise contact the sender, then confirm manually or cancel if the customer does not proceed.
                     </p>
                   </div>
+                  {(order.payment?.method === 'card' || order.payment?.method === 'hbl') && (
+                    <button
+                      type="button"
+                      onClick={syncPaymentFromGateway}
+                      disabled={syncingPayment || confirmingLead || cancellingLead}
+                      className="btn-secondary w-full sm:w-auto"
+                    >
+                      {syncingPayment ? 'Syncing from gateway...' : 'Sync payment from gateway'}
+                    </button>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <input
                       className="input-field flex-1 min-w-[140px] bg-white"
@@ -273,7 +299,7 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                     <button
                       type="button"
                       onClick={confirmLead}
-                      disabled={confirmingLead || cancellingLead}
+                      disabled={confirmingLead || cancellingLead || syncingPayment}
                       className="btn-primary"
                     >
                       {confirmingLead ? 'Confirming...' : 'Confirm order'}
@@ -281,7 +307,7 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                     <button
                       type="button"
                       onClick={cancelLead}
-                      disabled={confirmingLead || cancellingLead}
+                      disabled={confirmingLead || cancellingLead || syncingPayment}
                       className="btn-secondary text-red-700 border-red-200 hover:bg-red-50"
                     >
                       {cancellingLead ? 'Cancelling...' : 'Cancel lead'}

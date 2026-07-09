@@ -669,6 +669,23 @@ export const markPaymentPaid = async (orderId, transactionId, gatewayResponse) =
   return order;
 };
 
+/** Mark gateway payment as failed — order stays in lead for follow-up. */
+export const markPaymentFailed = async (orderId, gatewayResponse = null, note = 'Payment failed at gateway') => {
+  const order = await Order.findById(orderId);
+  if (!order) throw new ApiError(404, 'Order not found');
+  if (order.payment?.status === PAYMENT_STATUS.PAID) return order;
+
+  order.payment.status = PAYMENT_STATUS.FAILED;
+  if (gatewayResponse) order.payment.gatewayResponse = gatewayResponse;
+  order.isLead = true;
+  order.statusHistory.push({
+    status: order.status,
+    note,
+  });
+  await order.save();
+  return order;
+};
+
 export const getDeliveryZones = (options) => deliveryService.getDeliveryGroups(options);
 export const createDeliveryZone = (data) => deliveryService.createDeliveryGroup(data);
 export const updateDeliveryZone = (id, data) => deliveryService.updateDeliveryGroup(id, data);

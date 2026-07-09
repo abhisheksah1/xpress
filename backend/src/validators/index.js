@@ -223,20 +223,24 @@ export const createOrderSchema = z.object({
 });
 
 export const verifyPaymentSchema = z.object({
-  body: z.object({
-    orderId: z.string().min(1),
-    method: z.enum(['khalti', 'esewa', 'imepay', 'fonepay', 'card', 'hbl']),
-    token: z.string().optional(),
-    productCode: z.string().optional(),
-    totalAmount: z.union([z.string(), z.number()]).optional(),
-    transactionUuid: z.string().optional(),
-    prn: z.string().optional(),
-    amount: z.union([z.string(), z.number()]).optional(),
-    statusCode: z.string().optional(),
-    paymentIntentId: z.string().optional(),
-    merchantTxnId: z.string().optional(),
-    gatewayTxnId: z.string().optional(),
-  }),
+  body: z
+    .object({
+      orderId: z.string().min(1).optional(),
+      method: z.enum(['khalti', 'esewa', 'imepay', 'fonepay', 'card', 'hbl']),
+      token: z.string().optional(),
+      productCode: z.string().optional(),
+      totalAmount: z.union([z.string(), z.number()]).optional(),
+      transactionUuid: z.string().optional(),
+      prn: z.string().optional(),
+      amount: z.union([z.string(), z.number()]).optional(),
+      statusCode: z.string().optional(),
+      paymentIntentId: z.string().optional(),
+      merchantTxnId: z.string().optional(),
+      gatewayTxnId: z.string().optional(),
+    })
+    .refine((data) => data.orderId || data.merchantTxnId, {
+      message: 'orderId or merchantTxnId is required',
+    }),
 });
 
 export const bulkPriceSchema = z.object({

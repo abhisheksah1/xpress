@@ -87,8 +87,8 @@ async function postNps(path, body, creds, env) {
   return data?.data ?? data?.Data ?? data;
 }
 
-export const initiatePayment = async (order, creds, env = 'sandbox') => {
-  const { merchantId, merchantName, secretKey, instrumentCode } = resolveCreds(creds);
+export const initiatePayment = async (order, creds, env = 'sandbox', options = {}) => {
+  const { merchantId, merchantName, instrumentCode } = resolveCreds(creds);
   const amount = Number(order.total).toFixed(2);
   const merchantTxnId = String(order.orderNumber);
 
@@ -109,7 +109,9 @@ export const initiatePayment = async (order, creds, env = 'sandbox') => {
     throw new ApiError(400, 'NPS OnePG did not return a ProcessId');
   }
 
-  const responseUrl = `${config.clientUrl}/checkout/card/callback`;
+  const returnBase = String(options.returnBaseUrl || config.clientUrl).replace(/\/$/, '');
+  const serverBase = String(options.serverBaseUrl || config.serverUrl).replace(/\/$/, '');
+  const responseUrl = `${serverBase}/api/${config.apiVersion}/store/payments/card/return?redirect=${encodeURIComponent(`${returnBase}/checkout/card/callback`)}`;
 
   return {
     type: 'nps_onepg',
@@ -187,28 +189,74 @@ export const testConnection = async (creds, env = 'sandbox') => {
   };
 };
 
-export const verifyPayment = async (verificationData, creds, env = 'sandbox') => {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Returns gateway outcome without throwing on fail/pending. */
+export const resolvePaymentOutcome = async (verificationData, creds, env = 'sandbox', options = {}) => {
   const merchantTxnId = verificationData?.merchantTxnId || verificationData?.MerchantTxnId;
   if (!merchantTxnId) {
     throw new ApiError(400, 'Missing MerchantTxnId for NPS verification');
   }
 
-  const data = await checkTransactionStatus(merchantTxnId, creds, env);
-  const status = String(data?.Status || data?.status || '').toLowerCase();
+  const maxAttempts = options.maxAttempts ?? 6;
+  const delayMs = options.delayMs ?? 2000;
+  let lastData = null;
 
-  if (status === 'pending') {
-    throw new ApiError(400, 'NPS payment is still pending. Please wait or try again.');
-  }
-  if (status !== 'success') {
-    throw new ApiError(400, data?.CbsMessage || 'NPS card payment failed or was not completed');
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const data = await checkTransactionStatus(merchantTxnId, creds, env);
+    lastData = data;
+    const status = String(data?.Status || data?.status || '').toLowerCase();
+
+    if (status === 'success') {
+      return {
+        outcome: 'success',
+        transactionId:
+          data?.GatewayReferenceNo
+          || verificationData?.gatewayTxnId
+          || verificationData?.GatewayTxnId
+          || merchantTxnId,
+        gatewayResponse: data,
+      };
+    }
+
+    if (status === 'fail' || status === 'failed') {
+      return {
+        outcome: 'failed',
+        message: data?.CbsMessage || 'Card payment failed',
+        gatewayResponse: data,
+      };
+    }
+
+    if (status === 'pending' && attempt < maxAttempts) {
+      await sleep(delayMs);
+      continue;
+    }
+
+    if (status === 'pending') {
+      return { outcome: 'pending', message: 'Payment is still processing', gatewayResponse: data };
+    }
+
+    return {
+      outcome: 'failed',
+      message: data?.CbsMessage || 'Card payment was not completed',
+      gatewayResponse: data,
+    };
   }
 
   return {
-    transactionId:
-      data?.GatewayReferenceNo
-      || verificationData?.gatewayTxnId
-      || verificationData?.GatewayTxnId
-      || merchantTxnId,
-    gatewayResponse: data,
+    outcome: 'pending',
+    message: lastData?.CbsMessage || 'Payment verification timed out',
+    gatewayResponse: lastData,
   };
+};
+
+export const verifyPayment = async (verificationData, creds, env = 'sandbox', options = {}) => {
+  const result = await resolvePaymentOutcome(verificationData, creds, env, options);
+  if (result.outcome === 'success') {
+    return { transactionId: result.transactionId, gatewayResponse: result.gatewayResponse };
+  }
+  if (result.outcome === 'pending') {
+    throw new ApiError(400, result.message || 'NPS payment is still pending');
+  }
+  throw new ApiError(400, result.message || 'NPS card payment failed');
 };
