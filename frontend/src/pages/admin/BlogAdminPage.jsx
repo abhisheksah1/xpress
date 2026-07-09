@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
+import AdminImageDropzone from '../../components/admin/AdminImageDropzone.jsx';
 import SeoMetaEditor, { emptySeoMeta } from '../../components/admin/SeoMetaEditor.jsx';
-import ImageSizeGuide from '../../components/ImageSizeGuide.jsx';
 import { mergeEntitySeo } from '../../utils/seoMeta.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
@@ -129,19 +129,21 @@ export default function BlogAdminPage() {
 
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Featured image</label>
-              <ImageSizeGuide guide="blogFeatured" variant="admin" className="rounded-lg border border-blue-100 mb-2" />
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="btn-secondary text-xs cursor-pointer">
-                  {uploading ? 'Uploading...' : 'Upload image'}
-                  <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFeaturedUpload(e.target.files?.[0])} />
-                </label>
-                <input
-                  className="input-field text-sm flex-1"
-                  placeholder="Image URL"
-                  value={form.featuredImage?.url || ''}
-                  onChange={(e) => setForm((f) => ({ ...f, featuredImage: { ...f.featuredImage, url: e.target.value } }))}
-                />
-              </div>
+              <AdminImageDropzone
+                guideKey="blogFeatured"
+                multiple={false}
+                uploading={uploading}
+                onFilesSelected={async (files) => handleFeaturedUpload(files[0])}
+                title="Drag & drop featured image"
+                hint="Crop to 16:9 before upload"
+                className="p-5"
+              />
+              <input
+                className="input-field text-sm flex-1 mt-3"
+                placeholder="Or paste image URL"
+                value={form.featuredImage?.url || ''}
+                onChange={(e) => setForm((f) => ({ ...f, featuredImage: { ...f.featuredImage, url: e.target.value } }))}
+              />
               {form.featuredImage?.url && (
                 <img src={resolveMediaUrl(form.featuredImage.url)} alt="" className="mt-2 h-28 object-cover rounded border" />
               )}

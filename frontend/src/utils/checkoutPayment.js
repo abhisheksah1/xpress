@@ -92,11 +92,10 @@ export function submitFonepayForm(payment) {
   form.submit();
 }
 
-/** NPS OnePG card gateway — multipart/form POST per Gateway 2025 docs. */
+/** NPS OnePG card gateway — standard application/x-www-form-urlencoded POST. */
 export function submitNpsForm(payment) {
   const form = document.createElement('form');
   form.method = 'POST';
-  form.enctype = 'multipart/form-data';
   form.action = payment.paymentUrl
     || (payment.environment === 'production'
       ? 'https://gateway.nepalpayment.com/payment/index'
@@ -109,13 +108,16 @@ export function submitNpsForm(payment) {
     Amount: payment.Amount,
     MerchantTxnId: payment.MerchantTxnId,
     ProcessId: payment.ProcessId,
-    InstrumentCode: payment.InstrumentCode ?? '',
     TransactionRemarks: payment.TransactionRemarks || '',
     ResponseUrl: payment.ResponseUrl || '',
   };
 
+  if (payment.InstrumentCode) {
+    fields.InstrumentCode = payment.InstrumentCode;
+  }
+
   Object.entries(fields).forEach(([key, value]) => {
-    if (value == null) return;
+    if (value == null || value === '') return;
     const input = document.createElement('input');
     input.type = 'hidden';
     input.name = key;

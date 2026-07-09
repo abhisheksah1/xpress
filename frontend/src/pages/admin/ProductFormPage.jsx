@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import DeliveryGroupRulesEditor from '../../components/admin/DeliveryGroupRulesEditor.jsx';
 import ComboItemsEditor from '../../components/admin/ComboItemsEditor.jsx';
-import ImageSizeGuide from '../../components/ImageSizeGuide.jsx';
+import AdminImageDropzone from '../../components/admin/AdminImageDropzone.jsx';
 import { serializeComboItemsForApi, buildComboShortDescription } from '../../utils/comboItems.js';
 import { auditSeo, generateSeoFields, generateSkuPreview, slugify } from '../../utils/seoAuditor.js';
 import {
@@ -133,7 +133,6 @@ export default function ProductFormPage() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
   const [comboStockPreview, setComboStockPreview] = useState(null);
   const [newOptionName, setNewOptionName] = useState('');
 
@@ -323,41 +322,28 @@ export default function ProductFormPage() {
     }
   };
 
-  const handleFileDrop = async (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
-    for (const file of files) {
-      setUploading(true);
-      try {
+  const uploadPreparedImages = async (files) => {
+    setUploading(true);
+    try {
+      for (const file of files) {
         const { data } = await adminApi.uploadImage(file);
         setImages((prev) => [
           ...prev,
-          { url: data.data.url, publicId: data.data.publicId, alt: form.name, isPrimary: prev.length === 0, sortOrder: prev.length },
+          {
+            url: data.data.url,
+            publicId: data.data.publicId,
+            alt: form.name,
+            isPrimary: prev.length === 0,
+            sortOrder: prev.length,
+          },
         ]);
-      } catch {
-        toast.error(`Failed to upload ${file.name}`);
       }
+      toast.success(files.length === 1 ? 'Image uploaded' : `${files.length} images uploaded`);
+    } catch {
+      toast.error('Upload failed — try pasting an image URL instead');
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
-  };
-
-  const handleFileSelect = async (e) => {
-    const files = [...(e.target.files || [])];
-    for (const file of files) {
-      setUploading(true);
-      try {
-        const { data } = await adminApi.uploadImage(file);
-        setImages((prev) => [
-          ...prev,
-          { url: data.data.url, publicId: data.data.publicId, alt: form.name, isPrimary: prev.length === 0, sortOrder: prev.length },
-        ]);
-      } catch {
-        toast.error('Upload failed — try pasting an image URL instead');
-      }
-    }
-    setUploading(false);
-    e.target.value = '';
   };
 
   const setPrimaryImage = (index) => {
@@ -658,22 +644,14 @@ export default function ProductFormPage() {
 
           <section className="card space-y-4">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Visual Digital Media Assets</h2>
-            <ImageSizeGuide guide="product" variant="admin" className="rounded-lg border border-blue-100" />
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleFileDrop}
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-                dragOver ? 'border-primary-400 bg-primary-50' : 'border-gray-200'
-              }`}
-            >
-              <p className="text-gray-600 font-medium">Drag &amp; Drop images here</p>
-              <p className="text-sm text-gray-400 mt-1">or</p>
-              <label className="btn-secondary inline-block mt-3 cursor-pointer">
-                {uploading ? 'Uploading...' : 'Browse Files'}
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} disabled={uploading} />
-              </label>
-            </div>
+            <AdminImageDropzone
+              guideKey="product"
+              multiple
+              uploading={uploading}
+              onFilesSelected={uploadPreparedImages}
+              title="Drag & drop product images"
+              hint="Each image opens in the crop tool — choose 1200×1200 or another preset"
+            />
 
             <div>
               <FieldLabel>Current Active Image URL(s)</FieldLabel>

@@ -131,7 +131,12 @@ function NpsOnePgTools({ gateway, onSelectInstrument }) {
         <div className="text-xs text-gray-600 space-y-1 bg-white rounded border border-rose-100 p-3">
           <p><span className="font-semibold">Notification URL (webhook):</span> {urls.notificationUrl}</p>
           <p><span className="font-semibold">Response URL (customer):</span> {urls.responseUrl}</p>
-          <p className="text-gray-400 mt-1">Provide the Notification URL to NPS during merchant setup.</p>
+          {urls.localDevWarning && (
+            <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
+              {urls.localDevWarning}
+            </p>
+          )}
+          <p className="text-gray-400 mt-1">Register both URLs with NPS during merchant setup. Response URL must match checkout redirect exactly.</p>
         </div>
       )}
 

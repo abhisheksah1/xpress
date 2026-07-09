@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
+import AdminImageDropzone from './AdminImageDropzone.jsx';
 import SeoMetaEditor, { emptySeoMeta } from './SeoMetaEditor.jsx';
-import ImageSizeGuide from '../ImageSizeGuide.jsx';
 import { mergeEntitySeo } from '../../utils/seoMeta.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
@@ -129,19 +129,21 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
 
         <div>
           <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Category image</label>
-          <ImageSizeGuide guide="category" variant="admin" className="rounded-lg border border-blue-100 mb-2" />
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="btn-secondary text-xs cursor-pointer">
-              {uploading ? 'Uploading...' : 'Upload image'}
-              <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleImageUpload(e.target.files?.[0])} />
-            </label>
-            <input
-              className="input-field text-sm flex-1 min-w-[200px]"
-              placeholder="Image URL"
-              value={form.image?.url || ''}
-              onChange={(e) => setField('image', { ...form.image, url: e.target.value })}
-            />
-          </div>
+          <AdminImageDropzone
+            guideKey="category"
+            multiple={false}
+            uploading={uploading}
+            onFilesSelected={async (files) => handleImageUpload(files[0])}
+            title="Drag & drop category image"
+            hint="Crop to 800×800 square before upload"
+            className="p-5"
+          />
+          <input
+            className="input-field text-sm flex-1 min-w-[200px] mt-3"
+            placeholder="Or paste image URL"
+            value={form.image?.url || ''}
+            onChange={(e) => setField('image', { ...form.image, url: e.target.value })}
+          />
           {form.image?.url && (
             <img src={resolveMediaUrl(form.image.url)} alt="" className="mt-2 h-24 object-cover rounded border" />
           )}

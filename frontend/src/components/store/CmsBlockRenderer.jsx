@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { storeApi } from '../../api/store.js';
 import ProductCard from './ProductCard.jsx';
+import CmsNavLink from './CmsNavLink.jsx';
 import { applyCategoriesGridRules } from '../../utils/categoriesGrid.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { getDeliveryCountdownState, getDeliveryCountdownCopy } from '../../utils/deliveryCountdown.js';
@@ -18,12 +19,12 @@ function HeroBlock({ block }) {
           </p>
         )}
         {block.buttonText && block.buttonLink && (
-          <Link
+          <CmsNavLink
             to={block.buttonLink}
             className="inline-block bg-white text-primary-600 px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-primary-50 transition-colors text-sm sm:text-base"
           >
             {block.buttonText}
-          </Link>
+          </CmsNavLink>
         )}
       </div>
     </section>
@@ -53,12 +54,12 @@ function BannerBlock({ block }) {
             </p>
           )}
           {block.buttonText && block.buttonLink && (
-            <Link
+            <CmsNavLink
               to={block.buttonLink}
               className="inline-block mt-4 sm:mt-6 bg-white text-slate-900 px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold hover:bg-white/90 transition-colors text-sm sm:text-base w-fit"
             >
               {block.buttonText}
-            </Link>
+            </CmsNavLink>
           )}
         </div>
       </div>
@@ -146,9 +147,9 @@ function CategoriesGridBlock({ block }) {
       <div className="cms-section-header">
         <h2 className="cms-title">{title}</h2>
         {block.buttonText && block.buttonLink && (
-          <Link to={block.buttonLink} className="text-primary-600 text-sm font-medium hover:underline shrink-0">
+          <CmsNavLink to={block.buttonLink} className="text-primary-600 text-sm font-medium hover:underline shrink-0">
             {block.buttonText}
-          </Link>
+          </CmsNavLink>
         )}
       </div>
       <div className={`grid ${colClass} gap-3 sm:gap-4`}>
@@ -193,9 +194,9 @@ function ProductGridBlock({ block }) {
       <div className="cms-section-header">
         <h2 className="cms-title">{block.title || 'Products'}</h2>
         {block.buttonText && block.buttonLink && (
-          <Link to={block.buttonLink} className="text-primary-600 text-sm font-medium hover:underline shrink-0">
+          <CmsNavLink to={block.buttonLink} className="text-primary-600 text-sm font-medium hover:underline shrink-0">
             {block.buttonText}
-          </Link>
+          </CmsNavLink>
         )}
       </div>
       {block.content && <p className="cms-body text-gray-600 mb-4 sm:mb-6 max-w-3xl whitespace-pre-line">{block.content}</p>}
@@ -231,7 +232,7 @@ function ImageContentBlock({ block }) {
         </div>
       )}
       {block.buttonText && block.buttonLink && (
-        <Link
+        <CmsNavLink
           to={block.buttonLink}
           className={`inline-block mt-4 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
             layout === 'overlay'
@@ -240,7 +241,7 @@ function ImageContentBlock({ block }) {
           }`}
         >
           {block.buttonText}
-        </Link>
+        </CmsNavLink>
       )}
     </>
   );
@@ -292,14 +293,14 @@ function ImageContentBlock({ block }) {
                 </div>
               )}
               {block.buttonText && block.buttonLink && (
-                <Link
+                <CmsNavLink
                   to={block.buttonLink}
                   className={`inline-block mt-4 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
                     textLight ? 'bg-white text-slate-900 hover:bg-white/90' : 'bg-primary-600 text-white hover:bg-primary-700'
                   }`}
                 >
                   {block.buttonText}
-                </Link>
+                </CmsNavLink>
               )}
             </div>
           </div>
@@ -584,9 +585,9 @@ function DeliveryCountdownBlock({ block }) {
           ))}
         </div>
         {btnText && btnUrl && (
-          <Link to={btnUrl} className="btn-primary inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 text-xs sm:text-sm font-bold uppercase tracking-wide w-full sm:w-auto max-w-xs sm:max-w-none mx-auto">
+          <CmsNavLink to={btnUrl} className="btn-primary inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 text-xs sm:text-sm font-bold uppercase tracking-wide w-full sm:w-auto max-w-xs sm:max-w-none mx-auto">
             {btnText}
-          </Link>
+          </CmsNavLink>
         )}
         </div>
       </div>
@@ -624,7 +625,19 @@ function TextBlock({ block }) {
   return (
     <section className="cms-section-narrow">
       {block.title && <Heading>{block.title}</Heading>}
-      {block.content && <div className="cms-body text-gray-600 whitespace-pre-line">{block.content}</div>}
+      {block.content && (
+        <div className="space-y-4">
+          {block.content
+            .split(/\n\s*\n+/)
+            .map((chunk) => chunk.trim())
+            .filter(Boolean)
+            .map((chunk, i) => (
+              <p key={i} className="cms-body text-gray-600 whitespace-pre-line">
+                {chunk}
+              </p>
+            ))}
+        </div>
+      )}
       {linkUrl && (
         <a href={linkUrl} className="inline-block mt-4 text-primary-600 font-medium hover:underline text-sm sm:text-base" target={linkUrl.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
           {block.buttonText || 'Learn more'}
@@ -641,7 +654,7 @@ function CtaBlock({ block }) {
         {block.title && <h2 className="cms-title mb-2 sm:mb-3">{block.title}</h2>}
         {block.content && <p className="cms-body text-gray-600 mb-4 sm:mb-6 max-w-2xl mx-auto">{block.content}</p>}
         {block.buttonText && block.buttonLink && (
-          <Link to={block.buttonLink} className="btn-primary inline-block text-sm sm:text-base">{block.buttonText}</Link>
+          <CmsNavLink to={block.buttonLink} className="btn-primary inline-block text-sm sm:text-base">{block.buttonText}</CmsNavLink>
         )}
       </div>
     </section>
@@ -654,14 +667,32 @@ function parseFaqItems(block) {
   if (valid.length) return valid;
 
   if (!block.content?.trim()) return [];
+
+  const inline = block.content.trim();
+  const inlineMatch = inline.match(/^Q[.:]\s*(.+?)(?:\s*\\+\s*|\s+A[.:]\s+)(.+)$/is);
+  if (inlineMatch) {
+    return [{ q: inlineMatch[1].trim(), a: inlineMatch[2].trim() }];
+  }
+
   return block.content
     .split(/\n\s*\n/)
     .map((chunk) => chunk.trim())
     .filter(Boolean)
-    .map((chunk) => ({
-      q: (chunk.match(/^Q:\s*(.*)$/m)?.[1] || '').trim(),
-      a: (chunk.match(/^A:\s*([\s\S]*)$/m)?.[1] || '').trim(),
-    }))
+    .map((chunk) => {
+      const qColon = chunk.match(/^Q[.:]\s*(.*)$/im);
+      const aColon = chunk.match(/^A[.:]\s*([\s\S]*)$/im);
+      if (qColon && aColon) {
+        return { q: qColon[1].trim(), a: aColon[1].trim() };
+      }
+      const parts = chunk.split(/\s*\\+\s*/);
+      if (parts.length >= 2) {
+        return {
+          q: parts[0].replace(/^Q[.:]\s*/i, '').trim(),
+          a: parts.slice(1).join(' ').trim(),
+        };
+      }
+      return { q: '', a: '' };
+    })
     .filter((item) => item.q && item.a);
 }
 
@@ -754,7 +785,9 @@ function TestimonialBlock({ block }) {
 }
 
 export default function CmsBlockRenderer({ blocks = [] }) {
-  const sorted = [...blocks].filter((b) => b.isActive !== false).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const sorted = [...blocks]
+    .filter((b) => b.isActive !== false)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || String(a._id).localeCompare(String(b._id)));
 
   return (
     <div className="cms-page">

@@ -45,6 +45,7 @@ router.post('/orders', optionalAuth, validate(createOrderSchema), orderControlle
 router.post('/orders/verify-payment', validate(verifyPaymentSchema), orderController.verifyPayment);
 router.get('/payments/card/return', orderController.cardPaymentReturn);
 router.get('/payments/nps/notify', orderController.npsNotification);
+router.post('/payments/nps/notify', orderController.npsNotification);
 router.get('/orders/track', orderController.trackOrder);
 router.get('/orders/my', authenticate, orderController.getMyOrders);
 router.get('/orders/my/:id', authenticate, orderController.getMyOrder);

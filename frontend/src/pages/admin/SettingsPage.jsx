@@ -3,6 +3,7 @@ import { useStoreSettings } from '../../hooks/useStoreSettings.js';
 import {
   StoreRegistrySection,
   MaintenanceSection,
+  LandingPopupSection,
   MultiCurrenciesSection,
   ServiceAddonsSection,
   DeliveryPricingSection,
@@ -21,6 +22,7 @@ import {
 const TABS = [
   { id: 'registry', label: 'Store Registry Identities', icon: '🏪' },
   { id: 'maintenance', label: 'Maintenance Mode', icon: '🛠️' },
+  { id: 'popup', label: 'Landing Popup', icon: '💬' },
   { id: 'currency', label: 'Multi-Currencies', icon: '💱' },
   { id: 'addons', label: 'Service Add-ons', icon: '➕' },
   { id: 'delivery', label: 'Delivery Pricing', icon: '🚚' },
@@ -49,6 +51,7 @@ export default function SettingsPage() {
     switch (activeTab) {
       case 'registry': return <StoreRegistrySection {...props} />;
       case 'maintenance': return <MaintenanceSection {...props} />;
+      case 'popup': return <LandingPopupSection {...props} />;
       case 'currency': return <MultiCurrenciesSection {...props} />;
       case 'addons': return <ServiceAddonsSection {...props} />;
       case 'delivery': return <DeliveryPricingSection {...props} />;

@@ -20,11 +20,19 @@ const resolveNpsRequest = async (body = {}) => {
 };
 
 export const getNpsUrls = asyncHandler(async (req, res) => {
-  const apiBase = `${req.protocol}://${req.get('host')}/api/${config.apiVersion}`;
+  const serverBase = String(config.serverUrl).replace(/\/$/, '');
+  const apiBase = `${serverBase}/api/${config.apiVersion}`;
+  const notificationUrl = `${apiBase}/store/payments/nps/notify`;
+  const responseUrl = `${String(config.clientUrl).replace(/\/$/, '')}/checkout/card/callback`;
+  const isLocalNotification = /localhost|127\.0\.0\.1/i.test(notificationUrl);
+
   res.json(
     new ApiResponse(200, {
-      notificationUrl: `${apiBase}/store/payments/nps/notify`,
-      responseUrl: `${config.clientUrl}/checkout/card/callback`,
+      notificationUrl,
+      responseUrl,
+      localDevWarning: isLocalNotification
+        ? 'NPS cannot reach localhost for server notifications. Use ngrok (or similar), set SERVER_URL to the public HTTPS URL, and register that notification URL with NPS.'
+        : null,
       sandboxApi: 'https://apisandbox.nepalpayment.com',
       sandboxGateway: 'https://gatewaysandbox.nepalpayment.com/Payment/Index',
       productionApi: 'https://apigateway.nepalpayment.com',

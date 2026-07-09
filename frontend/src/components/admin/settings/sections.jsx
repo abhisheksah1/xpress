@@ -140,6 +140,114 @@ export function MaintenanceSection({ values, set }) {
   );
 }
 
+const DEFAULT_LANDING_POPUP = {
+  enabled: false,
+  mode: 'text',
+  title: '',
+  text: '',
+  imageUrl: '',
+  buttonText: 'Learn more',
+  redirectUrl: '',
+  version: '1',
+};
+
+export function LandingPopupSection({ values, set }) {
+  const [saving, setSaving] = useState(false);
+  const popup = { ...DEFAULT_LANDING_POPUP, ...(values.landing_popup || {}) };
+  const setPopup = (patch) => set('landing_popup', { ...popup, ...patch });
+  const imageImages = popup.imageUrl ? [{ url: popup.imageUrl, alt: popup.title || 'Popup notice' }] : [];
+  const showTextFields = popup.mode === 'text' || popup.mode === 'image_text';
+  const showImageField = popup.mode === 'image' || popup.mode === 'image_text';
+
+  return (
+    <SectionCard
+      title="Landing Page Popup"
+      description="Show a dismissible notice on the storefront homepage. Choose text only, image only, or image with text. Optionally link to any URL."
+      onSave={() => saveSection(['landing_popup'], values, setSaving)}
+      saving={saving}
+    >
+      <Toggle
+        label="Enable landing popup"
+        checked={popup.enabled}
+        onChange={(v) => setPopup({ enabled: v })}
+        hint="Popup appears only on the homepage (/). Visitors can close it; change the version below to show it again."
+      />
+      <Field label="Content type">
+        <select
+          className="input-field"
+          value={popup.mode}
+          onChange={(e) => setPopup({ mode: e.target.value })}
+        >
+          <option value="text">Text only</option>
+          <option value="image">Image only</option>
+          <option value="image_text">Image and text</option>
+        </select>
+      </Field>
+      {showTextFields && (
+        <>
+          <Field label="Title">
+            <input
+              className="input-field"
+              value={popup.title}
+              onChange={(e) => setPopup({ title: e.target.value })}
+              placeholder="Optional headline"
+            />
+          </Field>
+          <Field label="Message">
+            <textarea
+              className="input-field"
+              rows={4}
+              value={popup.text}
+              onChange={(e) => setPopup({ text: e.target.value })}
+              placeholder="Your announcement or promotion text"
+            />
+          </Field>
+        </>
+      )}
+      {showImageField && (
+        <Field label="Popup image">
+          <CmsImagePicker
+            mode="single"
+            guideKey="landingPopup"
+            images={imageImages}
+            onChange={(imgs) => setPopup({ imageUrl: imgs[0]?.url || '' })}
+            alt={popup.title || 'Popup notice'}
+          />
+        </Field>
+      )}
+      <div className="grid md:grid-cols-2 gap-4">
+        <Field label="Button label">
+          <input
+            className="input-field"
+            value={popup.buttonText}
+            onChange={(e) => setPopup({ buttonText: e.target.value })}
+            placeholder="Learn more"
+          />
+        </Field>
+        <Field label="Redirect URL">
+          <input
+            className="input-field"
+            value={popup.redirectUrl}
+            onChange={(e) => setPopup({ redirectUrl: e.target.value })}
+            placeholder="/shop or https://example.com"
+          />
+        </Field>
+      </div>
+      <Field
+        label="Popup version"
+        hint="Change this (e.g. 2, summer-sale) after updating content so returning visitors see the popup again."
+      >
+        <input
+          className="input-field max-w-xs"
+          value={popup.version}
+          onChange={(e) => setPopup({ version: e.target.value })}
+          placeholder="1"
+        />
+      </Field>
+    </SectionCard>
+  );
+}
+
 export function MultiCurrenciesSection({ values, set, setValues }) {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);

@@ -87,6 +87,25 @@ async function postNps(path, body, creds, env) {
   return data?.data ?? data?.Data ?? data;
 }
 
+function isUninitializedTransactionError(err) {
+  return /not initialized/i.test(err?.message || '');
+}
+
+async function postNpsStatus(path, body, creds, env) {
+  try {
+    return await postNps(path, body, creds, env);
+  } catch (err) {
+    if (isUninitializedTransactionError(err)) {
+      return {
+        Status: 'not_initialized',
+        status: 'not_initialized',
+        CbsMessage: err.message,
+      };
+    }
+    throw err;
+  }
+}
+
 export const initiatePayment = async (order, creds, env = 'sandbox', options = {}) => {
   const { merchantId, merchantName, instrumentCode } = resolveCreds(creds);
   const amount = Number(order.total).toFixed(2);
@@ -110,8 +129,16 @@ export const initiatePayment = async (order, creds, env = 'sandbox', options = {
   }
 
   const returnBase = String(options.returnBaseUrl || config.clientUrl).replace(/\/$/, '');
+  // Must match the URL registered with NPS (storefront callback, not API server).
+  const responseUrl = `${returnBase}/checkout/card/callback`;
+
   const serverBase = String(options.serverBaseUrl || config.serverUrl).replace(/\/$/, '');
-  const responseUrl = `${serverBase}/api/${config.apiVersion}/store/payments/card/return?redirect=${encodeURIComponent(`${returnBase}/checkout/card/callback`)}`;
+  if (/localhost|127\.0\.0\.1/i.test(serverBase) && config.env === 'development') {
+    console.warn(
+      '[NPS] SERVER_URL is local — register a public HTTPS notification URL with NPS (e.g. ngrok) for webhooks:',
+      `${serverBase}/api/${config.apiVersion}/store/payments/nps/notify`
+    );
+  }
 
   return {
     type: 'nps_onepg',
@@ -121,7 +148,7 @@ export const initiatePayment = async (order, creds, env = 'sandbox', options = {
     Amount: amount,
     MerchantTxnId: merchantTxnId,
     ProcessId: processId,
-    InstrumentCode: instrumentCode || '',
+    ...(instrumentCode ? { InstrumentCode: instrumentCode } : {}),
     TransactionRemarks: `Order ${merchantTxnId}`,
     ResponseUrl: responseUrl,
     environment: env || 'sandbox',
@@ -130,7 +157,7 @@ export const initiatePayment = async (order, creds, env = 'sandbox', options = {
 
 export const checkTransactionStatus = async (merchantTxnId, creds, env = 'sandbox') => {
   const { merchantId, merchantName } = resolveCreds(creds);
-  return postNps(
+  return postNpsStatus(
     '/CheckTransactionStatus',
     {
       MerchantId: String(merchantId),
@@ -206,6 +233,14 @@ export const resolvePaymentOutcome = async (verificationData, creds, env = 'sand
     const data = await checkTransactionStatus(merchantTxnId, creds, env);
     lastData = data;
     const status = String(data?.Status || data?.status || '').toLowerCase();
+
+    if (status === 'not_initialized' || /not initialized/i.test(data?.CbsMessage || '')) {
+      return {
+        outcome: 'failed',
+        message: data?.CbsMessage || 'Card payment was not started at gateway',
+        gatewayResponse: data,
+      };
+    }
 
     if (status === 'success') {
       return {

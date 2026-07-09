@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import ImageSizeGuide from '../ImageSizeGuide.jsx';
+import { useImageCropUpload } from '../../hooks/useImageCropUpload.jsx';
+import { isImageFile } from '../../utils/imageCrop.js';
 
 const ACCEPT = 'image/jpeg,image/jpg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif';
 
@@ -11,12 +13,6 @@ const parseUrlInput = (input) =>
     .split(/[\n,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-
-const isImageFile = (file) => {
-  if (!file) return false;
-  if (file.type && file.type.startsWith('image/')) return true;
-  return /\.(jpe?g|png|gif|webp)$/i.test(file.name || '');
-};
 
 async function resolveUploadedUrl(url, alt = '') {
   const trimmed = url?.trim();
@@ -46,11 +42,14 @@ export default function CmsImagePicker({
   onChange,
   label = 'Images',
   alt = '',
+  enableCrop = true,
 }) {
   const [urlInput, setUrlInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef(null);
+  const resolvedGuideKey = guideKey || (mode === 'slides' ? 'cmsSlide' : 'cmsContent');
+  const crop = useImageCropUpload({ guideKey: resolvedGuideKey, enableCrop });
 
   const slides = Array.isArray(images) ? images.filter((img) => img?.url) : [];
 
@@ -99,16 +98,10 @@ export default function CmsImagePicker({
     }
   };
 
-  const addFromFiles = async (fileList) => {
-    const imageFiles = [...(fileList || [])].filter(isImageFile);
-    if (!imageFiles.length) {
-      toast.error('Please choose JPEG, PNG, WebP, or GIF image files');
-      return;
-    }
-
+  const uploadPreparedFiles = async (preparedFiles) => {
     setUploading(true);
     try {
-      const urls = await uploadFiles(mode === 'single' ? imageFiles.slice(0, 1) : imageFiles);
+      const urls = await uploadFiles(mode === 'single' ? preparedFiles.slice(0, 1) : preparedFiles);
       if (urls.length) {
         appendUrls(urls);
         toast.success(
@@ -125,6 +118,22 @@ export default function CmsImagePicker({
     }
   };
 
+  const addFromFiles = async (fileList) => {
+    const imageFiles = [...(fileList || [])].filter(isImageFile);
+    if (!imageFiles.length) {
+      toast.error('Please choose JPEG, PNG, WebP, or GIF image files');
+      return;
+    }
+
+    const toProcess = mode === 'single' ? imageFiles.slice(0, 1) : imageFiles;
+    try {
+      const prepared = await crop.processFiles(toProcess);
+      if (prepared.length) await uploadPreparedFiles(prepared);
+    } catch {
+      /* crop cancelled */
+    }
+  };
+
   const handleDrop = async (e) => {
     e.preventDefault();
     setDragOver(false);
@@ -136,22 +145,23 @@ export default function CmsImagePicker({
   };
 
   const openFilePicker = () => {
-    if (uploading) return;
+    if (uploading || crop.isCropping) return;
     fileRef.current?.click();
   };
 
   const listTitle = mode === 'slides' ? 'Slider carousel slides list' : 'Image';
-  const resolvedGuideKey = guideKey || (mode === 'slides' ? 'cmsSlide' : 'cmsContent');
+  const busy = uploading || crop.isCropping;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
+      {crop.modal}
       <input
         ref={fileRef}
         type="file"
         accept={ACCEPT}
         multiple={mode === 'slides'}
         className="hidden"
-        disabled={uploading}
+        disabled={busy}
         onChange={(e) => {
           addFromFiles(e.target.files);
         }}
@@ -161,8 +171,8 @@ export default function CmsImagePicker({
         <span className="text-xs font-bold uppercase tracking-wide text-slate-700">{listTitle}</span>
         <span className="text-xs text-slate-500">
           {mode === 'slides'
-            ? 'Add multiple URLs or drag several image files at once'
-            : 'Add URLs or drag local image files directly'}
+            ? 'Drag images here — each file is cropped to slide size before upload'
+            : 'Drag an image here or browse — crop to recommended size before upload'}
         </span>
       </div>
 
@@ -172,12 +182,27 @@ export default function CmsImagePicker({
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`p-3 min-h-[96px] transition-colors ${dragOver ? 'bg-primary-50 ring-2 ring-inset ring-primary-200' : ''}`}
+        onClick={openFilePicker}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openFilePicker();
+          }
+        }}
+        className={`p-3 min-h-[120px] transition-colors cursor-pointer ${
+          dragOver ? 'bg-primary-50 ring-2 ring-inset ring-primary-200' : 'hover:bg-white/80'
+        } ${busy ? 'opacity-60 pointer-events-none' : ''}`}
       >
         {slides.length === 0 ? (
-          <p className="text-xs text-slate-400 py-6 text-center">
-            No {mode === 'slides' ? 'slides' : 'image'} yet — paste URL(s) or upload file(s) below
-          </p>
+          <div className="py-8 text-center">
+            <p className="text-2xl mb-2" aria-hidden>🖼️</p>
+            <p className="text-sm text-slate-500 font-medium">
+              Drop {mode === 'slides' ? 'slide images' : 'an image'} here or click to browse
+            </p>
+            <p className="text-xs text-slate-400 mt-1">Crop tool opens automatically with size presets</p>
+          </div>
         ) : (
           <div className="space-y-2">
             {mode === 'slides' && (
@@ -201,7 +226,10 @@ export default function CmsImagePicker({
                   )}
                   <button
                     type="button"
-                    onClick={() => removeAt(idx)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeAt(idx);
+                    }}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Remove"
                   >
@@ -210,6 +238,7 @@ export default function CmsImagePicker({
                 </div>
               ))}
             </div>
+            <p className="text-[10px] text-slate-400 pt-1">Drop or click to add more</p>
           </div>
         )}
       </div>
@@ -230,23 +259,22 @@ export default function CmsImagePicker({
               addFromUrl();
             }
           }}
-          disabled={uploading}
+          disabled={busy}
+          onClick={(e) => e.stopPropagation()}
         />
         <button
           type="button"
-          onClick={openFilePicker}
-          disabled={uploading}
+          onClick={(e) => {
+            e.stopPropagation();
+            openFilePicker();
+          }}
+          disabled={busy}
           className="btn-secondary text-sm whitespace-nowrap inline-flex items-center justify-center gap-1.5 shrink-0"
         >
-          <span aria-hidden>📁</span>
-          {uploading ? 'Uploading...' : (mode === 'slides' ? 'Upload Slides' : 'Upload Image')}
+          <span aria-hidden>✂️</span>
+          {busy ? (crop.isCropping ? 'Cropping...' : 'Uploading...') : (mode === 'slides' ? 'Upload & crop slides' : 'Upload & crop')}
         </button>
       </div>
-      {mode === 'slides' && (
-        <p className="px-3 pb-2 text-[10px] text-slate-400">
-          Tip: in the file dialog, hold Ctrl (Windows) or Cmd (Mac) to select multiple JPEG/PNG files.
-        </p>
-      )}
 
       {label && mode === 'single' && slides.length > 0 && (
         <p className="px-3 pb-2 text-[10px] text-slate-400 truncate">{label}: {slides[0].url}</p>

@@ -8,6 +8,7 @@ import {
 } from '../../utils/seoMeta.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import ImageSizeGuide from '../ImageSizeGuide.jsx';
+import AdminImageDropzone from './AdminImageDropzone.jsx';
 
 function Section({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -144,20 +145,23 @@ export default function SeoMetaEditor({
         <div>
           <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">OG image</label>
           <ImageSizeGuide guide="og" variant="admin" className="rounded-lg border border-blue-100 mb-2" />
-          <div className="flex flex-wrap items-center gap-3">
-            {onUploadImage && (
-              <label className="btn-secondary text-xs cursor-pointer">
-                Upload image
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleOgUpload(e.target.files?.[0])} />
-              </label>
-            )}
-            <input
-              className="input-field text-sm flex-1 min-w-[200px]"
-              placeholder="Image URL"
-              value={seo.ogImage?.url || ''}
-              onChange={(e) => patch({ ogImage: { ...seo.ogImage, url: e.target.value } })}
+          {onUploadImage ? (
+            <AdminImageDropzone
+              guideKey="og"
+              multiple={false}
+              onFilesSelected={async (files) => handleOgUpload(files[0])}
+              title="Drag & drop OG image"
+              hint="Crop to 1200×630 before upload"
+              className="p-4"
+              showGuide={false}
             />
-          </div>
+          ) : null}
+          <input
+            className="input-field text-sm flex-1 min-w-[200px] mt-3"
+            placeholder="Or paste image URL"
+            value={seo.ogImage?.url || ''}
+            onChange={(e) => patch({ ogImage: { ...seo.ogImage, url: e.target.value } })}
+          />
           {seo.ogImage?.url && (
             <img src={resolveMediaUrl(seo.ogImage.url)} alt="" className="mt-2 h-20 object-cover rounded border" />
           )}

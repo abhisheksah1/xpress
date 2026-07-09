@@ -46,14 +46,15 @@ const resolveOrderIdForVerification = async (orderId, verificationData) => {
   return order?._id?.toString() || null;
 };
 
-const processCardGatewayPayment = async (order, creds, env, verificationData) => {
+const processCardGatewayPayment = async (order, creds, env, verificationData, options = {}) => {
   const result = await npsService.resolvePaymentOutcome(
     {
       merchantTxnId: verificationData.merchantTxnId || order.orderNumber,
       gatewayTxnId: verificationData.gatewayTxnId,
     },
     creds,
-    env
+    env,
+    options.reconcile ? { maxAttempts: 1, delayMs: 0 } : undefined
   );
 
   if (result.outcome === 'success') {
@@ -82,7 +83,7 @@ const processCardGatewayPayment = async (order, creds, env, verificationData) =>
 };
 
 /** Auto-process payment: paid → confirmed order, failed → lead with failed payment. */
-export const processPaymentVerification = async (orderId, method, verificationData) => {
+export const processPaymentVerification = async (orderId, method, verificationData, options = {}) => {
   const resolvedOrderId = await resolveOrderIdForVerification(orderId, verificationData);
   if (!resolvedOrderId) throw new ApiError(404, 'Order not found for payment verification');
 
@@ -102,7 +103,7 @@ export const processPaymentVerification = async (orderId, method, verificationDa
   const env = gateway?.environment || 'sandbox';
 
   if (method === PAYMENT_METHODS.CARD) {
-    return processCardGatewayPayment(order, creds, env, verificationData);
+    return processCardGatewayPayment(order, creds, env, verificationData, options);
   }
 
   const service = paymentServices[method];

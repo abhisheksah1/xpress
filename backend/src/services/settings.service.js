@@ -36,6 +36,21 @@ const DEFAULT_SETTINGS = [
     group: 'store',
     label: 'Maintenance Message',
   },
+  {
+    key: 'landing_popup',
+    group: 'store',
+    label: 'Landing Page Popup',
+    value: {
+      enabled: false,
+      mode: 'text',
+      title: '',
+      text: '',
+      imageUrl: '',
+      buttonText: 'Learn more',
+      redirectUrl: '',
+      version: '1',
+    },
+  },
 
   // Multi-Currencies
   {

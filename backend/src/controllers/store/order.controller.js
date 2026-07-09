@@ -85,8 +85,16 @@ export const cardPaymentReturn = asyncHandler(async (req, res) => {
 
 /** NPS OnePG server webhook — respond with plain text "received" / "already received". */
 export const npsNotification = asyncHandler(async (req, res) => {
-  const merchantTxnId = req.query.MerchantTxnId || req.query.merchantTxnId;
-  const gatewayTxnId = req.query.GatewayTxnId || req.query.gatewayTxnId;
+  const merchantTxnId =
+    req.query.MerchantTxnId
+    || req.query.merchantTxnId
+    || req.body?.MerchantTxnId
+    || req.body?.merchantTxnId;
+  const gatewayTxnId =
+    req.query.GatewayTxnId
+    || req.query.gatewayTxnId
+    || req.body?.GatewayTxnId
+    || req.body?.gatewayTxnId;
   const result = await paymentService.handleNpsNotification({ merchantTxnId, gatewayTxnId });
   res.status(result.status).type('text/plain').send(result.body);
 });
