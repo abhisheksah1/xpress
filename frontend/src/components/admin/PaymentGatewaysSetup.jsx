@@ -72,6 +72,94 @@ function CurrencyPills({ selected, onChange, codes }) {
   );
 }
 
+function NpsOnePgTools({ gateway, onSelectInstrument }) {
+  const [urls, setUrls] = useState(null);
+  const [instruments, setInstruments] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    adminApi.getNpsUrls().then(({ data }) => setUrls(data.data)).catch(() => {});
+  }, []);
+
+  const credPayload = () => ({
+    ...gateway.credentials,
+    environment: gateway.environment,
+  });
+
+  const fetchInstruments = async () => {
+    setLoading(true);
+    try {
+      const { data } = await adminApi.getNpsInstruments(credPayload());
+      const list = data.data || [];
+      setInstruments(list);
+      toast.success(`Found ${list.length} payment instrument(s)`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to fetch NPS instruments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setLoading(true);
+    try {
+      const { data } = await adminApi.testNpsConnection(credPayload());
+      setInstruments(data.data?.instruments || []);
+      toast.success(`NPS connected — ${data.data?.instrumentCount || 0} instrument(s)`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'NPS connection failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-rose-900">NPS OnePG — Card Checkout</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={testConnection} disabled={loading} className="btn-secondary text-xs">
+            Test Connection
+          </button>
+          <button type="button" onClick={fetchInstruments} disabled={loading} className="btn-secondary text-xs">
+            Fetch Instruments
+          </button>
+        </div>
+      </div>
+
+      {urls && (
+        <div className="text-xs text-gray-600 space-y-1 bg-white rounded border border-rose-100 p-3">
+          <p><span className="font-semibold">Notification URL (webhook):</span> {urls.notificationUrl}</p>
+          <p><span className="font-semibold">Response URL (customer):</span> {urls.responseUrl}</p>
+          <p className="text-gray-400 mt-1">Provide the Notification URL to NPS during merchant setup.</p>
+        </div>
+      )}
+
+      {instruments.length > 0 && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Select Instrument Code</label>
+          <select
+            className="input-field text-sm"
+            value={gateway.credentials.instrumentCode || ''}
+            onChange={(e) => onSelectInstrument(e.target.value)}
+          >
+            <option value="">— Customer chooses on gateway —</option>
+            {instruments.map((item) => {
+              const code = item.InstrumentCode || item.instrumentCode;
+              const name = item.InstrumentName || item.instrumentName || code;
+              return (
+                <option key={code} value={code}>
+                  {name} ({code})
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GatewayPanel({ gateway, onChange, onUploadLogo, currencyCodes }) {
   const fields = GATEWAY_FIELD_DEFS[gateway.type] || [];
 
@@ -175,6 +263,15 @@ function GatewayPanel({ gateway, onChange, onUploadLogo, currencyCodes }) {
               );
             })}
           </div>
+        )}
+
+        {gateway.type === 'card' && (
+          <NpsOnePgTools
+            gateway={gateway}
+            onSelectInstrument={(instrumentCode) =>
+              onChange({ ...gateway, credentials: { ...gateway.credentials, instrumentCode } })
+            }
+          />
         )}
 
         <div className="grid md:grid-cols-2 gap-3 pt-2 border-t border-gray-200">

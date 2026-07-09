@@ -103,7 +103,7 @@ const DEFAULT_SETTINGS = [
   { key: 'khalti_enabled', value: true, group: 'payment', label: 'Khalti' },
   { key: 'esewa_enabled', value: true, group: 'payment', label: 'eSewa' },
   { key: 'fonepay_enabled', value: true, group: 'payment', label: 'Fonepay' },
-  { key: 'card_enabled', value: true, group: 'payment', label: 'Card / Stripe' },
+  { key: 'card_enabled', value: true, group: 'payment', label: 'Card / NPS OnePG' },
   { key: 'khalti_public_key', value: '', group: 'payment', label: 'Khalti Public Key' },
   { key: 'esewa_merchant_code', value: '', group: 'payment', label: 'eSewa Merchant Code' },
   { key: 'fonepay_merchant_code', value: '', group: 'payment', label: 'Fonepay Merchant Code' },

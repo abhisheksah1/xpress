@@ -21,6 +21,23 @@ const base = (overrides) => ({
   ...overrides,
 });
 
+const npsEnvCredentials = () => ({
+  merchantId: process.env.NPS_MERCHANT_ID || '',
+  merchantName: process.env.NPS_MERCHANT_NAME || '',
+  secretKey: process.env.NPS_SECRET_KEY || '',
+  apiUsername: process.env.NPS_API_USERNAME || '',
+  apiPassword: process.env.NPS_API_PASSWORD || '',
+  instrumentCode: process.env.NPS_INSTRUMENT_CODE || '',
+});
+
+const hasNpsEnvCredentials = () => {
+  const c = npsEnvCredentials();
+  return !!(c.merchantId && c.merchantName && c.secretKey && c.apiUsername && c.apiPassword);
+};
+
+export const getNpsEnvCredentials = npsEnvCredentials;
+export const hasNpsEnvConfig = hasNpsEnvCredentials;
+
 export const getDefaultPaymentGateways = () => [
   base({
     id: 'khalti',
@@ -62,17 +79,11 @@ export const getDefaultPaymentGateways = () => [
     id: 'card',
     type: GATEWAY_TYPES.CARD,
     sortOrder: 5,
-    enabled: true,
+    enabled: hasNpsEnvCredentials(),
+    environment: process.env.NPS_ENVIRONMENT === 'production' ? 'production' : 'sandbox',
     displayLabel: 'Visa / Mastercard (NPS OnePG)',
     currencies: ['NPR', 'INR', 'AUD', 'USD', 'EUR'],
-    credentials: {
-      merchantName: '',
-      merchantId: '',
-      secretKey: '',
-      apiUsername: '',
-      apiPassword: '',
-      instrumentCode: '',
-    },
+    credentials: npsEnvCredentials(),
   }),
   base({
     id: 'hbl',

@@ -8,6 +8,7 @@ import * as blogController from '../controllers/admin/blog.controller.js';
 import * as cmsController from '../controllers/admin/cms.controller.js';
 import * as navbarController from '../controllers/admin/navbar.controller.js';
 import * as settingsController from '../controllers/admin/settings.controller.js';
+import * as npsController from '../controllers/admin/nps.controller.js';
 import * as uploadController from '../controllers/admin/upload.controller.js';
 import * as dashboardController from '../controllers/admin/dashboard.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
@@ -174,6 +175,12 @@ router.patch('/settings/bulk', isAdmin, validate(updateSettingsSchema), settings
 router.patch('/settings/:key', isAdmin, settingsController.updateSetting);
 router.post('/settings/test-smtp', isAdmin, settingsController.testSmtp);
 router.post('/settings/sync-nrb-rates', isAdmin, settingsController.syncNrbRates);
+
+// NPS OnePG (Visa / Mastercard)
+router.get('/payments/nps/urls', isAdmin, npsController.getNpsUrls);
+router.post('/payments/nps/test', isAdmin, npsController.testNpsConnection);
+router.post('/payments/nps/instruments', isAdmin, npsController.getNpsInstruments);
+router.post('/payments/nps/service-charge', isAdmin, npsController.getNpsServiceCharge);
 
 // Upload
 router.post('/upload', uploadSingle('image'), uploadController.uploadImage);

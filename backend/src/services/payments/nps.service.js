@@ -140,6 +140,53 @@ export const checkTransactionStatus = async (merchantTxnId, creds, env = 'sandbo
   );
 };
 
+/** 4.1 Get Payment Instrument Details */
+export const getPaymentInstruments = async (creds, env = 'sandbox') => {
+  const { merchantId, merchantName } = resolveCreds(creds);
+  const data = await postNps(
+    '/GetPaymentInstrumentDetails',
+    {
+      MerchantId: String(merchantId),
+      MerchantName: String(merchantName),
+    },
+    creds,
+    env
+  );
+  return Array.isArray(data) ? data : [];
+};
+
+/** 4.2 Get Service Charge */
+export const getServiceCharge = async ({ amount, instrumentCode }, creds, env = 'sandbox') => {
+  const { merchantId, merchantName } = resolveCreds(creds);
+  return postNps(
+    '/GetServiceCharge',
+    {
+      MerchantId: String(merchantId),
+      MerchantName: String(merchantName),
+      Amount: Number(amount).toFixed(2),
+      InstrumentCode: String(instrumentCode),
+    },
+    creds,
+    env
+  );
+};
+
+/** Test API connectivity using GetPaymentInstrumentDetails. */
+export const testConnection = async (creds, env = 'sandbox') => {
+  const instruments = await getPaymentInstruments(creds, env);
+  return {
+    ok: true,
+    instrumentCount: instruments.length,
+    instruments: instruments.map((item) => ({
+      institutionName: item.InstitutionName || item.institutionName,
+      instrumentName: item.InstrumentName || item.instrumentName,
+      instrumentCode: item.InstrumentCode || item.instrumentCode,
+      bankType: item.BankType || item.bankType,
+      logoUrl: item.LogoUrl || item.logoUrl,
+    })),
+  };
+};
+
 export const verifyPayment = async (verificationData, creds, env = 'sandbox') => {
   const merchantTxnId = verificationData?.merchantTxnId || verificationData?.MerchantTxnId;
   if (!merchantTxnId) {

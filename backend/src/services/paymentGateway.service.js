@@ -2,6 +2,8 @@ import { Settings } from '../models/index.js';
 import {
   getDefaultPaymentGateways,
   GATEWAY_CREDENTIAL_FIELDS,
+  getNpsEnvCredentials,
+  hasNpsEnvConfig,
 } from '../config/paymentGatewayDefaults.js';
 
 const SECRET_KEYS = new Set(
@@ -78,10 +80,50 @@ export const getCheckoutGateways = async (currency) => {
     .map(sanitizeGatewayForCheckout);
 };
 
+const mergeCredentialFields = (saved = {}, fallback = {}) => {
+  const merged = { ...fallback, ...saved };
+  for (const key of Object.keys(fallback)) {
+    if (!merged[key]) merged[key] = fallback[key];
+  }
+  return merged;
+};
+
 export const getGatewayRuntimeCredentials = async (id) => {
   const gateway = await getGatewayById(id);
   if (!gateway?.enabled) return null;
+
+  if (id === 'card' && hasNpsEnvConfig()) {
+    return {
+      ...gateway,
+      credentials: mergeCredentialFields(gateway.credentials, getNpsEnvCredentials()),
+    };
+  }
   return gateway;
+};
+
+export const syncPaymentGatewaysFromEnv = async () => {
+  if (!hasNpsEnvConfig()) return;
+
+  const envCreds = getNpsEnvCredentials();
+  const envMode = process.env.NPS_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+  const gateways = await getPaymentGatewaysConfig();
+
+  const updated = gateways.map((g) => {
+    if (g.id !== 'card') return g;
+    const neverConfigured = !g.credentials?.merchantId;
+    return {
+      ...g,
+      ...(neverConfigured ? { enabled: true, environment: envMode } : {}),
+      credentials: mergeCredentialFields(g.credentials, envCreds),
+    };
+  });
+
+  await Settings.findOneAndUpdate(
+    { key: 'payment_gateways' },
+    { value: updated, group: 'payment', label: 'Integrated Payment Gateways' },
+    { upsert: true }
+  );
+  await syncLegacyPaymentFlags(updated);
 };
 
 export const syncLegacyPaymentFlags = async (gateways) => {

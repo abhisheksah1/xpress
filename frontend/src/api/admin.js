@@ -24,6 +24,11 @@ export const adminApi = {
   testSmtp: (email) => api.post('/admin/settings/test-smtp', { email }),
   syncNrbRates: () => api.post('/admin/settings/sync-nrb-rates'),
 
+  getNpsUrls: () => api.get('/admin/payments/nps/urls'),
+  testNpsConnection: (credentials) => api.post('/admin/payments/nps/test', credentials),
+  getNpsInstruments: (credentials) => api.post('/admin/payments/nps/instruments', credentials),
+  getNpsServiceCharge: (payload) => api.post('/admin/payments/nps/service-charge', payload),
+
   getCmsPages: (params) => api.get('/admin/cms', { params }),
   getCmsPage: (id) => api.get(`/admin/cms/${id}`),
   createCmsPage: (data) => api.post('/admin/cms', data),

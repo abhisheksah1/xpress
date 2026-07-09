@@ -9,15 +9,15 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_PROXY || 'http://localhost:5001',
         changeOrigin: true,
       },
       '/robots.txt': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_PROXY || 'http://localhost:5001',
         changeOrigin: true,
       },
       '/sitemap.xml': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_PROXY || 'http://localhost:5001',
         changeOrigin: true,
       },
     },

@@ -7,6 +7,7 @@ import { DEFAULT_HOME_PAGE } from '../config/defaultHomePage.js';
 import { DEFAULT_FOOTER_LAYOUT, DEFAULT_FOOTER_OPTIONS, resolveFooterOptions } from '../config/defaultFooterContent.js';
 import { DEFAULT_BRAND_LOGO } from '../config/brandLogo.js';
 import { seedDefaultSettings } from '../services/settings.service.js';
+import { syncPaymentGatewaysFromEnv } from '../services/paymentGateway.service.js';
 
 dotenv.config();
 
@@ -204,6 +205,7 @@ const runSeed = async () => {
     await mongoose.connect(config.db.uri);
     await seedSuperAdmin();
     await seedDefaultSettings();
+    await syncPaymentGatewaysFromEnv();
     await seedNavbar();
     await seedFooterNavbar();
     await seedHomePage();
@@ -225,6 +227,7 @@ if (process.argv[1]?.includes('superAdmin.seed')) {
 export default async function seedOnStartup() {
   await seedSuperAdmin();
   await seedDefaultSettings();
+  await syncPaymentGatewaysFromEnv();
   await seedNavbar();
   await seedFooterNavbar();
   await seedHomePage();

@@ -70,6 +70,7 @@ const config = {
       apiUsername: process.env.NPS_API_USERNAME,
       apiPassword: process.env.NPS_API_PASSWORD,
       instrumentCode: process.env.NPS_INSTRUMENT_CODE || '',
+      environment: process.env.NPS_ENVIRONMENT === 'production' ? 'production' : 'sandbox',
     },
   },
 
