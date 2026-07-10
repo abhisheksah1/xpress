@@ -461,7 +461,7 @@ export default function ProductDetailPage() {
       })
       .filter(Boolean);
 
-    addItem(
+    const result = addItem(
       {
         _id: product._id,
         name: product.name,
@@ -469,11 +469,23 @@ export default function ProductDetailPage() {
         images: product.images,
         selectedOptions: optionsList,
         optionsKey: optionsKey(optionsList),
+        stock: product.stock,
+        allowBackorder: product.allowBackorder,
+        isHamper: product.isHamper,
+        comboItems: product.comboItems,
       },
       qty,
       showPersonalization ? snapshot : null
     );
     uploadedPrintRef.current = null;
+    if (result?.ok === false) {
+      toast.error('Not enough stock available');
+      return;
+    }
+    if (result?.capped) {
+      toast.error(`Only ${result.max} in stock — added ${result.quantity}`);
+      return;
+    }
     toast.success('Added to basket');
   };
 

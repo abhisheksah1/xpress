@@ -60,8 +60,9 @@ export function quickAddProductToCart(addItem, product) {
 
   const { selectedOptions, priceAdjustment, optionsKey: oKey } = buildDefaultSelectedOptions(product);
   const unitPrice = Number(product.price || 0) + priceAdjustment;
+  const stock = resolveProductStock(product);
 
-  addItem(
+  const result = addItem(
     {
       _id: product._id,
       name: product.name,
@@ -69,10 +70,23 @@ export function quickAddProductToCart(addItem, product) {
       images: product.images,
       selectedOptions,
       optionsKey: oKey,
+      stock,
+      allowBackorder: product.allowBackorder,
+      isHamper: product.isHamper,
+      comboItems: product.comboItems,
     },
     1,
     null
   );
+
+  if (result?.ok === false) {
+    toast.error('This item is out of stock');
+    return false;
+  }
+  if (result?.capped) {
+    toast.error(`Only ${result.max} in stock — quantity adjusted`);
+    return true;
+  }
 
   toast.success('Added to basket');
   return true;

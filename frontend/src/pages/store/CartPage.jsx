@@ -1,17 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useCartStore } from '../../store/cartStore.js';
+import { useCartStore, getCartItemMaxQuantity } from '../../store/cartStore.js';
 import { PersonalizationSummary } from '../../components/store/ProductPersonalization.jsx';
 import { resolveCartItemPersonalization } from '../../utils/personalization.js';
 import { storeApi } from '../../api/store.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { useStore } from '../../context/StoreContext.jsx';
+import { allowsBackorder, resolveProductStock } from '../../utils/comboItems.js';
 
 export default function CartPage() {
   const { formatPriceNpr } = useStore();
-  const { items, updateQuantity, removeItem, total, coupon, setCoupon, clearCoupon, grandTotal } = useCartStore();
+  const { items, updateQuantity, removeItem, total, coupon, setCoupon, clearCoupon, grandTotal, syncItemStock } = useCartStore();
   const [code, setCode] = useState(coupon?.coupon?.code || '');
   const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    const ids = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+    if (!ids.length) return;
+    const idKey = ids.join(',');
+
+    storeApi
+      .getProducts({ ids: idKey, limit: ids.length })
+      .then((res) => {
+        const products = res.data?.data?.products || [];
+        const stockByProductId = {};
+        products.forEach((p) => {
+          stockByProductId[String(p._id)] = {
+            stock: resolveProductStock(p),
+            allowBackorder: allowsBackorder(p),
+          };
+        });
+        if (Object.keys(stockByProductId).length) {
+          syncItemStock(stockByProductId);
+        }
+      })
+      .catch(() => {
+        /* keep existing cart stock meta */
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when cart product set changes
+  }, [items.map((i) => i.productId).join(',')]);
 
   const applyCoupon = async (e) => {
     e.preventDefault();
@@ -42,6 +69,18 @@ export default function CartPage() {
     toast.success('Coupon removed');
   };
 
+  const handleQuantityChange = (item, rawValue) => {
+    const requested = Number(rawValue);
+    if (!Number.isFinite(requested) || requested < 1) {
+      updateQuantity(item.cartItemId || item.productId, 1);
+      return;
+    }
+    const result = updateQuantity(item.cartItemId || item.productId, requested);
+    if (result?.capped) {
+      toast.error(`Only ${result.max} in stock for "${item.name}"`);
+    }
+  };
+
   if (!items.length) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center">
@@ -60,6 +99,8 @@ export default function CartPage() {
       <div className="space-y-4">
         {items.map((item) => {
           const resolvedPersonalization = resolveCartItemPersonalization(item, useCartStore.getState().productUploads);
+          const maxQty = getCartItemMaxQuantity(item, items);
+          const showStockLimit = !item.allowBackorder && item.stock != null;
           return (
           <div key={item.cartItemId || item.productId} className="card flex items-start gap-4">
             {item.image && (
@@ -78,6 +119,11 @@ export default function CartPage() {
                   {item.selectedOptions.map((o) => `${o.category}: ${o.label}`).join(' · ')}
                 </p>
               )}
+              {showStockLimit && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {item.stock <= 0 ? 'Out of stock' : `${item.stock} available`}
+                </p>
+              )}
               <PersonalizationSummary personalization={resolvedPersonalization} className="mt-2" />
               {resolvedPersonalization?.printImageUrl && (
                 <img
@@ -90,8 +136,9 @@ export default function CartPage() {
             <input
               type="number"
               min="1"
+              max={maxQty}
               value={item.quantity}
-              onChange={(e) => updateQuantity(item.cartItemId || item.productId, Number(e.target.value))}
+              onChange={(e) => handleQuantityChange(item, e.target.value)}
               className="input-field w-20"
             />
             <button
