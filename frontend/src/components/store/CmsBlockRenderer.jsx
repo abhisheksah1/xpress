@@ -163,10 +163,10 @@ function CategoriesGridBlock({ block }) {
 
   return (
     <section className="cms-section">
-      <div className="cms-section-header justify-center text-center sm:justify-center">
-        <h2 className="cms-title w-full text-center">{title}</h2>
+      <div className="mb-6 sm:mb-8 text-center">
+        <h2 className="cms-title">{title}</h2>
         {block.buttonText && block.buttonLink && (
-          <CmsNavLink to={block.buttonLink} className="text-primary-600 text-sm font-medium hover:underline shrink-0">
+          <CmsNavLink to={block.buttonLink} className="inline-block mt-2 text-primary-600 text-sm font-medium hover:underline">
             {block.buttonText}
           </CmsNavLink>
         )}
@@ -228,10 +228,10 @@ function ProductGridBlock({ block }) {
 
   return (
     <section className="cms-section">
-      <div className="cms-section-header">
+      <div className="mb-6 sm:mb-8 text-center">
         <h2 className="cms-title">{block.title || 'Products'}</h2>
         {block.buttonText && block.buttonLink && (
-          <CmsNavLink to={block.buttonLink} className="text-primary-600 text-sm font-medium hover:underline shrink-0">
+          <CmsNavLink to={block.buttonLink} className="inline-block mt-2 text-primary-600 text-sm font-medium hover:underline">
             {block.buttonText}
           </CmsNavLink>
         )}

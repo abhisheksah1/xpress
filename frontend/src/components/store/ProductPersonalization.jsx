@@ -2,7 +2,6 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { storeApi } from '../../api/store.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
-import ImageSizeGuide from '../ImageSizeGuide.jsx';
 import {
   FIELD_CONFIG,
   getActivePersonalizationFields,
@@ -84,7 +83,6 @@ export default function ProductPersonalization({ personalizationFields, values, 
                 {config.label}
                 {!config.required && <span className="text-slate-400 font-normal"> (Optional)</span>}
               </label>
-              <ImageSizeGuide guide="printDesign" variant="store" className="mb-1" />
               {config.hint && <p className="text-xs text-slate-400">{config.hint}</p>}
               <div className="flex flex-wrap items-center gap-3 pt-0.5">
                 <label className="inline-flex items-center px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors">
