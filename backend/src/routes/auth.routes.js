@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import * as authController from '../controllers/auth.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
-import { registerSchema, loginSchema } from '../validators/index.js';
+import { registerSchema, loginSchema, verifyAdminOtpSchema, resendAdminOtpSchema } from '../validators/index.js';
 import config from '../config/index.js';
 
 const router = Router();
@@ -20,6 +20,8 @@ const authAttemptLimiter = config.rateLimit.enabled
 
 router.post('/register', authAttemptLimiter, validate(registerSchema), authController.register);
 router.post('/login', authAttemptLimiter, validate(loginSchema), authController.login);
+router.post('/verify-admin-otp', authAttemptLimiter, validate(verifyAdminOtpSchema), authController.verifyAdminOtp);
+router.post('/resend-admin-otp', authAttemptLimiter, validate(resendAdminOtpSchema), authController.resendAdminOtp);
 router.post('/refresh', authController.refreshToken);
 router.post('/logout', authenticate, authController.logout);
 router.get('/me', authenticate, authController.getProfile);

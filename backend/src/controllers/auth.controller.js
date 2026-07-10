@@ -1,30 +1,54 @@
 import * as authService from '../services/auth.service.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { getClientIp, parseDeviceLabel } from '../utils/adminDevice.js';
+
+const REFRESH_COOKIE = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+const setAuthCookie = (res, refreshToken) => {
+  if (!refreshToken) return res;
+  return res.cookie('refreshToken', refreshToken, REFRESH_COOKIE);
+};
 
 export const register = asyncHandler(async (req, res) => {
   const result = await authService.register(req.validated.body);
-  res
+  setAuthCookie(res, result.refreshToken)
     .status(201)
-    .cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
     .json(new ApiResponse(201, result, 'Registration successful'));
 });
 
 export const login = asyncHandler(async (req, res) => {
-  const result = await authService.login(req.validated.body);
-  res
-    .cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
+  const body = req.validated.body;
+  const userAgent = body.userAgent || req.headers['user-agent'] || '';
+  const result = await authService.login({
+    ...body,
+    userAgent,
+    deviceLabel: body.deviceLabel || parseDeviceLabel(userAgent),
+    ipAddress: getClientIp(req),
+  });
+
+  if (result.requiresOtp) {
+    return res.json(new ApiResponse(200, result, 'Verification code sent to your email'));
+  }
+
+  setAuthCookie(res, result.refreshToken)
     .json(new ApiResponse(200, result, 'Login successful'));
+});
+
+export const verifyAdminOtp = asyncHandler(async (req, res) => {
+  const result = await authService.verifyAdminLoginOtp(req.validated.body);
+  setAuthCookie(res, result.refreshToken)
+    .json(new ApiResponse(200, result, 'Login successful'));
+});
+
+export const resendAdminOtp = asyncHandler(async (req, res) => {
+  const result = await authService.resendAdminLoginOtp(req.validated.body);
+  res.json(new ApiResponse(200, result, 'Verification code resent'));
 });
 
 export const refreshToken = asyncHandler(async (req, res) => {

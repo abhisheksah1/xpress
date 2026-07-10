@@ -29,6 +29,26 @@ export const loginSchema = z.object({
   body: z.object({
     email: z.string().email(),
     password: z.string().min(1),
+    deviceFingerprint: z.string().min(8).max(200).optional(),
+    userAgent: z.string().max(500).optional(),
+    deviceLabel: z.string().max(200).optional(),
+    trustDevice: z.boolean().optional(),
+  }),
+});
+
+export const verifyAdminOtpSchema = z.object({
+  body: z.object({
+    challengeId: z.string().min(1),
+    otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+    deviceFingerprint: z.string().min(8).max(200),
+    trustDevice: z.boolean().optional(),
+  }),
+});
+
+export const resendAdminOtpSchema = z.object({
+  body: z.object({
+    challengeId: z.string().min(1),
+    deviceFingerprint: z.string().min(8).max(200),
   }),
 });
 

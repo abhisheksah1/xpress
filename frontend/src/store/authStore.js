@@ -6,8 +6,15 @@ import {
   isAdminUser,
   isSuperAdminUser,
 } from '../utils/adminPermissions.js';
+import { getDeviceMeta } from '../utils/adminDevice.js';
 
 const STAFF_ROLES = ['super_admin', 'admin', 'staff'];
+
+const applySession = (set, user, accessToken) => {
+  localStorage.setItem('accessToken', accessToken);
+  set({ user, accessToken });
+  return user;
+};
 
 export const useAuthStore = create(
   persist(
@@ -20,12 +27,48 @@ export const useAuthStore = create(
       isSuperAdmin: () => isSuperAdminUser(get().user),
       hasPermission: (permission) => hasStaffPermission(get().user, permission),
 
-      login: async (email, password) => {
-        const { data } = await api.post('/auth/login', { email, password });
-        const { user, accessToken } = data.data;
-        localStorage.setItem('accessToken', accessToken);
-        set({ user, accessToken });
-        return user;
+      login: async (email, password, { trustDevice = true } = {}) => {
+        const device = getDeviceMeta();
+        const { data } = await api.post('/auth/login', {
+          email,
+          password,
+          trustDevice,
+          ...device,
+        });
+        const payload = data.data;
+
+        if (payload?.requiresOtp) {
+          return {
+            requiresOtp: true,
+            challengeId: payload.challengeId,
+            emailHint: payload.emailHint,
+            deviceLabel: payload.deviceLabel,
+            expiresInSeconds: payload.expiresInSeconds,
+          };
+        }
+
+        return applySession(set, payload.user, payload.accessToken);
+      },
+
+      verifyAdminOtp: async ({ challengeId, otp, trustDevice = true }) => {
+        const device = getDeviceMeta();
+        const { data } = await api.post('/auth/verify-admin-otp', {
+          challengeId,
+          otp,
+          trustDevice,
+          deviceFingerprint: device.deviceFingerprint,
+        });
+        const payload = data.data;
+        return applySession(set, payload.user, payload.accessToken);
+      },
+
+      resendAdminOtp: async (challengeId) => {
+        const device = getDeviceMeta();
+        const { data } = await api.post('/auth/resend-admin-otp', {
+          challengeId,
+          deviceFingerprint: device.deviceFingerprint,
+        });
+        return data.data;
       },
 
       logout: async () => {

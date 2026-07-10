@@ -19,3 +19,6 @@ export { default as SupplierPurchase } from './SupplierPurchase.model.js';
 export { default as OverheadExpense } from './OverheadExpense.model.js';
 export { default as TreasuryAccount } from './TreasuryAccount.model.js';
 export { default as TreasuryTransaction } from './TreasuryTransaction.model.js';
+export { default as Media } from './Media.model.js';
+export { default as AdminTrustedDevice } from './AdminTrustedDevice.model.js';
+export { default as AdminLoginChallenge } from './AdminLoginChallenge.model.js';
