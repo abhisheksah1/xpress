@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import SeoMetaEditor, { emptySeoMeta } from './SeoMetaEditor.jsx';
-import { mergeEntitySeo } from '../../utils/seoMeta.js';
+import { mergeEntitySeoForEditor } from '../../utils/seoMeta.js';
 
 export const PAGE_TYPES = [
   { value: 'home', label: 'Homepage', hint: 'Shown at /' },
@@ -69,7 +69,7 @@ export default function CmsPageFormModal({
         slug: suggestCloneSlug(initial.slug),
         pageType: SINGLETON_TYPES.has(initial.pageType) ? 'custom' : (initial.pageType || 'custom'),
         isPublished: false,
-        seo: mergeEntitySeo(initial),
+        seo: mergeEntitySeoForEditor(initial),
       });
       setSlugTouched(true);
       return;
@@ -80,7 +80,7 @@ export default function CmsPageFormModal({
         slug: initial.slug || '',
         pageType: initial.pageType || 'custom',
         isPublished: initial.isPublished !== false,
-        seo: mergeEntitySeo(initial),
+        seo: mergeEntitySeoForEditor(initial),
       });
       setSlugTouched(true);
     } else {

@@ -253,16 +253,16 @@ export default function RemindersPage() {
   const staffSignedIn = hasToken && user && user.role !== 'customer';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Special Date Reminders</h1>
+    <div className="cms-section">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+        <div className="min-w-0">
+          <h1 className="cms-title">Special Date Reminders</h1>
           <p className="text-sm text-gray-500 mt-1">
             Save upcoming dates and we&apos;ll remind you before the day.
           </p>
         </div>
         {isCustomer && (
-          <button className="btn-primary shrink-0" type="button" onClick={openAddModal}>
+          <button className="btn-primary shrink-0 w-full sm:w-auto" type="button" onClick={openAddModal}>
             + Add date
           </button>
         )}

@@ -100,17 +100,40 @@ export const adminApi = {
   updateProfile: (data) => api.patch('/auth/me', data),
   changePassword: (data) => api.post('/auth/change-password', data),
 
-  uploadImage: (file) => {
+  uploadImage: (file, meta = {}) => {
     const form = new FormData();
     form.append('image', file);
+    if (meta.alt) form.append('alt', meta.alt);
+    if (meta.tags) form.append('tags', Array.isArray(meta.tags) ? meta.tags.join(',') : meta.tags);
+    if (meta.category) form.append('category', meta.category);
+    if (meta.sourceContext) form.append('sourceContext', meta.sourceContext);
+    if (meta.sourceLabel) form.append('sourceLabel', meta.sourceLabel);
     return api.post('/admin/upload', form);
   },
-  uploadImages: (files) => {
+  uploadImages: (files, meta = {}) => {
     const form = new FormData();
     [...files].forEach((file) => form.append('images', file));
+    if (meta.alt) form.append('alt', meta.alt);
+    if (meta.tags) form.append('tags', Array.isArray(meta.tags) ? meta.tags.join(',') : meta.tags);
+    if (meta.category) form.append('category', meta.category);
+    if (meta.sourceContext) form.append('sourceContext', meta.sourceContext);
+    if (meta.sourceLabel) form.append('sourceLabel', meta.sourceLabel);
     return api.post('/admin/upload/batch', form);
   },
-  uploadImageUrl: (url, alt) => api.post('/admin/upload', { url, alt }),
+  uploadImageUrl: (url, alt, meta = {}) =>
+    api.post('/admin/upload', {
+      url,
+      alt,
+      tags: meta.tags,
+      category: meta.category,
+      sourceContext: meta.sourceContext,
+      sourceLabel: meta.sourceLabel,
+    }),
+
+  getMedia: (params) => api.get('/admin/media', { params }),
+  getMediaItem: (id) => api.get(`/admin/media/${id}`),
+  updateMedia: (id, data) => api.patch(`/admin/media/${id}`, data),
+  deleteMedia: (id) => api.delete(`/admin/media/${id}`),
 
   getApiPartners: (params) => api.get('/admin/api-partners', { params }),
   getApiPartner: (id) => api.get(`/admin/api-partners/${id}`),

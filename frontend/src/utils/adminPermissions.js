@@ -35,6 +35,7 @@ const NAV_ITEM_DEFS = {
   dashboard: { to: '/admin', label: 'Dashboard', end: true, permissions: [] },
   catalog: { to: '/admin/products', label: 'Catalog', permissions: ['products:read'] },
   content: { to: '/admin/content', label: 'Content', permissions: ['cms:read'] },
+  media: { to: '/admin/media', label: 'Media library', permissions: ['cms:read'] },
   navbar: { to: '/admin/navbar', label: 'Navigation', adminOnly: true },
   blog: { to: '/admin/blog', label: 'Blog', permissions: ['blog:read'] },
   orders: { to: '/admin/orders', label: 'Orders', permissions: ['orders:read'], badge: 'leads' },
@@ -56,7 +57,7 @@ export const NAV_GROUPS = [
   {
     id: 'store',
     label: 'Store',
-    items: [NAV_ITEM_DEFS.catalog, NAV_ITEM_DEFS.content, NAV_ITEM_DEFS.navbar, NAV_ITEM_DEFS.blog],
+    items: [NAV_ITEM_DEFS.catalog, NAV_ITEM_DEFS.content, NAV_ITEM_DEFS.media, NAV_ITEM_DEFS.navbar, NAV_ITEM_DEFS.blog],
   },
   {
     id: 'sales',
@@ -87,6 +88,7 @@ export const NAV_ITEMS = [
   NAV_ITEM_DEFS.dashboard,
   NAV_ITEM_DEFS.catalog,
   NAV_ITEM_DEFS.content,
+  NAV_ITEM_DEFS.media,
   NAV_ITEM_DEFS.navbar,
   NAV_ITEM_DEFS.blog,
   NAV_ITEM_DEFS.orders,
@@ -154,6 +156,9 @@ export function canAccessAdminPath(user, pathname) {
     return hasStaffPermission(user, 'users:read');
   }
   if (normalized.startsWith('/admin/content')) {
+    return hasStaffPermission(user, 'cms:read');
+  }
+  if (normalized.startsWith('/admin/media')) {
     return hasStaffPermission(user, 'cms:read');
   }
   if (normalized.startsWith('/admin/blog')) {

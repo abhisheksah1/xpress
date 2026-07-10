@@ -5,6 +5,7 @@ import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import ImageSizeGuide from '../ImageSizeGuide.jsx';
 import { useImageCropUpload } from '../../hooks/useImageCropUpload.jsx';
 import { isImageFile } from '../../utils/imageCrop.js';
+import MediaLibraryModal from './MediaLibraryModal.jsx';
 
 const ACCEPT = 'image/jpeg,image/jpg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif';
 
@@ -14,23 +15,23 @@ const parseUrlInput = (input) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-async function resolveUploadedUrl(url, alt = '') {
+async function resolveUploadedUrl(url, alt = '', meta = {}) {
   const trimmed = url?.trim();
   if (!trimmed) return null;
   try {
-    const { data } = await adminApi.uploadImageUrl(trimmed, alt);
+    const { data } = await adminApi.uploadImageUrl(trimmed, alt, meta);
     return data.data?.url || trimmed;
   } catch {
     return trimmed;
   }
 }
 
-async function uploadFiles(imageFiles) {
+async function uploadFiles(imageFiles, meta = {}) {
   if (imageFiles.length === 1) {
-    const { data } = await adminApi.uploadImage(imageFiles[0]);
+    const { data } = await adminApi.uploadImage(imageFiles[0], meta);
     return [data.data?.url].filter(Boolean);
   }
-  const { data } = await adminApi.uploadImages(imageFiles);
+  const { data } = await adminApi.uploadImages(imageFiles, meta);
   const images = data.data?.images || [];
   return images.map((img) => img.url).filter(Boolean);
 }
@@ -43,13 +44,25 @@ export default function CmsImagePicker({
   label = 'Images',
   alt = '',
   enableCrop = true,
+  mediaCategory = 'cms',
+  mediaSourceLabel = '',
+  mediaTags = [],
 }) {
   const [urlInput, setUrlInput] = useState('');
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const fileRef = useRef(null);
   const resolvedGuideKey = guideKey || (mode === 'slides' ? 'cmsSlide' : 'cmsContent');
   const crop = useImageCropUpload({ guideKey: resolvedGuideKey, enableCrop });
+
+  const uploadMeta = {
+    alt,
+    category: mediaCategory,
+    sourceContext: 'cms',
+    sourceLabel: mediaSourceLabel,
+    tags: mediaTags,
+  };
 
   const slides = Array.isArray(images) ? images.filter((img) => img?.url) : [];
 
@@ -77,7 +90,7 @@ export default function CmsImagePicker({
     try {
       const resolved = [];
       for (const url of urls) {
-        const stored = await resolveUploadedUrl(url, alt);
+        const stored = await resolveUploadedUrl(url, alt, uploadMeta);
         if (stored) resolved.push(stored);
       }
       if (resolved.length) {
@@ -101,7 +114,7 @@ export default function CmsImagePicker({
   const uploadPreparedFiles = async (preparedFiles) => {
     setUploading(true);
     try {
-      const urls = await uploadFiles(mode === 'single' ? preparedFiles.slice(0, 1) : preparedFiles);
+      const urls = await uploadFiles(mode === 'single' ? preparedFiles.slice(0, 1) : preparedFiles, uploadMeta);
       if (urls.length) {
         appendUrls(urls);
         toast.success(
@@ -149,12 +162,26 @@ export default function CmsImagePicker({
     fileRef.current?.click();
   };
 
+  const handleLibrarySelect = (selected) => {
+    const entries = selected.map((item) => ({ url: item.url, alt: item.alt || alt || '' }));
+    if (!entries.length) return;
+    applyChange((current) => (mode === 'single' ? entries : [...current, ...entries]));
+    toast.success(mode === 'single' ? 'Image selected from library' : `${entries.length} image(s) added from library`);
+  };
+
   const listTitle = mode === 'slides' ? 'Slider carousel slides list' : 'Image';
   const busy = uploading || crop.isCropping;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
       {crop.modal}
+      <MediaLibraryModal
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        mode={mode === 'slides' ? 'multiple' : 'single'}
+        onSelect={handleLibrarySelect}
+        title={mode === 'slides' ? 'Choose slides from library' : 'Choose image from library'}
+      />
       <input
         ref={fileRef}
         type="file"
@@ -262,6 +289,18 @@ export default function CmsImagePicker({
           disabled={busy}
           onClick={(e) => e.stopPropagation()}
         />
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setLibraryOpen(true);
+          }}
+          disabled={busy}
+          className="btn-secondary text-sm whitespace-nowrap inline-flex items-center justify-center gap-1.5 shrink-0"
+        >
+          <span aria-hidden>📁</span>
+          Library
+        </button>
         <button
           type="button"
           onClick={(e) => {

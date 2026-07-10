@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import AdminImageDropzone from '../../components/admin/AdminImageDropzone.jsx';
+import RichTextEditor from '../../components/admin/RichTextEditor.jsx';
 import SeoMetaEditor, { emptySeoMeta } from '../../components/admin/SeoMetaEditor.jsx';
 import { mergeEntitySeo } from '../../utils/seoMeta.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
+import { isHtmlContent } from '../../utils/productHtml.js';
 
 const emptyBlog = () => ({
   title: '',
@@ -16,6 +18,12 @@ const emptyBlog = () => ({
   featuredImage: { url: '', alt: '' },
   seo: emptySeoMeta({ schemaType: 'BlogPosting' }),
 });
+
+function plainTextPreview(htmlOrText = '') {
+  if (!htmlOrText) return '';
+  if (!isHtmlContent(htmlOrText)) return htmlOrText;
+  return htmlOrText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
 export default function BlogAdminPage() {
   const [blogs, setBlogs] = useState([]);
@@ -38,7 +46,7 @@ export default function BlogAdminPage() {
     setForm({
       title: b.title,
       excerpt: b.excerpt || '',
-      content: b.content,
+      content: b.content || '',
       category: b.category || '',
       isPublished: b.isPublished,
       tags: (b.tags || []).join(', '),
@@ -51,7 +59,12 @@ export default function BlogAdminPage() {
     if (!file) return;
     setUploading(true);
     try {
-      const { data } = await adminApi.uploadImage(file);
+      const { data } = await adminApi.uploadImage(file, {
+        category: 'blog',
+        sourceContext: 'blog',
+        sourceLabel: form.title,
+        alt: form.title,
+      });
       const image = data.data;
       setForm((f) => ({
         ...f,
@@ -124,7 +137,16 @@ export default function BlogAdminPage() {
             <input className="input-field" placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
             <input className="input-field" placeholder="Category" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} />
             <input className="input-field" placeholder="Excerpt" value={form.excerpt} onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))} />
-            <textarea className="input-field" rows={8} placeholder="Content" value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} />
+
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Content</label>
+              <RichTextEditor
+                value={form.content}
+                onChange={(html) => setForm((f) => ({ ...f, content: html }))}
+                placeholder="Write your blog post — headings, paragraphs, images, buttons…"
+              />
+            </div>
+
             <input className="input-field" placeholder="Tags (comma-separated)" value={form.tags} onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))} />
 
             <div>
@@ -160,11 +182,28 @@ export default function BlogAdminPage() {
               value={form.seo}
               onChange={(seo) => setForm((f) => ({ ...f, seo }))}
               pageTitle={form.title}
-              pageDescription={form.excerpt || form.content}
+              pageDescription={form.excerpt || plainTextPreview(form.content)}
               canonicalPreview={form.title ? `/blog/${form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '/blog'}
               defaultSchemaType="BlogPosting"
+              auditContext={{
+                type: 'blog',
+                title: form.title,
+                slug: form.title
+                  ? form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                  : '',
+                contentHtml: form.content,
+                excerpt: form.excerpt,
+                images: form.featuredImage?.url
+                  ? [{ url: form.featuredImage.url, alt: form.featuredImage.alt || form.title }]
+                  : [],
+              }}
               onUploadImage={async (file) => {
-                const { data } = await adminApi.uploadImage(file);
+                const { data } = await adminApi.uploadImage(file, {
+        category: 'blog',
+        sourceContext: 'blog',
+        sourceLabel: form.title,
+        alt: form.title,
+      });
                 return data.data;
               }}
             />

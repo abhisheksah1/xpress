@@ -21,6 +21,7 @@ const contentBlockSchema = new mongoose.Schema(
         'html_embed',
         'delivery_countdown',
         'text',
+        'text_runner',
         'cta',
         'testimonial',
         'gallery',

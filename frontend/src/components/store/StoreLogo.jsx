@@ -11,7 +11,6 @@ export default function StoreLogo({
   alt,
   storeName = 'KoseliXpress',
   variant = 'header',
-  tile = false,
   className = '',
 }) {
   const [failed, setFailed] = useState(false);
@@ -26,7 +25,7 @@ export default function StoreLogo({
     );
   }
 
-  const img = (
+  return (
     <img
       src={logoUrl}
       alt={alt || storeName}
@@ -37,14 +36,4 @@ export default function StoreLogo({
       onError={() => setFailed(true)}
     />
   );
-
-  if (tile) {
-    return (
-      <span className="inline-flex items-center justify-center rounded-md bg-black p-2 sm:p-3 shadow-sm">
-        {img}
-      </span>
-    );
-  }
-
-  return img;
 }

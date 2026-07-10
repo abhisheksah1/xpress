@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import SeoHead from '../../components/store/SeoHead.jsx';
+import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
 export default function BlogPage() {
   const { settings } = useStore();
@@ -13,7 +14,7 @@ export default function BlogPage() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="w-full overflow-x-hidden">
       <SeoHead
         siteSettings={settings}
         fallbacks={{
@@ -24,24 +25,37 @@ export default function BlogPage() {
         }}
         jsonLdId="blog-list-json-ld"
       />
-      <h1 className="text-2xl font-bold mb-8">Blog</h1>
-      {blogs.length === 0 ? (
-        <p className="text-gray-400">No blog posts yet.</p>
-      ) : (
-        <div className="grid md:grid-cols-3 gap-6">
-          {blogs.map((blog) => (
-            <Link key={blog._id} to={`/blog/${blog.slug}`} className="card hover:shadow-md transition-shadow p-0 overflow-hidden">
-              {blog.featuredImage?.url && (
-                <img src={blog.featuredImage.url} alt="" className="w-full h-40 object-cover" />
-              )}
-              <div className="p-4">
-                <h2 className="font-semibold line-clamp-2">{blog.title}</h2>
-                {blog.excerpt && <p className="text-sm text-gray-500 mt-2 line-clamp-3">{blog.excerpt}</p>}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className="cms-section">
+        <h1 className="cms-title mb-6 sm:mb-8">Blog</h1>
+        {blogs.length === 0 ? (
+          <p className="text-gray-400 text-sm sm:text-base">No blog posts yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+            {blogs.map((blog) => (
+              <Link
+                key={blog._id}
+                to={`/blog/${blog.slug}`}
+                className="card hover:shadow-md transition-shadow p-0 overflow-hidden flex flex-col h-full"
+              >
+                {blog.featuredImage?.url && (
+                  <img
+                    src={resolveMediaUrl(blog.featuredImage.url)}
+                    alt={blog.featuredImage.alt || blog.title}
+                    className="w-full h-40 sm:h-44 object-cover"
+                    loading="lazy"
+                  />
+                )}
+                <div className="p-3 sm:p-4 flex flex-col flex-1 min-w-0">
+                  <h2 className="font-semibold text-sm sm:text-base line-clamp-2 leading-snug">{blog.title}</h2>
+                  {blog.excerpt && (
+                    <p className="text-xs sm:text-sm text-gray-500 mt-2 line-clamp-3">{blog.excerpt}</p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

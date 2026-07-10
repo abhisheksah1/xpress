@@ -48,7 +48,12 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
     if (!file) return;
     setUploading(true);
     try {
-      const { data } = await adminApi.uploadImage(file);
+      const { data } = await adminApi.uploadImage(file, {
+        category: 'category',
+        sourceContext: 'category',
+        sourceLabel: form.name,
+        alt: form.name,
+      });
       const image = data.data;
       setForm((f) => ({
         ...f,
@@ -162,7 +167,12 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
           canonicalPreview={category.slug ? `/shop/category/${category.slug}` : `/shop?category=${category._id}`}
           defaultSchemaType="CollectionPage"
           onUploadImage={async (file) => {
-            const { data } = await adminApi.uploadImage(file);
+            const { data } = await adminApi.uploadImage(file, {
+              category: 'category',
+              sourceContext: 'category',
+              sourceLabel: form.name,
+              alt: form.name,
+            });
             return data.data;
           }}
         />

@@ -302,7 +302,11 @@ export default function ProductFormPage() {
     const urls = urlString.split(',').map((u) => u.trim()).filter(Boolean);
     for (const url of urls) {
       try {
-        const { data } = await adminApi.uploadImageUrl(url, form.name);
+        const { data } = await adminApi.uploadImageUrl(url, form.name, {
+          category: 'product',
+          sourceContext: 'product',
+          sourceLabel: form.name,
+        });
         setImages((prev) => [
           ...prev,
           {
@@ -326,7 +330,12 @@ export default function ProductFormPage() {
     setUploading(true);
     try {
       for (const file of files) {
-        const { data } = await adminApi.uploadImage(file);
+        const { data } = await adminApi.uploadImage(file, {
+          category: 'product',
+          sourceContext: 'product',
+          sourceLabel: form.name,
+          alt: form.name,
+        });
         setImages((prev) => [
           ...prev,
           {

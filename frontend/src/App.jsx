@@ -18,6 +18,7 @@ import AdminDashboard from './pages/admin/DashboardPage';
 import AdminProducts from './pages/admin/ProductsPage';
 import ProductFormPage from './pages/admin/ProductFormPage';
 import ContentPage from './pages/admin/ContentPage';
+import MediaLibraryPage from './pages/admin/MediaLibraryPage';
 import NavbarPage from './pages/admin/NavbarPage';
 import BlogAdminPage from './pages/admin/BlogAdminPage';
 import AdminOrders from './pages/admin/OrdersPage';
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="products/new" element={<ProductFormPage />} />
         <Route path="products/:id/edit" element={<ProductFormPage />} />
         <Route path="content" element={<ContentPage />} />
+        <Route path="media" element={<MediaLibraryPage />} />
         <Route path="navbar" element={<NavbarPage />} />
         <Route path="blog" element={<BlogAdminPage />} />
         <Route path="orders" element={<AdminOrders />} />

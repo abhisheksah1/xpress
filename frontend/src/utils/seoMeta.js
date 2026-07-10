@@ -63,6 +63,27 @@ export function mergeEntitySeo(entity = {}) {
   return normalizeSeoMeta({ ...legacy, ...(entity.seo || {}) });
 }
 
+/** Raw SEO for admin editors — does not inject site-wide fallbacks. */
+export function mergeEntitySeoForEditor(entity = {}) {
+  const fromDb = entity.seo || {};
+  return emptySeoMeta({
+    metaTitle: fromDb.metaTitle ?? entity.metaTitle ?? '',
+    metaDescription: fromDb.metaDescription ?? entity.metaDescription ?? '',
+    focusKeyword: fromDb.focusKeyword ?? '',
+    metaKeywords: Array.isArray(fromDb.metaKeywords) ? fromDb.metaKeywords : [],
+    ogTitle: fromDb.ogTitle ?? '',
+    ogDescription: fromDb.ogDescription ?? '',
+    ogImage: fromDb.ogImage,
+    twitterCard: fromDb.twitterCard,
+    canonicalUrl: fromDb.canonicalUrl ?? '',
+    robotsIndex: fromDb.robotsIndex,
+    robotsFollow: fromDb.robotsFollow,
+    schemaType: fromDb.schemaType,
+    schemaJson: fromDb.schemaJson ?? '',
+    geo: fromDb.geo,
+  });
+}
+
 export function stripHtmlText(html = '') {
   return String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }

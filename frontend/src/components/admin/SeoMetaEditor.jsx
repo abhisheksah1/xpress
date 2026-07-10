@@ -9,6 +9,7 @@ import {
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import ImageSizeGuide from '../ImageSizeGuide.jsx';
 import AdminImageDropzone from './AdminImageDropzone.jsx';
+import SeoAuditorPanel from './SeoAuditorPanel.jsx';
 
 function Section({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -35,6 +36,8 @@ export default function SeoMetaEditor({
   canonicalPreview = '',
   defaultSchemaType = 'WebPage',
   onUploadImage,
+  /** When set, shows Real-Time SEO Auditor (blog / page builder) */
+  auditContext = null,
 }) {
   const seo = { ...emptySeoMeta({ schemaType: defaultSchemaType }), ...(value || {}) };
   const geo = { ...emptySeoMeta().geo, ...(seo.geo || {}) };
@@ -83,6 +86,18 @@ export default function SeoMetaEditor({
           </button>
         )}
       </div>
+
+      {auditContext && (
+        <SeoAuditorPanel
+          seo={seo}
+          context={{
+            ...auditContext,
+            title: auditContext.title || pageTitle,
+            canonicalPreview: auditContext.canonicalPreview || canonicalPreview,
+            excerpt: auditContext.excerpt || pageDescription,
+          }}
+        />
+      )}
 
       <Section title="Basic SEO">
         <div>

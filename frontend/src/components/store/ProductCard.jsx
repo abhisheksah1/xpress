@@ -5,15 +5,49 @@ import { canQuickAddProduct, quickAddProductToCart } from '../../utils/quickAddP
 import { isProductSoldOut } from '../../utils/comboItems.js';
 import { resolveProductImageUrl } from '../../utils/mediaUrl.js';
 
-export default function ProductCard({ product, currency, priceNpr, showQuickAdd = true }) {
+function getListingPriceLabel(product, formatPriceNpr) {
+  const base = product.price ?? 0;
+  let min = base;
+  let max = base;
+
+  (product.optionCategories || []).forEach((cat) => {
+    (cat.options || []).forEach((opt) => {
+      const value = base + (opt.priceAdjustment || 0);
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+    });
+  });
+
+  (product.variants || []).forEach((variant) => {
+    const value = variant.price ?? base;
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  });
+
+  if (min !== max) {
+    return `${formatPriceNpr(min)} – ${formatPriceNpr(max)}`;
+  }
+  return formatPriceNpr(base);
+}
+
+export default function ProductCard({
+  product,
+  currency,
+  priceNpr,
+  showQuickAdd = true,
+  variant = 'default',
+}) {
   const { formatPriceNpr } = useStore();
   const addItem = useCartStore((s) => s.addItem);
+  const isCatalog = variant === 'catalog';
 
   const image = resolveProductImageUrl(product);
   const npr = priceNpr != null ? priceNpr : product.price;
   const priceLabel = currency
     ? `${currency} ${Number(npr).toLocaleString('en-NP')}`
-    : formatPriceNpr(npr);
+    : isCatalog
+      ? getListingPriceLabel(product, formatPriceNpr)
+      : formatPriceNpr(npr);
 
   const soldOut = isProductSoldOut(product);
   const quickAdd = showQuickAdd && canQuickAddProduct(product);
@@ -26,9 +60,21 @@ export default function ProductCard({ product, currency, priceNpr, showQuickAdd 
   };
 
   return (
-    <article className="card group hover:shadow-md transition-shadow p-0 overflow-hidden flex flex-col h-full">
+    <article
+      className={
+        isCatalog
+          ? 'group flex flex-col h-full min-w-0 md:card md:hover:shadow-md md:transition-shadow md:p-0 md:overflow-hidden'
+          : 'card group hover:shadow-md transition-shadow p-0 overflow-hidden flex flex-col h-full'
+      }
+    >
       <Link to={productUrl} className="block shrink-0">
-        <div className="aspect-square bg-gray-100 overflow-hidden">
+        <div
+          className={
+            isCatalog
+              ? 'aspect-square bg-gray-50 overflow-hidden rounded-xl md:rounded-none md:bg-gray-100'
+              : 'aspect-square bg-gray-100 overflow-hidden'
+          }
+        >
           {image ? (
             <img
               src={image}
@@ -43,21 +89,31 @@ export default function ProductCard({ product, currency, priceNpr, showQuickAdd 
         </div>
       </Link>
 
-      <div className="p-3 sm:p-4 flex flex-col flex-1 gap-2 min-w-0">
-        {product.category?.name && (
-          <p className="text-[10px] sm:text-xs text-gray-400 line-clamp-1">{product.category.name}</p>
-        )}
-
+      <div className={`flex flex-col flex-1 min-w-0 ${isCatalog ? 'pt-2.5 gap-1 md:p-4 md:gap-2' : 'p-3 sm:p-4 gap-2'}`}>
         <Link to={productUrl} className="min-w-0">
-          <h3 className="font-medium text-gray-900 text-sm sm:text-base line-clamp-2 leading-snug hover:text-primary-600 transition-colors">
+          <h3
+            className={
+              isCatalog
+                ? 'font-semibold text-slate-900 text-sm leading-snug line-clamp-2 hover:text-primary-600 transition-colors md:font-medium md:text-base'
+                : 'font-medium text-gray-900 text-sm sm:text-base line-clamp-2 leading-snug hover:text-primary-600 transition-colors'
+            }
+          >
             {product.name}
           </h3>
         </Link>
 
-        <p className="text-primary-600 font-semibold text-sm sm:text-base tabular-nums">{priceLabel}</p>
+        <p
+          className={
+            isCatalog
+              ? 'text-green-600 font-semibold text-sm tabular-nums md:text-primary-600 md:text-base'
+              : 'text-primary-600 font-semibold text-sm sm:text-base tabular-nums'
+          }
+        >
+          {priceLabel}
+        </p>
 
         {showQuickAdd && (
-          <div className="mt-auto pt-1">
+          <div className={isCatalog ? 'mt-auto pt-1 hidden md:block' : 'mt-auto pt-1'}>
             {soldOut ? (
               <button
                 type="button"

@@ -225,14 +225,13 @@ function AccountNavControl({ user, onNavigate, compact = false }) {
   );
 }
 
-function LogoMark({ logoUrl, storeName, alt, compact = false }) {
+function LogoMark({ logoUrl, storeName, alt }) {
   return (
     <StoreLogo
       src={logoUrl}
       alt={alt}
       storeName={storeName}
       variant="header"
-      tile={!compact}
     />
   );
 }
@@ -310,8 +309,8 @@ export default function StoreHeader() {
 
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2 min-w-0">
-            <div className={`flex items-center justify-start shrink-0 min-w-[40px] ${searchOpen ? 'flex-1 sm:flex-none' : ''}`}>
+          <div className="relative flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2 min-w-0">
+            <div className={`relative z-10 flex items-center justify-start shrink-0 min-w-[40px] ${searchOpen ? 'flex-1 sm:flex-none' : ''}`}>
               {headerOptions.showSearch && (
                 <div className="relative">
                   {searchOpen ? (
@@ -341,20 +340,24 @@ export default function StoreHeader() {
               )}
             </div>
 
-            <div className={`flex justify-center min-w-0 flex-1 px-1 overflow-hidden ${searchOpen ? 'hidden sm:flex' : ''}`}>
-              {headerOptions.showLogo !== false && (
-                <a href="/" onClick={goToHome} className="inline-flex items-center justify-center max-w-full" aria-label={`${storeName} — home`}>
-                  <span className="md:hidden">
-                    <LogoMark logoUrl={logoUrl} storeName={storeName} alt={logoAlt} compact />
-                  </span>
-                  <span className="hidden md:inline-flex">
-                    <LogoMark logoUrl={logoUrl} storeName={storeName} alt={logoAlt} />
-                  </span>
+            {headerOptions.showLogo !== false && (
+              <div
+                className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[1] pointer-events-none max-w-[min(52vw,180px)] sm:max-w-[220px] ${
+                  searchOpen ? 'hidden sm:block' : ''
+                }`}
+              >
+                <a
+                  href="/"
+                  onClick={goToHome}
+                  className="pointer-events-auto inline-flex items-center justify-center w-full"
+                  aria-label={`${storeName} — home`}
+                >
+                  <LogoMark logoUrl={logoUrl} storeName={storeName} alt={logoAlt} />
                 </a>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="flex items-center justify-end shrink-0 gap-0 min-w-0">
+            <div className="relative z-10 flex items-center justify-end shrink-0 gap-0 min-w-0">
               {headerOptions.showCurrency && (
                 <div className="hidden lg:block">
                   <NavbarCurrencySelect />

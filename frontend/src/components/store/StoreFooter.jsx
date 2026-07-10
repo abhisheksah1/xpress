@@ -42,7 +42,6 @@ export default function StoreFooter() {
                   alt={logoAlt}
                   storeName={storeName}
                   variant="footer"
-                  tile
                 />
               </Link>
             </div>

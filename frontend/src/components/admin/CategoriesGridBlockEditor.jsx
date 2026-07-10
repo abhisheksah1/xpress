@@ -5,10 +5,6 @@ export default function CategoriesGridBlockEditor({
   categories,
   onTitleChange,
   onSettingChange,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
 }) {
   const settings = block.settings || {};
   const selectedIds = (settings.categoryIds || []).map(String);
@@ -29,10 +25,6 @@ export default function CategoriesGridBlockEditor({
             Categories grid
           </span>
           <span className="text-sm font-medium text-gray-800 truncate">{block.title || 'Browse categories'}</span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button type="button" disabled={!canMoveUp} onClick={onMoveUp} className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30" title="Move up">↑</button>
-          <button type="button" disabled={!canMoveDown} onClick={onMoveDown} className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30" title="Move down">↓</button>
         </div>
       </div>
 
@@ -72,7 +64,7 @@ export default function CategoriesGridBlockEditor({
             />
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Columns (2–6)</label>
+            <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Desktop columns (2–6)</label>
             <input
               type="number"
               min="2"
@@ -81,6 +73,7 @@ export default function CategoriesGridBlockEditor({
               value={settings.cols ?? 4}
               onChange={(e) => onSettingChange('cols', Math.max(2, Math.min(6, Number(e.target.value) || 4)))}
             />
+            <p className="text-[11px] text-gray-400 mt-1">Mobile always shows 2 per row.</p>
           </div>
           <div className="flex items-end">
             <label className="flex items-center gap-2 text-sm text-gray-700">

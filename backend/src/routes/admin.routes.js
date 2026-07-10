@@ -10,6 +10,7 @@ import * as navbarController from '../controllers/admin/navbar.controller.js';
 import * as settingsController from '../controllers/admin/settings.controller.js';
 import * as npsController from '../controllers/admin/nps.controller.js';
 import * as uploadController from '../controllers/admin/upload.controller.js';
+import * as mediaController from '../controllers/admin/media.controller.js';
 import * as dashboardController from '../controllers/admin/dashboard.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { isStaff, isAdmin, isSuperAdmin, hasPermission } from '../middlewares/role.middleware.js';
@@ -187,6 +188,12 @@ router.post('/payments/nps/service-charge', isAdmin, npsController.getNpsService
 router.post('/upload', uploadSingle('image'), uploadController.uploadImage);
 router.post('/upload/batch', uploadMultiple('images', 20), uploadController.uploadImages);
 router.delete('/upload', uploadController.deleteImage);
+
+// Media library
+router.get('/media', isStaff, mediaController.listMedia);
+router.get('/media/:id', isStaff, mediaController.getMedia);
+router.patch('/media/:id', isStaff, mediaController.updateMedia);
+router.delete('/media/:id', isStaff, mediaController.deleteMedia);
 
 // API Gateway Partners
 router.get('/api-partners/reports/explorer', isAdmin, apiPartnerReportController.getExplorerReport);

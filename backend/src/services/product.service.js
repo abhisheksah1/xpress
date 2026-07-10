@@ -63,11 +63,21 @@ export const getProducts = async ({
   deliveryGroup,
   excludeId,
   forComboPicker,
+  ids,
   sort = 'newest',
 }) => {
   const sortBy = resolveProductSort(sort);
   const isComboPicker = forComboPicker === 'true' || forComboPicker === true;
   const filter = {};
+  const idList = Array.isArray(ids)
+    ? ids.map(String).filter(Boolean)
+    : String(ids || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+  if (idList.length) {
+    filter._id = { $in: idList };
+  }
   if (isActive !== undefined && isActive !== '' && !isComboPicker) {
     filter.isActive = isActive === 'true' || isActive === true;
   }
@@ -117,33 +127,54 @@ export const getProducts = async ({
       filter.$and = [...(filter.$and || []), searchClause];
     }
   }
-  if (excludeId) filter._id = { $ne: excludeId };
+  if (excludeId) {
+    filter._id = idList.length
+      ? { $in: idList.filter((id) => id !== String(excludeId)) }
+      : { $ne: excludeId };
+  }
 
   const skip = (page - 1) * limit;
+  const preserveIdOrder = idList.length > 0;
 
   if (deliveryGroup) {
-    let products = await Product.find(filter)
+    let query = Product.find(filter)
       .populate('category', 'name slug deliveryScope deliveryGroupRules')
-      .populate('categories', 'name slug')
-      .sort(sortBy);
+      .populate('categories', 'name slug');
+    if (!preserveIdOrder) query = query.sort(sortBy);
+    let products = await query;
     products = await deliveryService.filterProductsByGroup(products, deliveryGroup);
+    if (preserveIdOrder) {
+      const order = new Map(idList.map((id, i) => [id, i]));
+      products.sort((a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0));
+    }
     const total = products.length;
     const paged = products.slice(skip, skip + limit);
     return { products: paged, pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } };
   }
 
+  let listQuery = Product.find(filter)
+    .populate('category', 'name slug deliveryScope deliveryGroupRules')
+    .populate('categories', 'name slug')
+    .select(isComboPicker ? 'name slug sku price stock images isHamper isActive shortDescription description' : undefined);
+  if (!preserveIdOrder) {
+    listQuery = listQuery.sort(sortBy).skip(skip).limit(limit);
+  } else {
+    listQuery = listQuery.limit(Math.max(Number(limit) || 20, idList.length));
+  }
+
   const [products, total] = await Promise.all([
-    Product.find(filter)
-      .populate('category', 'name slug deliveryScope deliveryGroupRules')
-      .populate('categories', 'name slug')
-      .select(isComboPicker ? 'name slug sku price stock images isHamper isActive shortDescription description' : undefined)
-      .sort(sortBy)
-      .skip(skip)
-      .limit(limit),
+    listQuery,
     Product.countDocuments(filter),
   ]);
 
-  const syncedProducts = await comboService.refreshHamperStocksInList(products);
+  let ordered = products;
+  if (preserveIdOrder) {
+    const order = new Map(idList.map((id, i) => [id, i]));
+    ordered = [...products].sort((a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0));
+    ordered = ordered.slice(skip, skip + Number(limit));
+  }
+
+  const syncedProducts = await comboService.refreshHamperStocksInList(ordered);
 
   return {
     products: syncedProducts.map((p) => enrichProductMedia(p)),

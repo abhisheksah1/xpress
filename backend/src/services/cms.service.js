@@ -1,4 +1,5 @@
 import { CMSPage } from '../models/index.js';
+import { syncLegacySeoFields } from '../models/schemas/seoMeta.schema.js';
 import { ApiError } from '../utils/ApiError.js';
 import { CMS_PAGE_TYPES } from '../config/constants.js';
 import { DEFAULT_HOME_PAGE } from '../config/defaultHomePage.js';
@@ -145,11 +146,25 @@ export const updatePage = async (id, data, userId) => {
     await assertUniquePageType(data.pageType, id);
   }
 
-  Object.assign(page, {
-    ...data,
-    slug: data.slug ? data.slug.trim().toLowerCase() : page.slug,
-    updatedBy: userId,
-  });
+  const { seo, ...rest } = data;
+
+  if (rest.title !== undefined) page.title = rest.title;
+  if (rest.slug !== undefined) page.slug = rest.slug.trim().toLowerCase();
+  if (rest.pageType !== undefined) page.pageType = rest.pageType;
+  if (rest.isPublished !== undefined) page.isPublished = rest.isPublished;
+  if (rest.metaTitle !== undefined) page.metaTitle = rest.metaTitle;
+  if (rest.metaDescription !== undefined) page.metaDescription = rest.metaDescription;
+
+  if (seo !== undefined) {
+    const currentSeo = page.seo?.toObject?.() || page.seo || {};
+    page.set('seo', { ...currentSeo, ...seo });
+    page.markModified('seo');
+    syncLegacySeoFields(page);
+  } else if (rest.metaTitle !== undefined || rest.metaDescription !== undefined) {
+    syncLegacySeoFields(page);
+  }
+
+  page.updatedBy = userId;
   await page.save();
   return page;
 };

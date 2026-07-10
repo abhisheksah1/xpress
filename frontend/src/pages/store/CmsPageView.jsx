@@ -24,14 +24,22 @@ export default function CmsPageView({ pageType }) {
       .finally(() => setLoading(false));
   }, [pageType, routeSlug]);
 
-  if (loading) return <div className="py-20 text-center text-gray-400">Loading...</div>;
-  if (!page) return <div className="py-20 text-center text-gray-400">Page not found. <Link to="/" className="text-primary-600">Go home</Link></div>;
+  if (loading) {
+    return <div className="cms-section text-center text-gray-400 py-16 sm:py-20">Loading...</div>;
+  }
+  if (!page) {
+    return (
+      <div className="cms-section text-center text-gray-400 py-16 sm:py-20">
+        Page not found. <Link to="/" className="text-primary-600">Go home</Link>
+      </div>
+    );
+  }
 
   const seo = mergeEntitySeo(page);
   const path = storeUrlForPage(page);
 
   return (
-    <div className="cms-page">
+    <div className="cms-page w-full overflow-x-hidden">
       <SeoHead
         seo={seo}
         siteSettings={settings}
@@ -50,9 +58,9 @@ export default function CmsPageView({ pageType }) {
         }}
         jsonLdContext={{ title: page.title, path }}
       />
-      <div className="bg-gray-50 border-b border-gray-100 py-6 sm:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-2xl sm:text-3xl font-bold leading-tight">{page.title}</h1>
+      <div className="bg-gray-50 border-b border-gray-100">
+        <div className="cms-section !py-6 sm:!py-8 md:!py-10">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight">{page.title}</h1>
         </div>
       </div>
       <CmsBlockRenderer blocks={page.blocks} />

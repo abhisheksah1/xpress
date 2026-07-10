@@ -125,11 +125,28 @@ export const addImageToEntity = async ({ file, url, alt }) => {
       public_id: file.originalname?.split('.')[0],
       filename: file.originalname,
     });
-    return { url: uploaded.url, publicId: uploaded.publicId, alt: alt || '' };
+    return {
+      url: uploaded.url,
+      publicId: uploaded.publicId,
+      alt: alt || '',
+      width: uploaded.width,
+      height: uploaded.height,
+      format: uploaded.format,
+      filename: file.originalname || '',
+      sizeBytes: file.size,
+    };
   }
   if (url) {
     const result = await uploadFromUrl(url);
-    return { url: result.url, publicId: result.publicId, alt: alt || '' };
+    return {
+      url: result.url,
+      publicId: result.publicId,
+      alt: alt || '',
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      filename: '',
+    };
   }
   throw new ApiError(400, 'Provide either a file or image URL');
 };

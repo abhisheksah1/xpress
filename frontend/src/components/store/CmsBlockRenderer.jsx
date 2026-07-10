@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { storeApi } from '../../api/store.js';
 import ProductCard from './ProductCard.jsx';
 import CmsNavLink from './CmsNavLink.jsx';
@@ -7,6 +7,9 @@ import { applyCategoriesGridRules } from '../../utils/categoriesGrid.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { getDeliveryCountdownState, getDeliveryCountdownCopy } from '../../utils/deliveryCountdown.js';
 import { resolveVideoEmbed, getVideoUrlFromBlock } from '../../utils/videoEmbed.js';
+import { resolveImageContentButtons } from '../../utils/imageContentLayout.js';
+import { getTextBlockHtml, sanitizeCmsHtml } from '../../utils/cmsHtml.js';
+import { isHtmlContent } from '../../utils/productHtml.js';
 
 function HeroBlock({ block }) {
   return (
@@ -79,40 +82,55 @@ function SliderBlock({ block }) {
   }, [slides.length, intervalMs]);
 
   if (!slides.length) return null;
-  const active = slides[idx];
-  const url = resolveMediaUrl(active.url || active);
 
   return (
-    <section className="cms-section-tight">
-      <div className="rounded-xl sm:rounded-2xl overflow-hidden border border-gray-100 bg-white relative">
-        <div className="aspect-[4/3] sm:aspect-[16/9] md:aspect-[16/7] bg-gray-100">
-          <img src={url} alt={active.alt || block.title || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
-        </div>
-        {(block.title || block.content) && (
-          <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-slate-900/80 via-slate-900/40 to-transparent flex items-end">
-            <div className="p-4 sm:p-6 md:p-10 text-white max-w-3xl w-full">
-              {block.title && <h2 className="text-xl sm:text-2xl md:text-4xl font-extrabold leading-tight">{block.title}</h2>}
-              {block.content && (
-                <p className="mt-2 sm:mt-3 text-xs sm:text-sm md:text-lg text-white/90 whitespace-pre-line line-clamp-4 sm:line-clamp-none">
-                  {block.content}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-        {slides.length > 1 && (
-          <div className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4 flex gap-1.5 sm:gap-2">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${i === idx ? 'bg-white' : 'bg-white/50'}`}
-                onClick={() => setIdx(i)}
-                aria-label={`Go to slide ${i + 1}`}
+    <section className="cms-slider w-full max-w-full overflow-hidden">
+      <div className="relative w-full max-w-full overflow-hidden bg-gray-100 px-3 sm:px-0">
+        <div className="relative w-full aspect-[16/7] min-h-[140px] sm:min-h-0 rounded-lg sm:rounded-none overflow-hidden">
+          {slides.map((slide, i) => {
+            const slideUrl = resolveMediaUrl(slide.url || slide);
+            if (!slideUrl) return null;
+            return (
+              <img
+                key={slide._id || slide.url || i}
+                src={slideUrl}
+                alt={slide.alt || block.title || ''}
+                className={`absolute inset-0 w-full h-full max-w-full object-contain sm:object-cover object-center transition-opacity duration-500 ${
+                  i === idx ? 'opacity-100' : 'opacity-0'
+                }`}
+                sizes="100vw"
+                referrerPolicy="no-referrer"
+                loading={i === 0 ? 'eager' : 'lazy'}
+                decoding="async"
               />
-            ))}
-          </div>
-        )}
+            );
+          })}
+          {(block.title || block.content) && (
+            <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-slate-900/80 via-slate-900/40 to-transparent flex items-end pointer-events-none">
+              <div className="p-4 sm:p-6 md:p-10 text-white max-w-3xl w-full pointer-events-auto">
+                {block.title && <h2 className="text-xl sm:text-2xl md:text-4xl font-extrabold leading-tight">{block.title}</h2>}
+                {block.content && (
+                  <p className="mt-2 sm:mt-3 text-xs sm:text-sm md:text-lg text-white/90 whitespace-pre-line line-clamp-4 sm:line-clamp-none">
+                    {block.content}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {slides.length > 1 && (
+            <div className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4 flex gap-1.5 sm:gap-2 z-10">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${i === idx ? 'bg-white' : 'bg-white/50'}`}
+                  onClick={() => setIdx(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -132,39 +150,54 @@ function CategoriesGridBlock({ block }) {
   );
 
   const title = block.title || 'Browse Categories';
+  // Mobile always 2 cols; desktop uses admin cols (default 4)
   const colClass = {
     2: 'grid-cols-2',
-    3: 'grid-cols-2 sm:grid-cols-3',
-    4: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
-    5: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5',
-    6: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6',
-  }[Math.min(6, Math.max(2, cols))] || 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4';
+    3: 'grid-cols-2 md:grid-cols-3',
+    4: 'grid-cols-2 md:grid-cols-4',
+    5: 'grid-cols-2 md:grid-cols-4 lg:grid-cols-5',
+    6: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6',
+  }[Math.min(6, Math.max(2, cols))] || 'grid-cols-2 md:grid-cols-4';
 
   if (!items.length) return null;
 
   return (
     <section className="cms-section">
-      <div className="cms-section-header">
-        <h2 className="cms-title">{title}</h2>
+      <div className="cms-section-header justify-center text-center sm:justify-center">
+        <h2 className="cms-title w-full text-center">{title}</h2>
         {block.buttonText && block.buttonLink && (
           <CmsNavLink to={block.buttonLink} className="text-primary-600 text-sm font-medium hover:underline shrink-0">
             {block.buttonText}
           </CmsNavLink>
         )}
       </div>
-      <div className={`grid ${colClass} gap-3 sm:gap-4`}>
+      <div className={`grid ${colClass} gap-3 sm:gap-4 md:gap-5`}>
         {items.map((cat) => {
           const imageUrl = resolveMediaUrl(cat.image?.url);
           return (
             <Link
               key={cat._id}
               to={`/shop?category=${cat._id}`}
-              className="card text-center py-4 sm:py-6 px-2 sm:px-3 hover:border-primary-300 transition-colors flex flex-col items-center gap-2 sm:gap-3 min-h-[100px] sm:min-h-[120px] justify-center"
+              className="group overflow-hidden rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col"
             >
-              {imageUrl ? (
-                <img src={imageUrl} alt={cat.image?.alt || cat.name} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg" referrerPolicy="no-referrer" loading="lazy" />
-              ) : null}
-              <span className="font-medium text-xs sm:text-sm leading-snug">{cat.name}</span>
+              <div className="aspect-square bg-gradient-to-b from-rose-50 to-white overflow-hidden flex items-center justify-center p-3 sm:p-4">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={cat.image?.alt || cat.name}
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                  />
+                ) : (
+                  <span className="text-gray-300 text-sm">No image</span>
+                )}
+              </div>
+              <div className="bg-[#c4b5e0] px-2 py-2.5 sm:py-3 text-center">
+                <span className="font-bold text-sm sm:text-base text-[#2d1b4e] leading-snug line-clamp-2">
+                  {cat.name}
+                </span>
+              </div>
             </Link>
           );
         })}
@@ -177,6 +210,10 @@ function ProductGridBlock({ block }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const params = useMemo(() => {
+    const productIds = (block.settings?.productIds || []).map(String).filter(Boolean);
+    if (productIds.length) {
+      return { ids: productIds.join(','), limit: productIds.length };
+    }
     const p = { limit: block.settings?.limit || 8 };
     if (block.settings?.categoryId) p.category = block.settings.categoryId;
     if (block.settings?.search) p.search = block.settings.search;
@@ -203,7 +240,7 @@ function ProductGridBlock({ block }) {
       {loading ? (
         <p className="text-gray-400 text-sm">Loading...</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {products.map((p) => (
             <ProductCard key={p._id} product={p} />
           ))}
@@ -218,9 +255,67 @@ function ImageContentBlock({ block }) {
   const layout = block.settings?.layout || block.settings?.imagePosition || 'left';
   const overlayPosition = block.settings?.overlayPosition || 'center';
   const overlayStyle = block.settings?.overlayStyle || 'dark';
+  const textAlign = block.settings?.textAlign || 'left';
+  const buttonLayout = block.settings?.buttonLayout || 'row';
+  const buttonAlign = block.settings?.buttonAlign || 'left';
+  const buttons = resolveImageContentButtons(block);
+
+  const textAlignClass = {
+    left: 'text-left',
+    center: 'text-center',
+    right: 'text-right',
+  }[textAlign] || 'text-left';
+
+  const buttonJustifyClass = {
+    left: 'justify-start',
+    center: 'justify-center',
+    right: 'justify-end',
+  }[buttonAlign] || 'justify-start';
+
+  const buttonClass = (style, isOverlay, textLight) => {
+    if (isOverlay) {
+      if (style === 'secondary') {
+        return textLight
+          ? 'border-2 border-white text-white hover:bg-white/15'
+          : 'border-2 border-slate-800 text-slate-800 hover:bg-slate-800/10';
+      }
+      if (style === 'dark') return 'bg-slate-900 text-white hover:bg-slate-800';
+      if (style === 'light') return 'bg-white text-slate-900 hover:bg-white/90';
+      return textLight
+        ? 'bg-white text-slate-900 hover:bg-white/90'
+        : 'bg-primary-600 text-white hover:bg-primary-700';
+    }
+    if (style === 'secondary') return 'btn-secondary';
+    if (style === 'dark') return 'bg-slate-900 text-white hover:bg-slate-800 rounded-lg font-semibold px-5 sm:px-6 py-2 sm:py-2.5';
+    if (style === 'light') return 'bg-white text-slate-900 border border-gray-200 hover:bg-gray-50 rounded-lg font-semibold px-5 sm:px-6 py-2 sm:py-2.5';
+    return 'btn-primary';
+  };
+
+  const renderButtons = ({ isOverlay = false, textLight = true } = {}) => {
+    if (!buttons.length) return null;
+    return (
+      <div
+        className={`mt-4 sm:mt-6 flex ${
+          buttonLayout === 'stack' ? 'flex-col' : 'flex-row flex-wrap'
+        } gap-2 sm:gap-3 ${buttonJustifyClass} ${textAlign === 'center' && buttonLayout === 'stack' ? 'items-center' : ''} ${
+          textAlign === 'right' && buttonLayout === 'stack' ? 'items-end' : ''
+        } ${textAlign === 'left' && buttonLayout === 'stack' ? 'items-start' : ''}`}
+      >
+        {buttons.map((btn) => (
+          <CmsNavLink
+            key={`${btn.text}-${btn.link}`}
+            to={btn.link}
+            className={`inline-block px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold transition-colors text-sm sm:text-base text-center ${buttonClass(btn.style, isOverlay, textLight)}`}
+          >
+            {btn.text}
+          </CmsNavLink>
+        ))}
+      </div>
+    );
+  };
 
   const contentBody = (
-    <>
+    <div className={textAlignClass}>
       {block.title && (
         <h2 className={`text-xl sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-3 ${layout === 'overlay' ? 'text-white' : 'text-gray-900'}`}>
           {block.title}
@@ -231,19 +326,8 @@ function ImageContentBlock({ block }) {
           {block.content}
         </div>
       )}
-      {block.buttonText && block.buttonLink && (
-        <CmsNavLink
-          to={block.buttonLink}
-          className={`inline-block mt-4 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
-            layout === 'overlay'
-              ? 'bg-white text-slate-900 hover:bg-white/90'
-              : 'btn-primary'
-          }`}
-        >
-          {block.buttonText}
-        </CmsNavLink>
-      )}
-    </>
+      {renderButtons()}
+    </div>
   );
 
   const imageEl = (
@@ -281,7 +365,7 @@ function ImageContentBlock({ block }) {
           )}
           {overlayStyle !== 'none' && <div className={`absolute inset-0 ${overlayClass}`} />}
           <div className={`relative z-10 flex flex-col min-h-[280px] sm:min-h-[340px] md:min-h-[420px] p-5 sm:p-8 md:p-12 ${positionClass}`}>
-            <div className={`max-w-2xl w-full ${textLight ? '' : 'text-gray-900'}`}>
+            <div className={`max-w-2xl w-full ${textAlignClass} ${textLight ? '' : 'text-gray-900'}`}>
               {block.title && (
                 <h2 className={`text-xl sm:text-2xl md:text-4xl font-bold mb-2 sm:mb-3 leading-tight ${textLight ? 'text-white' : 'text-gray-900'}`}>
                   {block.title}
@@ -292,16 +376,7 @@ function ImageContentBlock({ block }) {
                   {block.content}
                 </div>
               )}
-              {block.buttonText && block.buttonLink && (
-                <CmsNavLink
-                  to={block.buttonLink}
-                  className={`inline-block mt-4 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
-                    textLight ? 'bg-white text-slate-900 hover:bg-white/90' : 'bg-primary-600 text-white hover:bg-primary-700'
-                  }`}
-                >
-                  {block.buttonText}
-                </CmsNavLink>
-              )}
+              {renderButtons({ isOverlay: true, textLight })}
             </div>
           </div>
         </div>
@@ -373,11 +448,77 @@ function VideoBlock({ block }) {
 }
 
 function HtmlEmbedBlock({ block }) {
-  if (!block.content) return null;
+  const html = block.content || '';
+  const css = block.settings?.css || '';
+  const js = block.settings?.js || '';
+  const width = block.settings?.width || 'contained';
+  const showBorder = block.settings?.showBorder !== false;
+  const hostRef = useRef(null);
+  const styleId = useMemo(
+    () => `cms-embed-style-${String(block._id || Math.random()).replace(/[^a-zA-Z0-9_-]/g, '')}`,
+    [block._id]
+  );
+
+  useEffect(() => {
+    if (!css.trim()) {
+      document.getElementById(styleId)?.remove();
+      return undefined;
+    }
+    let el = document.getElementById(styleId);
+    if (!el) {
+      el = document.createElement('style');
+      el.id = styleId;
+      document.head.appendChild(el);
+    }
+    el.textContent = css;
+    return () => {
+      document.getElementById(styleId)?.remove();
+    };
+  }, [css, styleId]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+
+    // Re-execute <script> tags from HTML (innerHTML does not run them)
+    const inlineScripts = [...host.querySelectorAll('script')];
+    inlineScripts.forEach((oldScript) => {
+      const next = document.createElement('script');
+      [...oldScript.attributes].forEach((attr) => next.setAttribute(attr.name, attr.value));
+      next.textContent = oldScript.textContent;
+      oldScript.parentNode?.replaceChild(next, oldScript);
+    });
+
+    let customScript;
+    if (js.trim()) {
+      customScript = document.createElement('script');
+      customScript.textContent = js;
+      document.body.appendChild(customScript);
+    }
+
+    return () => {
+      customScript?.remove();
+    };
+  }, [html, js]);
+
+  if (!html.trim() && !css.trim()) return null;
+
+  const sectionClass = width === 'full' ? 'w-full py-6 sm:py-8' : 'cms-section';
+  const embedClass = [
+    'cms-embed',
+    showBorder ? 'rounded-xl border border-gray-100 bg-white p-3 sm:p-4' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <section className="cms-section-medium">
-      {block.title && <h2 className="cms-title mb-3 sm:mb-4">{block.title}</h2>}
-      <div className="cms-embed rounded-xl border border-gray-100 bg-white p-3 sm:p-4" dangerouslySetInnerHTML={{ __html: block.content }} />
+    <section className={sectionClass}>
+      {block.title && (
+        <h2 className={`cms-title mb-3 sm:mb-4 ${width === 'full' ? 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8' : ''}`}>
+          {block.title}
+        </h2>
+      )}
+      <div className={embedClass} ref={hostRef} dangerouslySetInnerHTML={{ __html: html }} />
     </section>
   );
 }
@@ -595,19 +736,57 @@ function DeliveryCountdownBlock({ block }) {
   );
 }
 
+function TextRunnerBlock({ block }) {
+  const text = (block.content || block.title || '').trim();
+  if (!text) return null;
+
+  const cfg = block.settings || {};
+  const backgroundColor = cfg.backgroundColor || '#e11d48';
+  const textColor = cfg.textColor || '#ffffff';
+  const height = Math.min(200, Math.max(28, Number(cfg.height) || 48));
+  const fontSize = Math.min(72, Math.max(10, Number(cfg.fontSize) || 16));
+  const speed = Math.min(120, Math.max(5, Number(cfg.speed) || 25));
+  const direction = cfg.direction === 'rtl' ? 'rtl' : 'ltr';
+
+  // Repeat enough times so short messages still fill the viewport
+  const unit = `${text}  •  `;
+  const segment = unit.repeat(Math.max(4, Math.ceil(40 / Math.max(text.length, 1))));
+
+  return (
+    <section
+      className={`cms-text-runner cms-text-runner--${direction}`}
+      style={{
+        backgroundColor,
+        color: textColor,
+        height: `${height}px`,
+        fontSize: `${fontSize}px`,
+        '--runner-duration': `${speed}s`,
+      }}
+      aria-label={text}
+    >
+      <div className="cms-text-runner-track">
+        <span className="cms-text-runner-segment">{segment}</span>
+        <span className="cms-text-runner-segment" aria-hidden="true">{segment}</span>
+      </div>
+    </section>
+  );
+}
+
 function TextBlock({ block }) {
-  const level = block.settings?.headingLevel || 'h2';
-  const linkUrl = block.settings?.linkUrl;
+  const cfg = block.settings || {};
+  const textAlign = cfg.textAlign || 'left';
+  const backgroundColor = cfg.backgroundColor || undefined;
+  const html = getTextBlockHtml(block);
+  const safeHtml = html && isHtmlContent(html) ? sanitizeCmsHtml(html) : '';
 
-  const Heading = ({ children }) => {
-    if (level === 'h1') return <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-3 sm:mb-4 leading-tight">{children}</h1>;
-    if (level === 'h3') return <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3">{children}</h3>;
-    if (level === 'p') return <p className="cms-body text-gray-600 mb-3">{children}</p>;
-    return <h2 className="cms-title mb-3 sm:mb-4">{children}</h2>;
-  };
+  const alignClass = {
+    left: 'text-left',
+    center: 'text-center',
+    right: 'text-right',
+  }[textAlign] || 'text-left';
 
-  const features = block.settings?.features;
-  if (block.settings?.layout === 'features' && features?.length) {
+  const features = cfg.features;
+  if (cfg.layout === 'features' && features?.length) {
     return (
       <section className="cms-section">
         {block.title && <h2 className="cms-title text-center mb-6 sm:mb-8">{block.title}</h2>}
@@ -622,27 +801,24 @@ function TextBlock({ block }) {
       </section>
     );
   }
+
+  if (!safeHtml && !html?.trim()) return null;
+
   return (
-    <section className="cms-section-narrow">
-      {block.title && <Heading>{block.title}</Heading>}
-      {block.content && (
-        <div className="space-y-4">
-          {block.content
-            .split(/\n\s*\n+/)
-            .map((chunk) => chunk.trim())
-            .filter(Boolean)
-            .map((chunk, i) => (
-              <p key={i} className="cms-body text-gray-600 whitespace-pre-line">
-                {chunk}
-              </p>
-            ))}
-        </div>
-      )}
-      {linkUrl && (
-        <a href={linkUrl} className="inline-block mt-4 text-primary-600 font-medium hover:underline text-sm sm:text-base" target={linkUrl.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
-          {block.buttonText || 'Learn more'}
-        </a>
-      )}
+    <section
+      className="w-full"
+      style={backgroundColor ? { backgroundColor } : undefined}
+    >
+      <div className={`cms-section ${alignClass}`}>
+        {safeHtml ? (
+          <div
+            className="cms-rich-text"
+            dangerouslySetInnerHTML={{ __html: safeHtml }}
+          />
+        ) : (
+          <div className="cms-rich-text whitespace-pre-line">{html}</div>
+        )}
+      </div>
     </section>
   );
 }
@@ -703,7 +879,7 @@ function FaqBlock({ block }) {
   if (!items.length) return null;
 
   return (
-    <section className="cms-section-narrow">
+    <section className="cms-section">
       {block.title && (
         <h2 className="cms-title text-center mb-2 sm:mb-3">{block.title}</h2>
       )}
@@ -801,6 +977,7 @@ export default function CmsBlockRenderer({ blocks = [] }) {
           case 'image_content': return <ImageContentBlock key={block._id} block={block} />;
           case 'video': return <VideoBlock key={block._id} block={block} />;
           case 'text': return <TextBlock key={block._id} block={block} />;
+          case 'text_runner': return <TextRunnerBlock key={block._id} block={block} />;
           case 'cta': return <CtaBlock key={block._id} block={block} />;
           case 'faq': return <FaqBlock key={block._id} block={block} />;
           case 'google_reviews': return <GoogleReviewsBlock key={block._id} block={block} />;

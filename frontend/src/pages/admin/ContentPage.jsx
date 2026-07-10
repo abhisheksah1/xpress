@@ -4,12 +4,16 @@ import { adminApi } from '../../api/admin.js';
 import CmsImagePicker from '../../components/admin/CmsImagePicker.jsx';
 import CmsPageFormModal, { storeUrlForPage } from '../../components/admin/CmsPageFormModal.jsx';
 import SeoMetaEditor, { emptySeoMeta } from '../../components/admin/SeoMetaEditor.jsx';
-import { mergeEntitySeo } from '../../utils/seoMeta.js';
+import { mergeEntitySeo, mergeEntitySeoForEditor } from '../../utils/seoMeta.js';
+import { collectCmsBlocksAuditContext } from '../../utils/seoAuditor.js';
 import CategoriesGridBlockEditor from '../../components/admin/CategoriesGridBlockEditor.jsx';
 import ImageContentLayoutSettings from '../../components/admin/ImageContentLayoutSettings.jsx';
 import GoogleReviewsBlockEditor from '../../components/admin/GoogleReviewsBlockEditor.jsx';
 import FaqBlockEditor from '../../components/admin/FaqBlockEditor.jsx';
 import VideoBlockEditor from '../../components/admin/VideoBlockEditor.jsx';
+import ProductGridBlockEditor from '../../components/admin/ProductGridBlockEditor.jsx';
+import TextBlockEditor from '../../components/admin/TextBlockEditor.jsx';
+import HtmlEmbedBlockEditor from '../../components/admin/HtmlEmbedBlockEditor.jsx';
 
 const BLOCK_TYPES = [
   'hero',
@@ -24,6 +28,8 @@ const BLOCK_TYPES = [
   'google_reviews',
   'delivery_countdown',
   'text',
+  'text_runner',
+  'html_embed',
   'cta',
   'testimonial',
 ];
@@ -44,6 +50,14 @@ export default function ContentPage() {
     [pages]
   );
 
+  const pageSeoAuditContext = useMemo(() => {
+    if (!selected) return null;
+    return {
+      ...collectCmsBlocksAuditContext(blocks, selected),
+      canonicalPreview: storeUrlForPage(selected),
+    };
+  }, [selected, blocks]);
+
   const load = async () => {
     const { data } = await adminApi.getCmsPages();
     setPages(data.data);
@@ -57,9 +71,18 @@ export default function ContentPage() {
   const selectPage = async (page) => {
     const { data } = await adminApi.getCmsPage(page._id);
     const pageData = data.data;
-    setSelected({ ...pageData, seo: mergeEntitySeo(pageData) });
+    setSelected({ ...pageData, seo: mergeEntitySeoForEditor(pageData) });
     setBlocks(pageData.blocks || []);
   };
+
+  const buildPageSettingsPayload = (page) => ({
+    title: page.title,
+    slug: page.slug,
+    pageType: page.pageType,
+    metaTitle: page.seo?.metaTitle,
+    metaDescription: page.seo?.metaDescription,
+    seo: page.seo,
+  });
 
   const updateBlock = (index, field, value) => {
     setBlocks((prev) => prev.map((b, i) => (i === index ? { ...b, [field]: value } : b)));
@@ -103,6 +126,16 @@ export default function ContentPage() {
     );
   };
 
+  const updateBlockSettings = (index, patch) => {
+    setBlocks((prev) =>
+      prev.map((b, i) =>
+        i === index
+          ? { ...b, settings: { ...(b.settings || {}), ...patch } }
+          : b
+      )
+    );
+  };
+
   const addBlock = (type) => {
     setBlocks((prev) => {
       const base = { type, title: '', content: '', sortOrder: prev.length, isActive: true };
@@ -111,7 +144,20 @@ export default function ContentPage() {
         base.settings = { sortBy: 'custom', limit: 20, hideEmpty: false, categoryIds: [], cols: 4 };
       }
       if (type === 'image_content') {
-        base.settings = { layout: 'left', overlayPosition: 'center', overlayStyle: 'dark' };
+        base.settings = {
+          layout: 'left',
+          overlayPosition: 'center',
+          overlayStyle: 'dark',
+          textAlign: 'left',
+          buttonLayout: 'row',
+          buttonAlign: 'left',
+          button1Text: '',
+          button1Link: '',
+          button1Style: 'primary',
+          button2Text: '',
+          button2Link: '',
+          button2Style: 'secondary',
+        };
       }
       if (type === 'google_reviews') {
         base.title = 'Google Reviews';
@@ -125,6 +171,41 @@ export default function ContentPage() {
           items: [
             { q: 'What is sample question?', a: 'This is beautiful visual builder answer.' },
           ],
+        };
+      }
+      if (type === 'text') {
+        base.title = '';
+        base.content = '';
+        base.settings = {
+          textAlign: 'center',
+          backgroundColor: '#ecfdf5',
+          html: [
+            '<h1 style="color:#e11d48;text-decoration:underline">Send Gifts To Nepal</h1>',
+            '<h2 style="color:#0f172a">Same Day Cake &amp; Flower Delivery in Nepal</h2>',
+            '<p style="color:#334155">We deliver fresh cakes, flowers and gifts across <strong>Kathmandu</strong>, <strong>Lalitpur</strong> and <strong>Bhaktapur</strong>.</p>',
+            '<p><a data-cms-btn="true" class="cms-btn cms-btn-primary" href="/shop">Shop now</a></p>',
+          ].join(''),
+        };
+      }
+      if (type === 'html_embed') {
+        base.title = '';
+        base.content = '<div class="kx-embed">\n  <p>Paste your HTML here</p>\n</div>';
+        base.settings = {
+          css: '.kx-embed { padding: 1rem; }',
+          js: '',
+          width: 'contained',
+          showBorder: true,
+        };
+      }
+      if (type === 'text_runner') {
+        base.content = 'Free same-day delivery on orders before 5 PM  •  Fresh flowers across Nepal  •  ';
+        base.settings = {
+          backgroundColor: '#e11d48',
+          textColor: '#ffffff',
+          height: 48,
+          fontSize: 16,
+          speed: 25,
+          direction: 'ltr',
         };
       }
       return [...prev, base];
@@ -147,11 +228,18 @@ export default function ContentPage() {
     if (!selected) return;
     setSaving(true);
     try {
+      await adminApi.updateCmsPage(selected._id, buildPageSettingsPayload(selected));
       const { data } = await adminApi.updateCmsBlocks(selected._id, blocks);
       const updated = data.data;
-      setSelected((p) => ({ ...p, isPublished: true, blocks: updated?.blocks || blocks }));
-      toast.success('Content saved and published to storefront');
-      load();
+      setSelected((p) => ({
+        ...p,
+        isPublished: true,
+        blocks: updated?.blocks || blocks,
+        seo: mergeEntitySeoForEditor(updated || p),
+      }));
+      toast.success('Page and content saved to storefront');
+      await load();
+      await selectPage({ _id: selected._id });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save');
     } finally {
@@ -207,7 +295,11 @@ export default function ContentPage() {
     if (!selected) return;
     setPageSaving(true);
     try {
-      await adminApi.updateCmsPage(selected._id, form);
+      await adminApi.updateCmsPage(selected._id, {
+        ...form,
+        metaTitle: form.seo?.metaTitle,
+        metaDescription: form.seo?.metaDescription,
+      });
       toast.success('Page updated');
       setPageModal({ open: false, mode: 'create' });
       await load();
@@ -256,27 +348,16 @@ export default function ContentPage() {
     if (!selected) return;
     setPageSaving(true);
     try {
-      await adminApi.updateCmsPage(selected._id, {
-        title: selected.title,
-        slug: selected.slug,
-        pageType: selected.pageType,
-        metaTitle: selected.seo?.metaTitle,
-        metaDescription: selected.seo?.metaDescription,
-        seo: selected.seo,
-      });
+      await adminApi.updateCmsPage(selected._id, buildPageSettingsPayload(selected));
       toast.success('Page settings saved');
-      load();
+      await load();
+      await selectPage({ _id: selected._id });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save page settings');
     } finally {
       setPageSaving(false);
     }
   };
-
-  const categoryOptions = useMemo(
-    () => [{ _id: '', name: 'All Categories' }, ...categories],
-    [categories]
-  );
 
   return (
     <div>
@@ -373,7 +454,7 @@ export default function ContentPage() {
                     {deleting ? 'Deleting...' : 'Delete'}
                   </button>
                   <button onClick={handleSaveBlocks} disabled={saving} className="btn-primary text-sm">
-                    {saving ? 'Saving...' : 'Save & publish blocks'}
+                    {saving ? 'Saving...' : 'Save & publish'}
                   </button>
                   <a
                     href={storeUrlForPage({ ...selected, isPublished: true })}
@@ -404,6 +485,7 @@ export default function ContentPage() {
                   pageTitle={selected.title}
                   pageDescription={blocks.find((b) => b.content)?.content || ''}
                   canonicalPreview={storeUrlForPage(selected)}
+                  auditContext={pageSeoAuditContext}
                   defaultSchemaType={
                     selected.pageType === 'faq'
                       ? 'FAQPage'
@@ -431,28 +513,132 @@ export default function ContentPage() {
 
               {blocks.map((block, i) => (
                 <div key={block._id || i} className="card space-y-3">
-                  {block.type !== 'categories_grid' && block.type !== 'faq' && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold uppercase text-gray-400">{block.type} block</span>
-                      <button onClick={() => removeBlock(i)} className="text-red-500 text-xs">Remove</button>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-xs font-semibold uppercase text-gray-400">
+                      {String(block.type || 'block').replace(/_/g, ' ')} block
+                      <span className="ml-2 text-gray-300 font-normal normal-case">#{i + 1}</span>
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        disabled={i === 0}
+                        onClick={() => moveBlock(i, -1)}
+                        className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={i === blocks.length - 1}
+                        onClick={() => moveBlock(i, 1)}
+                        className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeBlock(i)}
+                        className="text-red-500 text-xs px-2 hover:underline"
+                      >
+                        Remove
+                      </button>
                     </div>
-                  )}
+                  </div>
 
-                  {(block.type === 'categories_grid' || block.type === 'faq') && (
-                    <div className="flex justify-end -mb-2">
-                      <button onClick={() => removeBlock(i)} className="text-red-500 text-xs">Remove block</button>
-                    </div>
-                  )}
-
-                  {(block.type === 'hero' || block.type === 'banner' || block.type === 'slider' || block.type === 'text' || block.type === 'cta' || block.type === 'testimonial' || block.type === 'image_content' || block.type === 'product_grid' || block.type === 'google_reviews' || block.type === 'delivery_countdown') && (
+                  {(block.type === 'hero' || block.type === 'banner' || block.type === 'slider' || block.type === 'cta' || block.type === 'testimonial' || block.type === 'image_content' || block.type === 'product_grid' || block.type === 'google_reviews' || block.type === 'delivery_countdown') && (
                     <input className="input-field" placeholder="Title" value={block.title || ''} onChange={(e) => updateBlock(i, 'title', e.target.value)} />
                   )}
 
-                  {(block.type === 'text' || block.type === 'hero' || block.type === 'banner' || block.type === 'cta' || block.type === 'image_content' || block.type === 'product_grid' || block.type === 'delivery_countdown') && (
+                  {(block.type === 'text_runner' || block.type === 'hero' || block.type === 'banner' || block.type === 'cta' || block.type === 'image_content' || block.type === 'product_grid' || block.type === 'delivery_countdown') && (
                     <textarea className="input-field" rows={3} placeholder="Text content" value={block.content || ''} onChange={(e) => updateBlock(i, 'content', e.target.value)} />
                   )}
 
-                  {(block.type === 'hero' || block.type === 'banner' || block.type === 'cta' || block.type === 'image_content' || block.type === 'product_grid' || block.type === 'delivery_countdown' || block.type === 'google_reviews') && (
+                  {(block.type === 'text_runner') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Background colour</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            className="h-10 w-12 rounded border border-gray-300 cursor-pointer bg-white p-1"
+                            value={block.settings?.backgroundColor || '#e11d48'}
+                            onChange={(e) => updateBlockSetting(i, 'backgroundColor', e.target.value)}
+                          />
+                          <input
+                            className="input-field font-mono text-sm"
+                            value={block.settings?.backgroundColor || '#e11d48'}
+                            onChange={(e) => updateBlockSetting(i, 'backgroundColor', e.target.value)}
+                            placeholder="#e11d48"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Text colour</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            className="h-10 w-12 rounded border border-gray-300 cursor-pointer bg-white p-1"
+                            value={block.settings?.textColor || '#ffffff'}
+                            onChange={(e) => updateBlockSetting(i, 'textColor', e.target.value)}
+                          />
+                          <input
+                            className="input-field font-mono text-sm"
+                            value={block.settings?.textColor || '#ffffff'}
+                            onChange={(e) => updateBlockSetting(i, 'textColor', e.target.value)}
+                            placeholder="#ffffff"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Block height (px)</label>
+                        <input
+                          type="number"
+                          min="28"
+                          max="200"
+                          className="input-field"
+                          value={block.settings?.height ?? 48}
+                          onChange={(e) => updateBlockSetting(i, 'height', Number(e.target.value) || 48)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Text size (px)</label>
+                        <input
+                          type="number"
+                          min="10"
+                          max="72"
+                          className="input-field"
+                          value={block.settings?.fontSize ?? 16}
+                          onChange={(e) => updateBlockSetting(i, 'fontSize', Number(e.target.value) || 16)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Speed (seconds)</label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="120"
+                          className="input-field"
+                          value={block.settings?.speed ?? 25}
+                          onChange={(e) => updateBlockSetting(i, 'speed', Number(e.target.value) || 25)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Scroll direction</label>
+                        <select
+                          className="input-field"
+                          value={block.settings?.direction || 'ltr'}
+                          onChange={(e) => updateBlockSetting(i, 'direction', e.target.value)}
+                        >
+                          <option value="ltr">Left to right</option>
+                          <option value="rtl">Right to left</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {(block.type === 'hero' || block.type === 'banner' || block.type === 'cta' || block.type === 'product_grid' || block.type === 'delivery_countdown' || block.type === 'google_reviews') && (
                     <div className="grid grid-cols-2 gap-3">
                       <input className="input-field text-sm" placeholder="Button text" value={block.buttonText || ''} onChange={(e) => updateBlock(i, 'buttonText', e.target.value)} />
                       <input className="input-field text-sm" placeholder="Button link (e.g. /shop)" value={block.buttonLink || ''} onChange={(e) => updateBlock(i, 'buttonLink', e.target.value)} />
@@ -460,30 +646,12 @@ export default function ContentPage() {
                   )}
 
                   {(block.type === 'text') && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Text style</label>
-                        <select
-                          className="input-field"
-                          value={block.settings?.headingLevel || 'p'}
-                          onChange={(e) => updateBlockSetting(i, 'headingLevel', e.target.value)}
-                        >
-                          <option value="h1">Heading H1</option>
-                          <option value="h2">Heading H2</option>
-                          <option value="h3">Heading H3</option>
-                          <option value="p">Paragraph</option>
-                        </select>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Optional link</label>
-                        <input
-                          className="input-field"
-                          placeholder="https://... or /shop"
-                          value={block.settings?.linkUrl || ''}
-                          onChange={(e) => updateBlockSetting(i, 'linkUrl', e.target.value)}
-                        />
-                      </div>
-                    </div>
+                    <TextBlockEditor
+                      block={block}
+                      onSettingChange={(key, value) => updateBlockSetting(i, key, value)}
+                      onSettingsChange={(patch) => updateBlockSettings(i, patch)}
+                      onContentChange={(value) => updateBlock(i, 'content', value)}
+                    />
                   )}
 
                   {(block.type === 'hero' || block.type === 'image' || block.type === 'banner' || block.type === 'image_content') && (
@@ -511,8 +679,17 @@ export default function ContentPage() {
                       </div>
                       {block.type === 'image_content' && (
                         <ImageContentLayoutSettings
-                          settings={block.settings || {}}
-                          onChange={(key, value) => updateBlockSetting(i, key, value)}
+                          settings={{
+                            ...(block.settings || {}),
+                            button1Text: block.settings?.button1Text ?? block.buttonText ?? '',
+                            button1Link: block.settings?.button1Link ?? block.buttonLink ?? '',
+                          }}
+                          onChange={(key, value) => {
+                            updateBlockSetting(i, key, value);
+                            // Keep legacy fields in sync for older content
+                            if (key === 'button1Text') updateBlock(i, 'buttonText', value);
+                            if (key === 'button1Link') updateBlock(i, 'buttonLink', value);
+                          }}
                         />
                       )}
                     </div>
@@ -552,6 +729,17 @@ export default function ContentPage() {
                     />
                   )}
 
+                  {(block.type === 'html_embed') && (
+                    <HtmlEmbedBlockEditor
+                      title={block.title || ''}
+                      content={block.content || ''}
+                      settings={block.settings || {}}
+                      onTitleChange={(value) => updateBlock(i, 'title', value)}
+                      onContentChange={(value) => updateBlock(i, 'content', value)}
+                      onSettingChange={(key, value) => updateBlockSetting(i, key, value)}
+                    />
+                  )}
+
                   {(block.type === 'google_reviews') && (
                     <GoogleReviewsBlockEditor
                       settings={block.settings || {}}
@@ -560,49 +748,11 @@ export default function ContentPage() {
                   )}
 
                   {(block.type === 'product_grid') && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Limit</label>
-                        <input
-                          type="number"
-                          min="1"
-                          className="input-field"
-                          value={block.settings?.limit || 8}
-                          onChange={(e) => updateBlockSetting(i, 'limit', Number(e.target.value) || 8)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Category</label>
-                        <select
-                          className="input-field"
-                          value={block.settings?.categoryId || ''}
-                          onChange={(e) => updateBlockSetting(i, 'categoryId', e.target.value)}
-                        >
-                          {categoryOptions.map((c) => (
-                            <option key={c._id} value={c._id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex items-end">
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={!!block.settings?.isFeatured}
-                            onChange={(e) => updateBlockSetting(i, 'isFeatured', e.target.checked)}
-                          />
-                          Featured only
-                        </label>
-                      </div>
-                      <div className="sm:col-span-3">
-                        <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Search (optional)</label>
-                        <input
-                          className="input-field"
-                          placeholder="Search products..."
-                          value={block.settings?.search || ''}
-                          onChange={(e) => updateBlockSetting(i, 'search', e.target.value)}
-                        />
-                      </div>
-                    </div>
+                    <ProductGridBlockEditor
+                      settings={block.settings || {}}
+                      categories={categories}
+                      onSettingChange={(key, value) => updateBlockSetting(i, key, value)}
+                    />
                   )}
 
                   {(block.type === 'categories_grid') && (
@@ -611,10 +761,6 @@ export default function ContentPage() {
                       categories={categories}
                       onTitleChange={(value) => updateBlock(i, 'title', value)}
                       onSettingChange={(key, value) => updateBlockSetting(i, key, value)}
-                      onMoveUp={() => moveBlock(i, -1)}
-                      onMoveDown={() => moveBlock(i, 1)}
-                      canMoveUp={i > 0}
-                      canMoveDown={i < blocks.length - 1}
                     />
                   )}
 

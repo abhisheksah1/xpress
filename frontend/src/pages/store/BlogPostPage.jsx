@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import SeoHead from '../../components/store/SeoHead.jsx';
 import { mergeEntitySeo } from '../../utils/seoMeta.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
+import { sanitizeCmsHtml } from '../../utils/cmsHtml.js';
+import { isHtmlContent } from '../../utils/productHtml.js';
 
 export default function BlogPostPage() {
   const { slug } = useParams();
@@ -15,13 +17,29 @@ export default function BlogPostPage() {
     storeApi.getBlog(slug).then((res) => setBlog(res.data.data));
   }, [slug]);
 
-  if (!blog) return <div className="py-20 text-center text-gray-400">Loading...</div>;
+  const contentHtml = useMemo(() => {
+    if (!blog?.content) return '';
+    if (isHtmlContent(blog.content)) return sanitizeCmsHtml(blog.content);
+    return '';
+  }, [blog?.content]);
+
+  if (!blog) {
+    return (
+      <div className="cms-section text-center text-gray-400 py-16 sm:py-20">
+        Loading...
+      </div>
+    );
+  }
 
   const seo = mergeEntitySeo(blog);
   const image = blog.featuredImage?.url || seo.ogImage?.url;
+  const plainDescription = blog.excerpt
+    || (isHtmlContent(blog.content)
+      ? blog.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      : blog.content);
 
   return (
-    <article className="max-w-3xl mx-auto px-4 py-12">
+    <article className="w-full overflow-x-hidden">
       <SeoHead
         seo={{
           ...seo,
@@ -30,7 +48,7 @@ export default function BlogPostPage() {
         siteSettings={settings}
         fallbacks={{
           title: blog.title,
-          description: blog.excerpt || blog.content,
+          description: plainDescription,
           image,
           path: `/blog/${blog.slug}`,
           schemaType: 'BlogPosting',
@@ -45,12 +63,27 @@ export default function BlogPostPage() {
         }}
         jsonLdId="blog-json-ld"
       />
-      <Link to="/blog" className="text-sm text-primary-600 hover:underline">&larr; Back to blog</Link>
-      <h1 className="text-3xl font-bold mt-4 mb-6">{blog.title}</h1>
-      {blog.featuredImage?.url && (
-        <img src={resolveMediaUrl(blog.featuredImage.url)} alt={blog.featuredImage.alt || blog.title} className="w-full rounded-xl mb-8" />
-      )}
-      <div className="prose text-gray-700 whitespace-pre-line">{blog.content}</div>
+      <div className="cms-section">
+        <Link to="/blog" className="text-sm text-primary-600 hover:underline inline-flex items-center gap-1">
+          &larr; Back to blog
+        </Link>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mt-3 sm:mt-4 mb-4 sm:mb-6 leading-tight">
+          {blog.title}
+        </h1>
+        {blog.featuredImage?.url && (
+          <img
+            src={resolveMediaUrl(blog.featuredImage.url)}
+            alt={blog.featuredImage.alt || blog.title}
+            className="w-full max-w-full rounded-xl mb-6 sm:mb-8 object-cover aspect-[16/9] sm:aspect-[2/1]"
+            loading="eager"
+          />
+        )}
+        {contentHtml ? (
+          <div className="cms-rich-text" dangerouslySetInnerHTML={{ __html: contentHtml }} />
+        ) : (
+          <div className="cms-rich-text whitespace-pre-line">{blog.content}</div>
+        )}
+      </div>
     </article>
   );
 }
