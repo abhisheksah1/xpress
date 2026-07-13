@@ -12,27 +12,86 @@ import { syncPaymentGatewaysFromEnv } from '../services/paymentGateway.service.j
 dotenv.config();
 
 const seedSuperAdmin = async () => {
-  const existing = await User.findOne({ role: ROLES.SUPER_ADMIN });
-  if (existing) {
-    console.log('Super admin already exists');
-    return;
-  }
-
   if (process.env.NODE_ENV === 'production' && config.superAdmin.password === 'ChangeMe@123') {
     throw new Error('Set SUPER_ADMIN_PASSWORD in production before seeding — default password is not allowed.');
   }
 
+  const { name, email, password, phone } = config.superAdmin;
+  const envEmail = String(email || '').trim().toLowerCase();
+
+  let target = envEmail
+    ? await User.findOne({ email: envEmail }).select('+password')
+    : null;
+
+  const existingSuperAdmin = await User.findOne({ role: ROLES.SUPER_ADMIN }).select('+password');
+
+  if (!target && existingSuperAdmin) {
+    target = existingSuperAdmin;
+  }
+
+  if (target) {
+    let changed = false;
+
+    if (name && target.name !== name) {
+      target.name = name;
+      changed = true;
+    }
+    if (envEmail && target.email !== envEmail) {
+      target.email = envEmail;
+      changed = true;
+    }
+    if (phone && target.phone !== phone) {
+      target.phone = phone;
+      changed = true;
+    }
+    if (target.role !== ROLES.SUPER_ADMIN) {
+      target.role = ROLES.SUPER_ADMIN;
+      changed = true;
+    }
+    if (!target.isEmailVerified) {
+      target.isEmailVerified = true;
+      changed = true;
+    }
+    if (!target.isActive) {
+      target.isActive = true;
+      changed = true;
+    }
+
+    if (password) {
+      const passwordMatches = await target.comparePassword(password);
+      if (!passwordMatches) {
+        target.password = password;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await target.save();
+      console.log(`Super admin synced from env: ${target.email}`);
+    } else {
+      console.log('Super admin already exists');
+    }
+
+    // Keep a single super admin: demote any other account still marked super_admin
+    if (existingSuperAdmin && String(existingSuperAdmin._id) !== String(target._id)) {
+      existingSuperAdmin.role = ROLES.ADMIN;
+      await existingSuperAdmin.save();
+      console.log(`Previous super admin demoted to admin: ${existingSuperAdmin.email}`);
+    }
+    return;
+  }
+
   await User.create({
-    name: config.superAdmin.name,
-    email: config.superAdmin.email,
-    password: config.superAdmin.password,
-    phone: config.superAdmin.phone,
+    name,
+    email: envEmail,
+    password,
+    phone,
     role: ROLES.SUPER_ADMIN,
     isEmailVerified: true,
     isActive: true,
   });
 
-  console.log(`Super admin created: ${config.superAdmin.email}`);
+  console.log(`Super admin created: ${envEmail}`);
 };
 
 const seedNavbar = async () => {

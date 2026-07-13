@@ -345,6 +345,6 @@ export const getManualPaymentInstructions = async () => {
     branchName: manual?.credentials?.branchName || '',
     qrCodeImage: manual?.credentials?.qrCodeImage || '',
     instructions: manual?.credentials?.instruction || '',
-    csrWhatsApp: map.registry_helpdesk_whatsapp || map.plugins_config?.whatsapp_number || '',
+    csrWhatsApp: map.plugins_config?.whatsapp_number || map.registry_helpdesk_whatsapp || '',
   };
 };

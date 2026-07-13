@@ -138,26 +138,30 @@ export const resolveDeliveryForGroup = (product, category, group) => {
   const productRule = findRule(product.deliveryGroupRules, group._id);
   const categoryRule = category ? findRule(category.deliveryGroupRules, group._id) : null;
 
-  const sameDay =
-    (group.estimatedHours != null && group.estimatedHours <= 24) ||
-    (group.estimatedDays?.min === 0) ||
-    productRule?.sameDay ||
-    categoryRule?.sameDay;
+  const hasProductDaysOverride = productRule?.estimatedDays?.min != null;
+  const hasCategoryDaysOverride = !hasProductDaysOverride && categoryRule?.estimatedDays?.min != null;
+  const hasDaysOverride = hasProductDaysOverride || hasCategoryDaysOverride;
 
-  const estimatedDays = productRule?.estimatedDays?.min != null
+  const estimatedDays = hasProductDaysOverride
     ? productRule.estimatedDays
-    : categoryRule?.estimatedDays?.min != null
+    : hasCategoryDaysOverride
       ? categoryRule.estimatedDays
       : group.estimatedDays || { min: 1, max: 3 };
 
   const resolvedDays = {
     min: estimatedDays.min ?? group.estimatedDays?.min ?? 1,
-    max: estimatedDays.max ?? group.estimatedDays?.max ?? 3,
+    max: estimatedDays.max ?? group.estimatedDays?.max ?? estimatedDays.min ?? 3,
   };
 
-  // If same-day is explicitly enabled (group/category/product), force min/max to 0
-  // so the rest of the system (checkout, labels, validation) treats it as same-day.
-  if (sameDay) {
+  // Same-day from explicit product/category flags, or from group defaults when no day override.
+  // Do not let group estimatedHours wipe a product/category min/max days override.
+  const sameDayFromRules = !!(productRule?.sameDay || categoryRule?.sameDay);
+  const sameDayFromGroup =
+    !hasDaysOverride &&
+    ((group.estimatedHours != null && group.estimatedHours <= 24) || group.estimatedDays?.min === 0);
+  const sameDay = sameDayFromRules || sameDayFromGroup || resolvedDays.min === 0;
+
+  if (sameDay && !hasDaysOverride) {
     resolvedDays.min = 0;
     resolvedDays.max = 0;
   }
@@ -170,6 +174,7 @@ export const resolveDeliveryForGroup = (product, category, group) => {
     cutoffTime: group.cutoffTime,
     productRule,
     categoryRule,
+    hasDaysOverride,
   };
 };
 
@@ -343,11 +348,31 @@ export const formatCutoffTimeLabel = (time) => {
 };
 
 export const formatEstimatedTimeLabel = (group, resolved) => {
+  const sameDayFromRules = !!(resolved?.productRule?.sameDay || resolved?.categoryRule?.sameDay);
+  const hasDaysOverride = !!resolved?.hasDaysOverride
+    || resolved?.productRule?.estimatedDays?.min != null
+    || resolved?.categoryRule?.estimatedDays?.min != null;
+
+  // Product / category delivery rules must win over the group's static label.
+  if (sameDayFromRules && !hasDaysOverride) {
+    return '⚡ Same day delivery';
+  }
+
+  if (hasDaysOverride) {
+    const min = resolved?.estimatedDays?.min;
+    const max = resolved?.estimatedDays?.max ?? min;
+    if (min === 0) return '⚡ Same day delivery';
+    if (min != null && max != null && min === max) {
+      return `${min} day${min === 1 ? '' : 's'}`;
+    }
+    if (min != null && max != null) return `${min}–${max} days`;
+  }
+
   if (group.estimatedDeliveryLabel) return group.estimatedDeliveryLabel;
   if (group.estimatedHours != null && group.estimatedHours > 0) {
     return `⚡ Minimum ${group.estimatedHours} Hour${group.estimatedHours === 1 ? '' : 's'}`;
   }
-  if (resolved?.estimatedDays?.min === 0) return '⚡ Same day delivery';
+  if (resolved?.estimatedDays?.min === 0 || resolved?.sameDay) return '⚡ Same day delivery';
   const min = resolved?.estimatedDays?.min ?? group.estimatedDays?.min;
   const max = resolved?.estimatedDays?.max ?? group.estimatedDays?.max;
   if (min != null && max != null && min === max) return `${min} day${min === 1 ? '' : 's'}`;
@@ -356,28 +381,31 @@ export const formatEstimatedTimeLabel = (group, resolved) => {
 };
 
 export const attachDeliveryInfo = (product, category, groups) =>
-  groups.map((group) => {
-    const resolved = resolveDeliveryForGroup(product, category, group);
-    const coverageAreas = (group.coverageLocations || [])
-      .map((loc) => loc?.name || loc)
-      .filter(Boolean);
+  groups
+    .map((group) => {
+      const resolved = resolveDeliveryForGroup(product, category, group);
+      const coverageAreas = (group.coverageLocations || [])
+        .map((loc) => loc?.name || loc)
+        .filter(Boolean);
 
-    return {
-      groupId: group._id,
-      groupName: group.name,
-      groupCode: group.code,
-      deliveryMethod: group.deliveryMethod,
-      deliveryMethodLabel: DELIVERY_METHOD_LABELS[group.deliveryMethod] || group.deliveryMethod,
-      coverageAreas,
-      coverageText: coverageAreas.join(', '),
-      estimatedTimeLabel: formatEstimatedTimeLabel(group, resolved),
-      cutoffTimeLabel: formatCutoffTimeLabel(group.cutoffTime),
-      availabilityLabel: resolved.available
-        ? 'Available on standard schedule'
-        : 'May require manual confirmation — you can still place an order',
-      ...resolved,
-      cutoffTime: group.cutoffTime,
-      estimatedDeliveryLabel: group.estimatedDeliveryLabel,
-      coverageLocations: group.coverageLocations,
-    };
-  });
+      return {
+        groupId: group._id,
+        groupName: group.name,
+        groupCode: group.code,
+        deliveryMethod: group.deliveryMethod,
+        deliveryMethodLabel: DELIVERY_METHOD_LABELS[group.deliveryMethod] || group.deliveryMethod,
+        coverageAreas,
+        coverageText: coverageAreas.join(', '),
+        estimatedTimeLabel: formatEstimatedTimeLabel(group, resolved),
+        cutoffTimeLabel: formatCutoffTimeLabel(group.cutoffTime),
+        availabilityLabel: resolved.available
+          ? 'Available on standard schedule'
+          : 'May require manual confirmation — you can still place an order',
+        ...resolved,
+        cutoffTime: group.cutoffTime,
+        estimatedDeliveryLabel: group.estimatedDeliveryLabel,
+        estimatedHours: group.estimatedHours,
+        coverageLocations: group.coverageLocations,
+      };
+    })
+    .filter((row) => row.available);

@@ -68,6 +68,8 @@ export const getManualBankPaymentDetails = async () => {
     const pluginSettings = await getSettings('plugins');
     const plugins = pluginSettings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
     whatsapp = plugins.plugins_config?.whatsapp_number || '';
+  }
+  // ... need more context
   } catch {
     /* optional */
   }
@@ -79,7 +81,7 @@ export const getManualBankPaymentDetails = async () => {
     branchName: creds.branchName || '',
     instruction: creds.instruction || '',
     qrCodeImage: creds.qrCodeImage || '',
-    csrWhatsApp: registry.registry_helpdesk_whatsapp || whatsapp || '',
+    csrWhatsApp: whatsapp || registry.registry_helpdesk_whatsapp || '',
   };
 };
 

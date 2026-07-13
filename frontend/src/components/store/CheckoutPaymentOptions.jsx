@@ -28,10 +28,10 @@ export function CheckoutCurrencyToggle({ currencies, value, onChange, selectedCu
     count <= 2
       ? 'grid-cols-2'
       : count <= 4
-        ? 'grid-cols-2 sm:grid-cols-4'
+        ? 'grid-cols-4'
         : count <= 6
-          ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6'
-          : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
+          ? 'grid-cols-4 sm:grid-cols-6'
+          : 'grid-cols-4 sm:grid-cols-5 lg:grid-cols-6';
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 w-full min-w-0">
@@ -112,7 +112,7 @@ export function CheckoutPaymentGrid({ gateways, value, onChange }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4 w-full min-w-0">
       <h3 className="text-sm sm:text-base font-bold text-slate-900">Choose payment method</h3>
-      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         {sorted.map((g) => {
           const selected = value === g.id;
           const label = g.displayLabel || PAYMENT_DISPLAY_LABELS[g.id] || g.id;

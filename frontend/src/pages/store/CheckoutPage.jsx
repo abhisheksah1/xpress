@@ -18,7 +18,6 @@ import { formatTimeSlotOption, formatTimeSlotSummary } from '../../utils/timeSlo
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { resolveCartItemPersonalization } from '../../utils/personalization.js';
 import {
-  DELIVERY_PREP_HOURS,
   filterAvailableTimeSlots,
   getMinPreferredDeliveryDate,
   validatePreferredDeliverySelection,
@@ -131,7 +130,20 @@ export default function CheckoutPage() {
   );
 
   useEffect(() => {
-    storeApi.getDeliveryLocations().then((res) => setDeliveryLocations(res.data.data || [])).catch(() => setDeliveryLocations([]));
+    storeApi
+      .getDeliveryLocations()
+      .then((res) => {
+        const locations = res.data.data || [];
+        setDeliveryLocations(locations);
+        setDeliveryLocationId((current) => {
+          if (current) return current;
+          const kathmandu = locations.find(
+            (loc) => String(loc.name || '').trim().toLowerCase() === 'kathmandu valley'
+          );
+          return kathmandu?._id ? String(kathmandu._id) : '';
+        });
+      })
+      .catch(() => setDeliveryLocations([]));
   }, []);
 
   const selectedDeliveryLocation = useMemo(
@@ -654,7 +666,6 @@ export default function CheckoutPage() {
                   id="preferred-date"
                   label="Preferred delivery date"
                   optional
-                  hint={`Orders need at least ${DELIVERY_PREP_HOURS} hours preparation time.`}
                 >
                   <input
                     id="preferred-date"

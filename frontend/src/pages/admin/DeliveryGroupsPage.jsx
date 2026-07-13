@@ -306,6 +306,7 @@ function GroupModal({ open, initial, locations, categories, products, onClose, o
           <div>
             <label className="block text-sm font-medium mb-1">Est. Delivery Time (label)</label>
             <input className="input-field" value={form.estimatedDeliveryLabel} onChange={(e) => setForm((f) => ({ ...f, estimatedDeliveryLabel: e.target.value }))} placeholder="Minimum 4 Hours" />
+            <p className="text-xs text-gray-400 mt-1">Shown on the product buy panel unless a product/category delivery rule overrides it.</p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Min Days</label>

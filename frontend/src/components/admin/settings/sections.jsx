@@ -544,7 +544,9 @@ export function PluginsSection({ values, set }) {
         <Field label="Google Tag Manager ID"><input className="input-field" value={plugins.google_tag_manager_id || ''} onChange={(e) => setPlugin('google_tag_manager_id', e.target.value)} /></Field>
         <Field label="Facebook Pixel ID"><input className="input-field" value={plugins.facebook_pixel_id || ''} onChange={(e) => setPlugin('facebook_pixel_id', e.target.value)} /></Field>
         <Field label="Hotjar ID"><input className="input-field" value={plugins.hotjar_id || ''} onChange={(e) => setPlugin('hotjar_id', e.target.value)} /></Field>
-        <Field label="WhatsApp Number"><input className="input-field" value={plugins.whatsapp_number || ''} onChange={(e) => setPlugin('whatsapp_number', e.target.value)} /></Field>
+        <Field label="WhatsApp Number" hint="Used for the storefront chat button and product WhatsApp help. Include country code or a 10-digit Nepal mobile (e.g. 98XXXXXXXX).">
+          <input className="input-field" value={plugins.whatsapp_number || ''} onChange={(e) => setPlugin('whatsapp_number', e.target.value)} placeholder="97798XXXXXXXX" />
+        </Field>
         <Field label="Messenger Page ID"><input className="input-field" value={plugins.messenger_page_id || ''} onChange={(e) => setPlugin('messenger_page_id', e.target.value)} /></Field>
       </div>
       <Toggle label="Enable WhatsApp Chat Button" checked={plugins.whatsapp_chat_enabled} onChange={(v) => setPlugin('whatsapp_chat_enabled', v)} />
@@ -863,7 +865,7 @@ export function ProductPageSection({ values, set }) {
           label="Show WhatsApp help banner on product pages"
           checked={values.product_whatsapp_help_enabled}
           onChange={(v) => set('product_whatsapp_help_enabled', v)}
-          hint="Uses Helpdesk WhatsApp from Store Registry or Plugins config."
+          hint="Uses WhatsApp number from Plugins Config (or Helpdesk WhatsApp from Store Registry)."
         />
         <Field label="WhatsApp help title">
           <input
