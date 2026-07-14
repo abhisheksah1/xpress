@@ -44,7 +44,14 @@ export default function LoginPage() {
       }
       finishLogin(result);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Invalid email or password');
+      const apiMessage = err.response?.data?.message;
+      if (apiMessage) {
+        toast.error(apiMessage);
+      } else if (!err.response) {
+        toast.error('Cannot reach the server. Check API URL / CORS settings.');
+      } else {
+        toast.error('Invalid email or password');
+      }
     } finally {
       setLoading(false);
     }

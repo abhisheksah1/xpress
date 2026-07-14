@@ -209,8 +209,9 @@ export const login = async ({
   ipAddress,
   trustDevice = true,
 }) => {
-  const user = await User.findOne({ email }).select('+password +refreshToken');
-  if (!user || !(await user.comparePassword(password))) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail }).select('+password +refreshToken');
+  if (!user || !(await user.comparePassword(String(password || '')))) {
     throw new ApiError(401, 'Invalid email or password');
   }
   if (!user.isActive) throw new ApiError(403, 'Account is deactivated');

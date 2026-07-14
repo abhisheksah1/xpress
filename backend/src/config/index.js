@@ -17,6 +17,13 @@ const config = {
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   adminUrl: process.env.ADMIN_URL || 'http://localhost:5173/admin',
   serverUrl: process.env.SERVER_URL || `http://localhost:${parseInt(process.env.PORT, 10) || 5000}`,
+  /** Comma-separated extra browser origins allowed by CORS (e.g. https://www.example.com,https://admin.example.com) */
+  corsOrigins: (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+  /** Cookie SameSite: use "none" when frontend and API are on different domains (requires HTTPS). */
+  cookieSameSite: process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
 
   db: {
     uri: process.env.MONGODB_URI,

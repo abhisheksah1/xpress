@@ -22,6 +22,7 @@ const seedSuperAdmin = async () => {
   let target = envEmail
     ? await User.findOne({ email: envEmail }).select('+password')
     : null;
+  const foundByEnvEmail = Boolean(target);
 
   const existingSuperAdmin = await User.findOne({ role: ROLES.SUPER_ADMIN }).select('+password');
 
@@ -36,9 +37,18 @@ const seedSuperAdmin = async () => {
       target.name = name;
       changed = true;
     }
+    // Only force email from env when that account already matches env email,
+    // or when creating/adopting and SUPER_ADMIN_FORCE_EMAIL=true.
+    // Otherwise keep the DB email (admins often change it in Compass).
     if (envEmail && target.email !== envEmail) {
-      target.email = envEmail;
-      changed = true;
+      if (foundByEnvEmail || process.env.SUPER_ADMIN_FORCE_EMAIL === 'true') {
+        target.email = envEmail;
+        changed = true;
+      } else {
+        console.warn(
+          `Super admin email in DB (${target.email}) differs from SUPER_ADMIN_EMAIL (${envEmail}). Keeping DB email. Set SUPER_ADMIN_FORCE_EMAIL=true to overwrite.`
+        );
+      }
     }
     if (phone && target.phone !== phone) {
       target.phone = phone;
