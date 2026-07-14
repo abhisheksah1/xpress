@@ -240,9 +240,9 @@ export default function FinancePurchasesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-slate-900">Purchase Entry</h2>
+        <h2 className="text-lg font-bold text-slate-900">Purchase Ledger</h2>
         <p className="text-sm text-slate-500 mt-1">
-          Lodge supplier wholesale bills, update stock, and deduct treasury automatically.
+          Lodge supplier wholesale bills, then review the purchase ledger report and export CSV.
         </p>
       </div>
 
@@ -562,7 +562,7 @@ export default function FinancePurchasesPage() {
       <div className="space-y-4">
         <div className="card flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
-            <h3 className="font-semibold text-slate-900">Purchase Entry Report</h3>
+            <h3 className="font-semibold text-slate-900">Purchase Ledger Report</h3>
             <p className="text-sm text-slate-500 mt-1">Summary of lodged wholesale bills for a custom date range.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-end">

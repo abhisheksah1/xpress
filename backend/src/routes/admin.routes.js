@@ -219,6 +219,8 @@ router.post('/finance/vendors', isAdmin, validate(createVendorSchema), financeCo
 router.get('/finance/vendors/:id', isAdmin, financeController.getVendor);
 router.patch('/finance/vendors/:id', isAdmin, validate(updateVendorSchema), financeController.updateVendor);
 router.delete('/finance/vendors/:id', isAdmin, financeController.deleteVendor);
+router.get('/finance/sales', isAdmin, financeController.getSalesLedger);
+router.get('/finance/sales/export', isAdmin, financeController.exportSalesLedgerCsv);
 router.get('/finance/purchases', isAdmin, financeController.listPurchases);
 router.get('/finance/purchases/report', isAdmin, financeController.getPurchaseReport);
 router.get('/finance/purchases/report/export', isAdmin, financeController.exportPurchaseReportCsv);

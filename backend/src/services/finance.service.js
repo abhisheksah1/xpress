@@ -581,6 +581,118 @@ export const getStockReport = async ({ search, lowStockOnly } = {}) => {
   return { rows, totals };
 };
 
+// ——— Sales ledger (customer orders) ———
+
+export const getSalesLedger = async ({
+  startDate,
+  endDate,
+  paymentStatus,
+  orderStatus,
+  paymentMethod,
+} = {}) => {
+  const filter = { isLead: { $ne: true } };
+  const dateRange = parseDateRange(startDate, endDate);
+  if (dateRange) filter.createdAt = dateRange;
+  if (paymentStatus) filter['payment.status'] = paymentStatus;
+  if (orderStatus) filter.status = orderStatus;
+  if (paymentMethod) filter['payment.method'] = paymentMethod;
+
+  const orders = await Order.find(filter)
+    .populate('user', 'name email phone')
+    .populate('deliveryLocation', 'name')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const summary = orders.reduce(
+    (acc, order) => {
+      const items = order.items || [];
+      const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      const total = Number(order.total) || 0;
+      const payStatus = order.payment?.status || 'pending';
+
+      acc.orderCount += 1;
+      acc.lineItems += items.length;
+      acc.unitsSold += units;
+      acc.subtotal += Number(order.subtotal) || 0;
+      acc.shippingFee += Number(order.shippingFee) || 0;
+      acc.discount += Number(order.discount) || 0;
+      acc.tax += Number(order.tax) || 0;
+      acc.grandTotal += total;
+
+      if (payStatus === 'paid') acc.paidTotal += total;
+      else if (payStatus === 'pending') acc.pendingTotal += total;
+      else if (payStatus === 'refunded') acc.refundedTotal += total;
+      else if (payStatus === 'failed') acc.failedTotal += total;
+
+      const method = order.payment?.method || 'unknown';
+      acc.byPaymentMethod[method] = (acc.byPaymentMethod[method] || 0) + 1;
+      acc.byOrderStatus[order.status || 'unknown'] = (acc.byOrderStatus[order.status || 'unknown'] || 0) + 1;
+
+      return acc;
+    },
+    {
+      orderCount: 0,
+      lineItems: 0,
+      unitsSold: 0,
+      subtotal: 0,
+      shippingFee: 0,
+      discount: 0,
+      tax: 0,
+      grandTotal: 0,
+      paidTotal: 0,
+      pendingTotal: 0,
+      refundedTotal: 0,
+      failedTotal: 0,
+      byPaymentMethod: {},
+      byOrderStatus: {},
+    }
+  );
+
+  const rows = orders.map((order) => {
+    const items = order.items || [];
+    const customerName =
+      order.sender?.fullName
+      || order.user?.name
+      || order.receiver?.fullName
+      || 'Guest';
+    const customerContact =
+      order.sender?.phone
+      || order.user?.phone
+      || order.guestPhone
+      || order.receiver?.phone
+      || order.guestEmail
+      || order.user?.email
+      || '';
+
+    return {
+      _id: order._id,
+      orderNumber: order.orderNumber,
+      date: order.createdAt,
+      customerName,
+      customerContact,
+      itemsCount: items.length,
+      units: items.reduce((sum, item) => sum + (item.quantity || 0), 0),
+      subtotal: order.subtotal || 0,
+      shippingFee: order.shippingFee || 0,
+      discount: order.discount || 0,
+      tax: order.tax || 0,
+      total: order.total || 0,
+      paymentMethod: order.payment?.method || '',
+      paymentStatus: order.payment?.status || 'pending',
+      orderStatus: order.status,
+      deliveryLocation: order.deliveryLocation?.name || '',
+      orderSource: order.orderSource || 'website',
+      couponCode: order.coupon?.code || '',
+    };
+  });
+
+  return {
+    period: { startDate: startDate || null, endDate: endDate || null },
+    summary,
+    rows,
+  };
+};
+
 // ——— Profit & Loss ———
 
 export const getProfitAndLoss = async ({ startDate, endDate } = {}) => {

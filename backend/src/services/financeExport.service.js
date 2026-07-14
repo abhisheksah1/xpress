@@ -42,6 +42,66 @@ export const buildPnlCsv = async (params) => {
   return rowsToCsv(rows);
 };
 
+export const buildSalesLedgerCsv = async (params) => {
+  const data = await financeService.getSalesLedger(params);
+  const rows = [
+    ['Sales Ledger Report'],
+    ['Period Start', data.period.startDate || ''],
+    ['Period End', data.period.endDate || ''],
+    ['Orders', data.summary.orderCount],
+    ['Line Items', data.summary.lineItems],
+    ['Units Sold', data.summary.unitsSold],
+    ['Subtotal (NPR)', data.summary.subtotal],
+    ['Shipping (NPR)', data.summary.shippingFee],
+    ['Discount (NPR)', data.summary.discount],
+    ['Tax (NPR)', data.summary.tax],
+    ['Grand Total (NPR)', data.summary.grandTotal],
+    ['Paid Total (NPR)', data.summary.paidTotal],
+    ['Pending Total (NPR)', data.summary.pendingTotal],
+    ['Refunded Total (NPR)', data.summary.refundedTotal],
+    [],
+    [
+      'Order #',
+      'Date',
+      'Customer',
+      'Contact',
+      'Items',
+      'Units',
+      'Subtotal (NPR)',
+      'Shipping (NPR)',
+      'Discount (NPR)',
+      'Tax (NPR)',
+      'Total (NPR)',
+      'Payment Method',
+      'Payment Status',
+      'Order Status',
+      'Delivery Location',
+      'Source',
+      'Coupon',
+    ],
+    ...(data.rows || []).map((row) => [
+      row.orderNumber,
+      fmtDate(row.date),
+      row.customerName,
+      row.customerContact,
+      row.itemsCount,
+      row.units,
+      row.subtotal,
+      row.shippingFee,
+      row.discount,
+      row.tax,
+      row.total,
+      row.paymentMethod,
+      row.paymentStatus,
+      row.orderStatus,
+      row.deliveryLocation,
+      row.orderSource,
+      row.couponCode,
+    ]),
+  ];
+  return rowsToCsv(rows);
+};
+
 export const buildPurchaseReportCsv = async (params) => {
   const data = await financeService.getPurchaseReport(params);
   const rows = [

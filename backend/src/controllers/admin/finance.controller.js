@@ -71,6 +71,11 @@ export const getPurchaseReport = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, data));
 });
 
+export const getSalesLedger = asyncHandler(async (req, res) => {
+  const data = await financeService.getSalesLedger(req.query);
+  res.json(new ApiResponse(200, data));
+});
+
 export const listExpenses = asyncHandler(async (req, res) => {
   const data = await financeService.listExpenses(req.query);
   res.json(new ApiResponse(200, data));
@@ -129,6 +134,11 @@ export const exportPnlCsv = asyncHandler(async (req, res) => {
 export const exportPurchaseReportCsv = asyncHandler(async (req, res) => {
   const csv = await financeExportService.buildPurchaseReportCsv(req.query);
   sendFinanceCsv(res, 'purchase-entry-report', csv);
+});
+
+export const exportSalesLedgerCsv = asyncHandler(async (req, res) => {
+  const csv = await financeExportService.buildSalesLedgerCsv(req.query);
+  sendFinanceCsv(res, 'sales-ledger-report', csv);
 });
 
 export const exportExpensesCsv = asyncHandler(async (req, res) => {

@@ -2,7 +2,8 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 const tabs = [
   { to: '/admin/finance/pnl', label: 'Profit & Loss' },
-  { to: '/admin/finance/purchases', label: 'Wholesale Purchases' },
+  { to: '/admin/finance/sales', label: 'Sales Ledger' },
+  { to: '/admin/finance/purchases', label: 'Purchase Ledger' },
   { to: '/admin/finance/expenses', label: 'Overhead Expenses' },
   { to: '/admin/finance/vendors', label: 'Vendor Registry' },
   { to: '/admin/finance/stock', label: 'Stock Valuation' },
@@ -15,7 +16,7 @@ export default function FinanceLayout() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Finance & Accounting</h1>
         <p className="text-sm text-slate-500 mt-1">
-          P&amp;L, supplier purchases, overhead, vendors, inventory valuation, and treasury.
+          P&amp;L, sales ledger, purchase ledger, overhead, vendors, inventory valuation, and treasury.
         </p>
       </div>
 

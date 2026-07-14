@@ -162,6 +162,9 @@ export const adminApi = {
   getFinancePurchaseReport: (params) => api.get('/admin/finance/purchases/report', { params }),
   exportFinancePurchaseReportCsv: (params) =>
     api.get('/admin/finance/purchases/report/export', { params, responseType: 'blob' }),
+  getFinanceSalesLedger: (params) => api.get('/admin/finance/sales', { params }),
+  exportFinanceSalesLedgerCsv: (params) =>
+    api.get('/admin/finance/sales/export', { params, responseType: 'blob' }),
   createFinancePurchase: (data) => api.post('/admin/finance/purchases', data),
   deleteFinancePurchase: (id) => api.delete(`/admin/finance/purchases/${id}`),
   getFinanceExpenses: (params) => api.get('/admin/finance/expenses', { params }),

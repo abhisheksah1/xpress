@@ -33,6 +33,7 @@ import ApiPartnersPage from './pages/admin/ApiPartnersPage';
 import PartnerReportsPage from './pages/admin/PartnerReportsPage';
 import FinanceLayout from './layouts/FinanceLayout';
 import FinancePnlPage from './pages/admin/finance/FinancePnlPage';
+import FinanceSalesPage from './pages/admin/finance/FinanceSalesPage';
 import FinancePurchasesPage from './pages/admin/finance/FinancePurchasesPage';
 import FinanceExpensesPage from './pages/admin/finance/FinanceExpensesPage';
 import FinanceVendorsPage from './pages/admin/finance/FinanceVendorsPage';
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="finance" element={<FinanceLayout />}>
           <Route index element={<FinancePnlPage />} />
           <Route path="pnl" element={<FinancePnlPage />} />
+          <Route path="sales" element={<FinanceSalesPage />} />
           <Route path="purchases" element={<FinancePurchasesPage />} />
           <Route path="expenses" element={<FinanceExpensesPage />} />
           <Route path="vendors" element={<FinanceVendorsPage />} />
