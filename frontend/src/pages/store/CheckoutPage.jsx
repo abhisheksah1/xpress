@@ -508,7 +508,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="bg-[#FCF9F9] min-h-screen overflow-x-hidden">
-      <div className="max-w-7xl mx-auto w-full min-w-0 px-3 sm:px-6 py-6 sm:py-10 pb-28 lg:pb-10">
+      <div className="max-w-7xl mx-auto w-full min-w-0 px-3 sm:px-6 py-6 sm:py-10">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Checkout</h1>
           <p className="text-sm text-slate-500 mt-1">Enter sender & receiver details, choose add-ons and payment.</p>
@@ -967,40 +967,15 @@ export default function CheckoutPage() {
                 type="button"
                 onClick={placeOrder}
                 disabled={placing || !gateways.length}
-                className="btn-primary w-full hidden lg:inline-flex justify-center"
+                className="w-full min-h-[48px] rounded-lg bg-[#16a34a] hover:bg-[#15803d] text-white text-base font-bold disabled:opacity-50 transition-colors inline-flex items-center justify-center"
               >
-                {placing ? 'Processing...' : 'Proceed to pay'}
+                {placing ? 'Processing...' : 'Place Order'}
               </button>
-              <p className="text-xs text-slate-400 text-center hidden lg:block">
-                By proceeding you agree to our terms and delivery policy.
+              <p className="text-xs text-slate-400 text-center">
+                By placing your order you agree to our terms and delivery policy.
               </p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-sm px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-      >
-        <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total</p>
-            <p className="text-lg font-extrabold text-slate-900 truncate">{fmt(totalsNpr.total)}</p>
-            {showNprDisclaimer && (
-              <p className="text-[10px] text-slate-500 truncate">
-                NPR Rs. {Number(totalsNpr.total).toLocaleString('en-NP')}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={placeOrder}
-            disabled={placing || !gateways.length}
-            className="btn-primary shrink-0 px-5 py-3 text-sm font-bold min-h-[44px]"
-          >
-            {placing ? 'Processing...' : 'Pay now'}
-          </button>
         </div>
       </div>
     </div>
