@@ -5,8 +5,8 @@ import { getClientIp, parseDeviceLabel } from '../utils/adminDevice.js';
 
 const REFRESH_COOKIE = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SAME_SITE === 'none',
+  sameSite: process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 

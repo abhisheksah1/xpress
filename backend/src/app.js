@@ -17,13 +17,46 @@ const app = express();
 
 app.set('trust proxy', 1);
 
+/** Browser Origin is scheme+host+port only — never includes path like /admin. */
+const toOrigin = (value) => {
+  if (!value) return null;
+  try {
+    const raw = String(value).trim();
+    if (!raw) return null;
+    const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    return new URL(withProtocol).origin;
+  } catch {
+    return null;
+  }
+};
+
+const allowedOrigins = new Set(
+  [config.clientUrl, config.adminUrl, config.serverUrl, ...(config.corsOrigins || [])]
+    .map(toOrigin)
+    .filter(Boolean)
+);
+
+if (config.env !== 'production') {
+  ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174']
+    .forEach((o) => allowedOrigins.add(o));
+}
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 app.use(
   cors({
-    origin: [config.clientUrl, config.adminUrl],
+    origin(origin, callback) {
+      // Non-browser / same-origin proxied requests have no Origin header
+      if (!origin || allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+      console.warn(`[cors] blocked origin: ${origin}`);
+      return callback(null, false);
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 app.use(morgan(config.env === 'development' ? 'dev' : 'combined'));
