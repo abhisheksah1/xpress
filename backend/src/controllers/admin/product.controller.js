@@ -48,7 +48,8 @@ export const bulkUpdatePrices = asyncHandler(async (req, res) => {
 });
 
 export const getCategories = asyncHandler(async (req, res) => {
-  const categories = await productService.getCategories(req.query.isActive);
+  const withProductCount = req.query.withProductCount === 'true' || req.query.withProductCount === '1';
+  const categories = await productService.getCategories(req.query.isActive, { withProductCount });
   res.json(new ApiResponse(200, categories));
 });
 
@@ -63,8 +64,10 @@ export const updateCategory = asyncHandler(async (req, res) => {
 });
 
 export const deleteCategory = asyncHandler(async (req, res) => {
-  await productService.deleteCategory(req.params.id);
-  res.json(new ApiResponse(200, null, 'Category deleted'));
+  const result = await productService.deleteCategory(req.params.id, {
+    reassignTo: req.query.reassignTo || req.body?.reassignTo,
+  });
+  res.json(new ApiResponse(200, result, 'Category deleted'));
 });
 
 export const getCatalogStats = asyncHandler(async (req, res) => {

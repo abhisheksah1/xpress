@@ -17,6 +17,12 @@ export function sanitizeProductHtml(html) {
     el.remove();
   });
 
+  doc.querySelectorAll('font').forEach((el) => {
+    const parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    el.remove();
+  });
+
   doc.querySelectorAll('*').forEach((el) => {
     [...el.attributes].forEach((attr) => {
       const name = attr.name.toLowerCase();
@@ -62,4 +68,25 @@ export function prepareProductContent(text) {
     return { mode: 'html', content: sanitizeProductHtml(text) };
   }
   return { mode: 'text', content: text.trim() };
+}
+
+/** Plain text for admin labels / previews. */
+export function htmlToPlainText(html) {
+  if (!html?.trim()) return '';
+  if (typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return (doc.body.textContent || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  }
+  return html
+    .replace(/<\/?font[^>]*>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

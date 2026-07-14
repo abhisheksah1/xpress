@@ -1,4 +1,4 @@
-import { Product, Category } from '../models/index.js';
+import { Product, Category, DeliveryGroup } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { normalizePersonalizationFields } from '../utils/personalization.js';
 import * as deliveryService from './delivery.service.js';
@@ -279,7 +279,6 @@ export const getCategories = async (isActive, options = {}) => {
   if (!options.withProductCount) return categories;
 
   const counts = await Product.aggregate([
-    { $match: { isActive: true } },
     {
       $project: {
         cats: {
@@ -311,13 +310,37 @@ export const updateCategory = async (id, data) => {
   return category;
 };
 
-export const deleteCategory = async (id) => {
-  const count = await Product.countDocuments({
-    $or: [{ category: id }, { categories: id }],
-  });
-  if (count > 0) throw new ApiError(400, 'Cannot delete category with products');
-  const category = await Category.findByIdAndDelete(id);
+export const deleteCategory = async (id, { reassignTo } = {}) => {
+  const category = await Category.findById(id);
   if (!category) throw new ApiError(404, 'Category not found');
+
+  const productFilter = { $or: [{ category: id }, { categories: id }] };
+  const count = await Product.countDocuments(productFilter);
+
+  if (count > 0) {
+    if (!reassignTo) {
+      throw new ApiError(
+        400,
+        `This category has ${count} product(s). Choose another category to move them to, then delete.`
+      );
+    }
+    if (String(reassignTo) === String(id)) {
+      throw new ApiError(400, 'Choose a different category to reassign products');
+    }
+    const target = await Category.findById(reassignTo);
+    if (!target) throw new ApiError(400, 'Target category for reassignment not found');
+
+    await Product.updateMany({ category: id }, { $set: { category: reassignTo } });
+    await Product.updateMany(
+      { categories: id },
+      { $pull: { categories: id }, $addToSet: { categories: reassignTo } }
+    );
+  }
+
+  await DeliveryGroup.updateMany({ categories: id }, { $pull: { categories: id } });
+  await Category.findByIdAndDelete(id);
+
+  return { deleted: true, productsReassigned: count };
 };
 
 export const getCatalogStats = async () => {

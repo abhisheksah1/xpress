@@ -17,6 +17,36 @@ import {
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 
+const isDevEnvironment = () =>
+  config.env === 'development' || process.env.NODE_ENV === 'development';
+
+const shouldSkipAdminOtp = () => {
+  if (process.env.ADMIN_LOGIN_REQUIRE_OTP === 'true') return false;
+  if (isDevEnvironment()) return true;
+  return process.env.ADMIN_LOGIN_SKIP_OTP === 'true';
+};
+
+const trustAdminDevice = async ({
+  userId,
+  fingerprintHash,
+  deviceLabel,
+  userAgent,
+  ipAddress,
+}) => {
+  await AdminTrustedDevice.findOneAndUpdate(
+    { user: userId, fingerprintHash },
+    {
+      user: userId,
+      fingerprintHash,
+      deviceLabel: deviceLabel || 'Trusted device',
+      userAgent: userAgent || '',
+      ipAddress: ipAddress || '',
+      lastUsedAt: new Date(),
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+};
+
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, config.jwt.accessSecret, {
     expiresIn: config.jwt.accessExpiresIn,
@@ -106,6 +136,21 @@ const createAdminOtpChallenge = async ({
       ipAddress,
     });
   } catch (err) {
+    if (isDevEnvironment()) {
+      console.warn(
+        `[dev] Admin OTP email failed (${err.message}). OTP for ${user.email}: ${otp}`
+      );
+      return {
+        requiresOtp: true,
+        challengeId: challenge._id,
+        emailHint: maskEmail(user.email),
+        deviceLabel: label,
+        expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
+        devOtp: otp,
+        devMessage: 'SMTP not configured — use this OTP or set ADMIN_LOGIN_SKIP_OTP (default in development).',
+      };
+    }
+
     await AdminLoginChallenge.deleteOne({ _id: challenge._id });
     throw new ApiError(
       err.statusCode || 503,
@@ -191,6 +236,20 @@ export const login = async ({
     trusted.ipAddress = ipAddress || trusted.ipAddress;
     if (deviceLabel) trusted.deviceLabel = deviceLabel;
     await trusted.save();
+    return completeLogin(user);
+  }
+
+  if (shouldSkipAdminOtp()) {
+    await trustAdminDevice({
+      userId: user._id,
+      fingerprintHash,
+      deviceLabel: deviceLabel || parseDeviceLabel(userAgent),
+      userAgent,
+      ipAddress,
+    });
+    if (isDevEnvironment()) {
+      console.log(`[dev] Admin OTP skipped for ${user.email} — device trusted automatically`);
+    }
     return completeLogin(user);
   }
 

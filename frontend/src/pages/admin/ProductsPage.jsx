@@ -30,6 +30,9 @@ function CategoriesTab({ categories, onRefresh }) {
   const [deliveryCategory, setDeliveryCategory] = useState(null);
   const [seoCategory, setSeoCategory] = useState(null);
   const [deliveryGroups, setDeliveryGroups] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [reassignTo, setReassignTo] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     adminApi.getDeliveryGroups().then(({ data }) => setDeliveryGroups(data.data));
@@ -59,14 +62,40 @@ function CategoriesTab({ categories, onRefresh }) {
     }
   };
 
-  const handleDelete = async (id, catName) => {
-    if (!confirm(`Delete category "${catName}"?`)) return;
+  const handleDelete = async (cat) => {
+    const count = cat.productCount ?? 0;
+    if (count > 0) {
+      setDeleteTarget(cat);
+      setReassignTo('');
+      return;
+    }
+    if (!confirm(`Delete category "${cat.name}"?`)) return;
     try {
-      await adminApi.deleteCategory(id);
+      await adminApi.deleteCategory(cat._id);
       toast.success('Category deleted');
       onRefresh();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Cannot delete category');
+    }
+  };
+
+  const confirmDeleteWithReassign = async () => {
+    if (!deleteTarget) return;
+    if (!reassignTo) {
+      toast.error('Select a category to move products to');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await adminApi.deleteCategory(deleteTarget._id, { reassignTo });
+      toast.success(`Category deleted. ${deleteTarget.productCount} product(s) moved.`);
+      setDeleteTarget(null);
+      setReassignTo('');
+      onRefresh();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Cannot delete category');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -93,6 +122,7 @@ function CategoriesTab({ categories, onRefresh }) {
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Name</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Slug</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Status</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Products</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Delivery</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">SEO</th>
               <th className="text-right px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Actions</th>
@@ -112,6 +142,11 @@ function CategoriesTab({ categories, onRefresh }) {
                 <td className="px-4 py-3">
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cat.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                     {cat.isActive ? 'ACTIVE' : 'INACTIVE'}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-xs font-semibold text-gray-700 tabular-nums">
+                    {cat.productCount ?? 0}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -139,18 +174,58 @@ function CategoriesTab({ categories, onRefresh }) {
                   ) : (
                     <>
                       <button onClick={() => { setEditing(cat._id); setEditName(cat.name); }} className="text-primary-600 text-xs font-medium">Edit</button>
-                      <button onClick={() => handleDelete(cat._id, cat.name)} className="text-red-500 text-xs font-medium">Delete</button>
+                      <button onClick={() => handleDelete(cat)} className="text-red-600 text-xs font-semibold">Delete</button>
                     </>
                   )}
                 </td>
               </tr>
             ))}
             {!categories.length && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No categories yet</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No categories yet</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">Delete category</h3>
+            <p className="text-sm text-gray-600">
+              <strong>{deleteTarget.name}</strong> has {deleteTarget.productCount} product(s).
+              Move them to another category before deleting.
+            </p>
+            <div>
+              <label className="block text-sm font-medium mb-1">Move products to</label>
+              <select
+                className="input-field text-sm"
+                value={reassignTo}
+                onChange={(e) => setReassignTo(e.target.value)}
+              >
+                <option value="">Select category</option>
+                {categories
+                  .filter((c) => c._id !== deleteTarget._id)
+                  .map((c) => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="btn-secondary text-sm">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteWithReassign}
+                disabled={deleting || !reassignTo}
+                className="text-sm font-semibold px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Move products & delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {seoCategory && (
         <CategoryEditModal
@@ -198,7 +273,7 @@ export default function ProductsPage() {
   const importRef = useRef(null);
 
   const loadCategories = useCallback(async () => {
-    const { data } = await adminApi.getCategories();
+    const { data } = await adminApi.getCategories({ withProductCount: true });
     setCategories(data.data);
   }, []);
 
@@ -326,6 +401,7 @@ export default function ProductsPage() {
       const result = data.data;
       setImportResult(result);
       const parts = [
+        result.totalRows != null ? `${result.totalRows} rows` : null,
         `${result.created} created`,
         result.updated ? `${result.updated} updated` : null,
         result.failed?.length ? `${result.failed.length} failed` : null,
@@ -333,6 +409,9 @@ export default function ProductsPage() {
       toast.success(`Import finished: ${parts.join(', ')}`);
       if (result.categoriesCreated?.length) {
         toast.success(`New categories: ${result.categoriesCreated.join(', ')}`, { duration: 5000 });
+      }
+      if (result.failed?.length) {
+        toast.error(`${result.failed.length} row(s) failed — see details below`, { duration: 6000 });
       }
       refresh();
       loadCategories();
@@ -443,9 +522,14 @@ export default function ProductsPage() {
                 <div>
                   <p className="font-semibold text-gray-900">Last CSV import</p>
                   <p className="text-gray-500 mt-1">
+                    {importResult.totalRows != null ? `${importResult.totalRows} CSV rows · ` : ''}
                     {importResult.created} created
                     {importResult.updated ? ` · ${importResult.updated} updated` : ''}
                     {importResult.failed?.length ? ` · ${importResult.failed.length} failed` : ''}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Products update only when SKU (or an explicit slug) matches an existing product.
+                    Same product names without matching SKUs create separate products.
                   </p>
                   {importResult.categoriesCreated?.length > 0 && (
                     <p className="text-green-700 mt-1">

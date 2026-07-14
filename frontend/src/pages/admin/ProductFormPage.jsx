@@ -7,11 +7,13 @@ import ComboItemsEditor from '../../components/admin/ComboItemsEditor.jsx';
 import AdminImageDropzone from '../../components/admin/AdminImageDropzone.jsx';
 import { serializeComboItemsForApi, buildComboShortDescription } from '../../utils/comboItems.js';
 import { auditSeo, generateSeoFields, generateSkuPreview, slugify } from '../../utils/seoAuditor.js';
+import AdminDescriptionPreview from '../../components/admin/AdminDescriptionPreview.jsx';
 import {
   ADMIN_PERSONALIZATION_OPTIONS,
   defaultPersonalizationFields,
   normalizePersonalizationFields,
 } from '../../utils/personalization.js';
+import { htmlToPlainText } from '../../utils/productHtml.js';
 
 const BRANDS = ['Koseli Artisans', 'Koseli Premium', 'Local Partners', 'Imported Selection'];
 const STATUS_OPTIONS = [
@@ -629,12 +631,13 @@ export default function ProductFormPage() {
                 </label>
               </div>
               <textarea
-                className="input-field font-mono text-sm"
+                className="input-field text-sm leading-relaxed"
                 rows={4}
                 value={form.description}
                 onChange={(e) => set('description', e.target.value)}
                 placeholder="Brief summary shown below the product title when enabled"
               />
+              <AdminDescriptionPreview content={form.description} label="Short description preview" />
               <p className="text-xs text-gray-400 mt-1">
                 {form.isHamper
                   ? 'Auto-filled from linked product short descriptions when combo contents change. Enable to show below the product title on the store.'
@@ -643,7 +646,22 @@ export default function ProductFormPage() {
             </div>
             <div>
               <FieldLabel>Product Long Description (SEO Rich Paragraphs)</FieldLabel>
-              <textarea className="input-field font-mono text-sm" rows={8} value={form.longDescription} onChange={(e) => set('longDescription', e.target.value)} placeholder="Full HTML description — delivery info, tutorial links, WhatsApp, etc." />
+              <textarea
+                className="input-field text-sm leading-relaxed"
+                rows={8}
+                value={form.longDescription}
+                onChange={(e) => set('longDescription', e.target.value)}
+                placeholder="Full description — delivery info, links, etc. HTML from CSV is cleaned on import."
+              />
+              <AdminDescriptionPreview content={form.longDescription} label="Long description preview (customer view)" />
+              {form.longDescription && htmlToPlainText(form.longDescription) !== form.longDescription.trim() && (
+                <details className="mt-2">
+                  <summary className="text-xs text-slate-500 cursor-pointer">Show raw HTML source</summary>
+                  <pre className="mt-2 text-[11px] text-slate-600 bg-slate-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap font-mono">
+                    {form.longDescription}
+                  </pre>
+                </details>
+              )}
             </div>
             <div>
               <FieldLabel>Additional Note</FieldLabel>

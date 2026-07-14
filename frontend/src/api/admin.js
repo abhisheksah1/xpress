@@ -14,10 +14,10 @@ export const adminApi = {
   downloadImportTemplate: () => api.get('/admin/products/import/template', { responseType: 'blob' }),
   exportProducts: () => api.get('/admin/products/export', { responseType: 'blob' }),
 
-  getCategories: () => api.get('/admin/categories'),
+  getCategories: (params) => api.get('/admin/categories', { params }),
   createCategory: (data) => api.post('/admin/categories', data),
   updateCategory: (id, data) => api.patch(`/admin/categories/${id}`, data),
-  deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
+  deleteCategory: (id, params) => api.delete(`/admin/categories/${id}`, { params }),
 
   getSettings: (group) => api.get('/admin/settings', { params: group ? { group } : {} }),
   bulkUpdateSettings: (settings) => api.patch('/admin/settings/bulk', { settings }),
