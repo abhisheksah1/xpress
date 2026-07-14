@@ -32,11 +32,14 @@ export function StoreProvider({ children }) {
     return localStorage.getItem(DISPLAY_CURRENCY_KEY) || 'NPR';
   });
 
-  const currencies = useMemo(() => getCheckoutDisplayCurrencies(settings), [settings]);
+  // Never expose undefined settings — live API can return empty/null payloads
+  const safeSettings = settings && typeof settings === 'object' ? settings : {};
+
+  const currencies = useMemo(() => getCheckoutDisplayCurrencies(safeSettings), [safeSettings]);
 
   const displayCurrency = useMemo(
-    () => currencies.find((c) => c.code === displayCurrencyCode) || getDefaultCurrency(settings),
-    [currencies, displayCurrencyCode, settings]
+    () => currencies.find((c) => c.code === displayCurrencyCode) || getDefaultCurrency(safeSettings),
+    [currencies, displayCurrencyCode, safeSettings]
   );
 
   const setDisplayCurrencyCode = (code) => {
@@ -51,14 +54,14 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    const primary = settings.primary_color || '#E11D48';
-    const secondary = settings.secondary_color || '#1E293B';
+    const primary = safeSettings.primary_color || '#E11D48';
+    const secondary = safeSettings.secondary_color || '#1E293B';
     root.style.setProperty('--brand-primary', primary);
     root.style.setProperty('--brand-secondary', secondary);
-  }, [settings.primary_color, settings.secondary_color]);
+  }, [safeSettings.primary_color, safeSettings.secondary_color]);
 
   useEffect(() => {
-    const href = resolveFaviconUrl(settings);
+    const href = resolveFaviconUrl(safeSettings);
     const iconLinks = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
     iconLinks.forEach((el) => {
       if (href) {
@@ -74,16 +77,16 @@ export function StoreProvider({ children }) {
       apple.setAttribute('href', href);
       document.head.appendChild(apple);
     }
-  }, [settings.favicon_url, settings.logo_url]);
+  }, [safeSettings.favicon_url, safeSettings.logo_url]);
 
   useEffect(() => {
     if (loading || !currencies.length) return;
     const valid = currencies.some((c) => c.code === displayCurrencyCode);
     if (!valid) {
-      const fallback = getDefaultCurrency(settings)?.code || currencies[0]?.code || 'NPR';
+      const fallback = getDefaultCurrency(safeSettings)?.code || currencies[0]?.code || 'NPR';
       setDisplayCurrencyCode(fallback);
     }
-  }, [loading, currencies, displayCurrencyCode, settings]);
+  }, [loading, currencies, displayCurrencyCode, safeSettings]);
 
   const refresh = async () => {
     try {
@@ -92,11 +95,12 @@ export function StoreProvider({ children }) {
         storeApi.getNavbar('header'),
         storeApi.getNavbar('footer'),
       ]);
-      setSettings(settingsRes.data.data);
-      setHeaderNav(headerRes.data.data?.[0] || null);
-      setFooterNav(footerRes.data.data?.[0] || null);
+      const payload = settingsRes?.data?.data;
+      setSettings(payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {});
+      setHeaderNav(headerRes?.data?.data?.[0] || null);
+      setFooterNav(footerRes?.data?.data?.[0] || null);
     } catch {
-      /* use defaults */
+      setSettings((prev) => (prev && typeof prev === 'object' ? prev : {}));
     } finally {
       setLoading(false);
     }
@@ -112,7 +116,7 @@ export function StoreProvider({ children }) {
   return (
     <StoreContext.Provider
       value={{
-        settings,
+        settings: safeSettings,
         headerNav,
         footerNav,
         loading,

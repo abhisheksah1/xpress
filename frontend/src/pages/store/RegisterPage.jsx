@@ -14,7 +14,7 @@ import {
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { settings } = useStore();
+  const { settings = {} } = useStore();
   const setUser = useAuthStore((s) => s.setUser);
   const [form, setForm] = useState({
     name: '',

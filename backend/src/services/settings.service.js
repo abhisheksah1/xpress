@@ -318,7 +318,7 @@ export const getPublicSettings = async () => {
   if (result.primary_color) {
     result.primary_color = result.primary_color || result.primary_color_legacy;
   }
-  return result;
+  return result || {};
 };
 
 const syncBrandingLogoToNavbars = async (logoUrl, userId) => {

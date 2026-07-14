@@ -120,8 +120,8 @@ export default function CheckoutPage() {
   );
 
   const serviceAddons = useMemo(
-    () => (settings.service_addons || []).filter((a) => a.enabled !== false),
-    [settings.service_addons]
+    () => (settings?.service_addons || []).filter((a) => a.enabled !== false),
+    [settings?.service_addons]
   );
 
   const minDeliveryDate = useMemo(
