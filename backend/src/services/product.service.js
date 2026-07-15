@@ -35,18 +35,15 @@ export const createProduct = async (data, userId) => {
 };
 
 export const updateProduct = async (id, data, userId) => {
-  const existing = await Product.findById(id).select('isHamper');
+  const existing = await Product.findById(id);
+  if (!existing) throw new ApiError(404, 'Product not found');
   const prepared = await comboService.prepareComboProductData(withNormalizedPersonalization(data), id);
-  const product = await Product.findByIdAndUpdate(
-    id,
-    { ...prepared, updatedBy: userId },
-    { new: true, runValidators: true }
-  );
-  if (!product) throw new ApiError(404, 'Product not found');
-  if (existing && !existing.isHamper && !product.isHamper) {
-    await comboService.syncComboProductsContaining([product._id]);
+  Object.assign(existing, prepared, { updatedBy: userId });
+  await existing.save();
+  if (!existing.isHamper) {
+    await comboService.syncComboProductsContaining([existing._id]);
   }
-  return Product.findById(product._id).populate('comboItems.product', 'name slug sku price stock images');
+  return Product.findById(existing._id).populate('comboItems.product', 'name slug sku price stock images');
 };
 
 export const getProducts = async ({

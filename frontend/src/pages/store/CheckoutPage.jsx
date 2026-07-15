@@ -98,7 +98,6 @@ export default function CheckoutPage() {
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
-  const [leavingForPayment, setLeavingForPayment] = useState(false);
   const leavingForPaymentRef = useRef(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -481,31 +480,33 @@ export default function CheckoutPage() {
         total: order.total,
       });
 
-      // Show redirect UI first so clearing the cart never flashes the empty-cart page
-      leavingForPaymentRef.current = true;
-      setLeavingForPayment(true);
-      clearCart();
-
+      // Hard-navigate to the gateway BEFORE any React state updates.
+      // Updating cart/UI first paints checkout/cart empty screens for a few frames.
       const redirected = redirectToPayment(method, payment);
       if (redirected) {
-        // Keep placing/leaving flags true until browser navigates away
+        leavingForPaymentRef.current = true;
+        window.setTimeout(() => {
+          try {
+            useCartStore.getState().clearCart();
+          } catch {
+            /* page may already be unloading */
+          }
+        }, 1000);
         return;
       }
 
-      leavingForPaymentRef.current = false;
-      setLeavingForPayment(false);
+      clearCart();
       setPlacing(false);
       toast.success('Order created — complete payment to confirm.');
       navigate('/orders');
     } catch (err) {
       leavingForPaymentRef.current = false;
-      setLeavingForPayment(false);
       setPlacing(false);
       toast.error(err.response?.data?.message || 'Failed to place order');
     }
   };
 
-  if (leavingForPayment || leavingForPaymentRef.current) {
+  if (leavingForPaymentRef.current) {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         <h1 className="text-2xl font-bold text-slate-900 mb-3">Redirecting to payment</h1>

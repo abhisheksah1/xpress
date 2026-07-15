@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { seoHtmlInjectPlugin } from './vite-plugin-seo-inject.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,7 +23,7 @@ function getBackendProxyTarget() {
 const apiProxy = getBackendProxyTarget();
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), seoHtmlInjectPlugin({ apiTarget: apiProxy })],
   server: {
     host: '127.0.0.1',
     port: 5173,

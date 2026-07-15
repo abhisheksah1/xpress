@@ -130,6 +130,7 @@ export const createProductSchema = z.object({
     metaDescription: z.string().optional(),
     metaKeywords: z.array(z.string()).optional(),
     focusKeyword: z.string().optional(),
+    seo: seoMetaZod,
   }),
 });
 

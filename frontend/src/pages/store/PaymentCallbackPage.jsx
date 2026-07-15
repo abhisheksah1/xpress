@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { storeApi } from '../../api/store.js';
+import { useCartStore } from '../../store/cartStore.js';
 import {
   clearPendingPayment,
   loadPendingPayment,
@@ -31,8 +32,14 @@ function resolveCardCallback(params, pending) {
 export default function PaymentCallbackPage({ mode = 'khalti' }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const clearCart = useCartStore((s) => s.clearCart);
   const [status, setStatus] = useState('processing');
   const [message, setMessage] = useState('Confirming your payment with the bank...');
+
+  useEffect(() => {
+    // Cart is kept until payment redirect completes; clear it on return
+    clearCart();
+  }, [clearCart]);
 
   useEffect(() => {
     let cancelled = false;

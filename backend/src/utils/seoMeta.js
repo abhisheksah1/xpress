@@ -34,6 +34,7 @@ export const seoMetaZod = z.object({
     'AboutPage',
     'ContactPage',
     'CollectionPage',
+    'Product',
     'LocalBusiness',
     'none',
   ]).optional(),

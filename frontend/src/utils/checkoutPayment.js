@@ -152,7 +152,8 @@ export function redirectToPayment(method, payment) {
   if (method === 'khalti') {
     const url = payment.payment_url || payment.paymentUrl;
     if (url) {
-      window.location.href = url;
+      // assign() navigates immediately; avoid intervening React re-renders that look like cart
+      window.location.assign(url);
       return true;
     }
   }
@@ -160,7 +161,7 @@ export function redirectToPayment(method, payment) {
   if (method === 'imepay' || method === 'hbl') {
     const url = payment.paymentUrl || payment.redirectUrl;
     if (url) {
-      window.location.href = url;
+      window.location.assign(url);
       return true;
     }
   }

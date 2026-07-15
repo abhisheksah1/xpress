@@ -90,28 +90,39 @@ export function stripHtmlText(html = '') {
 
 export function mergeProductSeo(product = {}) {
   const primaryImage = product.images?.find((i) => i.isPrimary) || product.images?.[0];
-  const rawDesc = product.metaDescription
+  const fromSeo = product.seo && typeof product.seo === 'object' ? product.seo : {};
+  const rawDesc = fromSeo.metaDescription
+    || product.metaDescription
     || (product.shortDescriptionEnabled && product.shortDescription)
     || product.shortDescription
     || product.description
     || product.longDescription
     || '';
-  const description = product.metaDescription || stripHtmlText(rawDesc).slice(0, 160);
-  const title = product.metaTitle || `${product.name} | Buy Online in Nepal | KoseliXpress`.slice(0, 60);
+  const description = fromSeo.metaDescription || product.metaDescription || stripHtmlText(rawDesc).slice(0, 160);
+  const title = fromSeo.metaTitle
+    || product.metaTitle
+    || `${product.name || 'Product'} | Buy Online in Nepal | KoseliXpress`.slice(0, 60);
+
+  const keywords = Array.isArray(fromSeo.metaKeywords) && fromSeo.metaKeywords.length
+    ? fromSeo.metaKeywords
+    : Array.isArray(product.metaKeywords)
+      ? product.metaKeywords
+      : [];
 
   return normalizeSeoMeta(
     {
-      metaTitle: product.metaTitle,
-      metaDescription: description,
-      focusKeyword: product.focusKeyword,
-      metaKeywords: Array.isArray(product.metaKeywords) ? product.metaKeywords : [],
-      schemaType: 'Product',
+      ...fromSeo,
+      metaTitle: fromSeo.metaTitle || product.metaTitle,
+      metaDescription: fromSeo.metaDescription || product.metaDescription || description,
+      focusKeyword: fromSeo.focusKeyword || product.focusKeyword,
+      metaKeywords: keywords,
+      schemaType: fromSeo.schemaType || 'Product',
     },
     {
       title,
       description: description || `Shop ${product.name} online at KoseliXpress Nepal.`,
-      image: primaryImage?.url,
-      imageAlt: primaryImage?.alt || product.name,
+      image: fromSeo.ogImage?.url || primaryImage?.url,
+      imageAlt: fromSeo.ogImage?.alt || primaryImage?.alt || product.name,
       path: product.slug ? `/shop/${product.slug}` : '',
       schemaType: 'Product',
     }
@@ -133,6 +144,7 @@ export function normalizeSeoMeta(seo = {}, fallbacks = {}) {
     || fallbacks.description?.trim()
     || site.meta_description?.trim()
     || '';
+  const cleanDescription = stripHtmlText(description).slice(0, 320);
   const keywords = Array.isArray(seo.metaKeywords) && seo.metaKeywords.length
     ? seo.metaKeywords
     : String(site.meta_keywords || '')
@@ -147,6 +159,7 @@ export function normalizeSeoMeta(seo = {}, fallbacks = {}) {
     || '';
 
   const canonical = seo.canonicalUrl?.trim()
+    || fallbacks.path
     || fallbacks.url
     || '';
 
@@ -160,11 +173,13 @@ export function normalizeSeoMeta(seo = {}, fallbacks = {}) {
 
   return {
     metaTitle: title,
-    metaDescription: description,
+    metaDescription: cleanDescription,
     focusKeyword: seo.focusKeyword?.trim() || '',
     metaKeywords: keywords,
     ogTitle: seo.ogTitle?.trim() || title,
-    ogDescription: seo.ogDescription?.trim() || description,
+    ogDescription: seo.ogDescription?.trim()
+      ? stripHtmlText(seo.ogDescription).slice(0, 320)
+      : cleanDescription,
     ogImage: {
       url: ogImageUrl,
       alt: seo.ogImage?.alt?.trim() || fallbacks.imageAlt || title,
