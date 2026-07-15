@@ -39,7 +39,11 @@ export const initiatePayment = async (order, method, options = {}) => {
 const resolveOrderIdForVerification = async (orderId, verificationData) => {
   if (orderId) return orderId;
 
-  const merchantTxnId = verificationData?.merchantTxnId || verificationData?.MerchantTxnId;
+  const merchantTxnId =
+    verificationData?.merchantTxnId
+    || verificationData?.MerchantTxnId
+    || verificationData?.purchase_order_id
+    || verificationData?.purchaseOrderId;
   if (!merchantTxnId) return null;
 
   const order = await Order.findOne({ orderNumber: String(merchantTxnId) });
@@ -110,33 +114,41 @@ export const processPaymentVerification = async (orderId, method, verificationDa
   if (!service) throw new ApiError(400, 'Unsupported payment method');
 
   let result;
-  switch (method) {
-    case PAYMENT_METHODS.KHALTI:
-      result = await khaltiService.verifyPayment(
-        verificationData.token,
-        Math.round(order.total * 100),
-        creds
-      );
-      break;
-    case PAYMENT_METHODS.ESEWA:
-      result = await esewaService.verifyPayment(
-        verificationData.productCode,
-        verificationData.totalAmount,
-        verificationData.transactionUuid,
-        creds
-      );
-      break;
-    case PAYMENT_METHODS.FONEPAY:
-      result = await fonepayService.verifyPayment(verificationData);
-      break;
-    case PAYMENT_METHODS.IMEPAY:
-      result = await imepayService.verifyPayment(verificationData);
-      break;
-    case PAYMENT_METHODS.HBL:
-      result = await hblService.verifyPayment(verificationData);
-      break;
-    default:
-      throw new ApiError(400, 'Unsupported payment method');
+  try {
+    switch (method) {
+      case PAYMENT_METHODS.KHALTI:
+        result = await khaltiService.verifyPayment(
+          verificationData.token || verificationData.pidx,
+          Math.round(Number(order.total) * 100),
+          creds,
+          env
+        );
+        break;
+      case PAYMENT_METHODS.ESEWA:
+        result = await esewaService.verifyPayment(
+          verificationData.productCode,
+          verificationData.totalAmount,
+          verificationData.transactionUuid,
+          creds
+        );
+        break;
+      case PAYMENT_METHODS.FONEPAY:
+        result = await fonepayService.verifyPayment(verificationData);
+        break;
+      case PAYMENT_METHODS.IMEPAY:
+        result = await imepayService.verifyPayment(verificationData);
+        break;
+      case PAYMENT_METHODS.HBL:
+        result = await hblService.verifyPayment(verificationData);
+        break;
+      default:
+        throw new ApiError(400, 'Unsupported payment method');
+    }
+  } catch (err) {
+    if (err.statusCode === 202 || err.outcome === 'pending') {
+      return { order, outcome: 'pending', message: err.message || 'Payment is still processing' };
+    }
+    throw err;
   }
 
   const updated = await orderService.markPaymentPaid(
@@ -164,8 +176,24 @@ export const syncOrderPaymentStatus = async (orderId) => {
   if (order.payment?.status === PAYMENT_STATUS.PAID) return order;
 
   const method = order.payment?.method;
+  if (method === PAYMENT_METHODS.KHALTI) {
+    const pidx = order.payment?.gatewayResponse?.initiate?.pidx
+      || order.payment?.gatewayResponse?.pidx;
+    if (!pidx) {
+      throw new ApiError(400, 'No Khalti payment reference saved on this order. Confirm manually if payment was received.');
+    }
+    const result = await processPaymentVerification(orderId, method, { token: pidx, pidx });
+    if (result.outcome === 'failed') {
+      throw new ApiError(400, result.message || 'Payment failed at gateway');
+    }
+    if (result.outcome === 'pending') {
+      throw new ApiError(400, result.message || 'Payment is still pending at gateway');
+    }
+    return result.order;
+  }
+
   if (![PAYMENT_METHODS.CARD, PAYMENT_METHODS.HBL].includes(method)) {
-    throw new ApiError(400, 'Payment sync is only supported for card/HBL gateway orders');
+    throw new ApiError(400, 'Payment sync is only supported for card/HBL/Khalti gateway orders');
   }
 
   const result = await processPaymentVerification(orderId, method, {

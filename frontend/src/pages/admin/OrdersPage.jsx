@@ -267,11 +267,11 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                   <div>
                     <p className="text-sm font-semibold text-orange-900">Unpaid checkout lead</p>
                     <p className="text-xs text-orange-800 mt-1">
-                      Payment was not confirmed in the system yet. For card payments, try syncing from NPS gateway first.
-                      Otherwise contact the sender, then confirm manually or cancel if the customer does not proceed.
+                      Payment was not confirmed in the system yet. For Khalti/card, try syncing from the gateway first
+                      (if a payment reference was saved). Otherwise enter the Khalti transaction ID and confirm payment manually.
                     </p>
                   </div>
-                  {(order.payment?.method === 'card' || order.payment?.method === 'hbl') && (
+                  {(order.payment?.method === 'card' || order.payment?.method === 'hbl' || order.payment?.method === 'khalti') && (
                     <button
                       type="button"
                       onClick={syncPaymentFromGateway}

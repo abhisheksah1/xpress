@@ -31,6 +31,26 @@ export const createOrder = asyncHandler(async (req, res) => {
     returnBaseUrl: req.get('origin') || config.clientUrl,
     serverBaseUrl: config.serverUrl,
   });
+
+  // Persist gateway payment reference for later reconcile (especially Khalti pidx)
+  if (payment?.pidx || payment?.payment_url || payment?.paymentUrl) {
+    try {
+      order.payment = order.payment || {};
+      order.payment.gatewayResponse = {
+        ...(order.payment.gatewayResponse || {}),
+        initiate: {
+          pidx: payment.pidx,
+          purchaseOrderId: payment.purchaseOrderId || order.orderNumber,
+          amount: payment.amount,
+          environment: payment.environment,
+        },
+      };
+      await order.save();
+    } catch (err) {
+      console.warn('[payment] Could not persist initiate response:', err.message);
+    }
+  }
+
   res.status(201).json(new ApiResponse(201, { order, payment }, 'Order created'));
 });
 

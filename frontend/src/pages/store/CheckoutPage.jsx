@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCartStore } from '../../store/cartStore.js';
@@ -98,6 +98,8 @@ export default function CheckoutPage() {
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [leavingForPayment, setLeavingForPayment] = useState(false);
+  const leavingForPaymentRef = useRef(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -479,21 +481,39 @@ export default function CheckoutPage() {
         total: order.total,
       });
 
+      // Show redirect UI first so clearing the cart never flashes the empty-cart page
+      leavingForPaymentRef.current = true;
+      setLeavingForPayment(true);
+      clearCart();
+
       const redirected = redirectToPayment(method, payment);
       if (redirected) {
-        clearCart();
+        // Keep placing/leaving flags true until browser navigates away
         return;
       }
 
+      leavingForPaymentRef.current = false;
+      setLeavingForPayment(false);
+      setPlacing(false);
       toast.success('Order created — complete payment to confirm.');
-      clearCart();
       navigate('/orders');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to place order');
-    } finally {
+      leavingForPaymentRef.current = false;
+      setLeavingForPayment(false);
       setPlacing(false);
+      toast.error(err.response?.data?.message || 'Failed to place order');
     }
   };
+
+  if (leavingForPayment || leavingForPaymentRef.current) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold text-slate-900 mb-3">Redirecting to payment</h1>
+        <p className="text-slate-600 mb-2">Please wait — opening your selected payment method…</p>
+        <p className="text-xs text-slate-400">Do not refresh or press back.</p>
+      </div>
+    );
+  }
 
   if (!items.length) {
     return (
