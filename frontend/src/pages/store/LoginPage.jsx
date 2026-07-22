@@ -94,7 +94,7 @@ export default function LoginPage() {
     <div className={`max-w-md mx-auto px-4 py-16${isAdminLogin ? ' min-h-screen flex items-center' : ''}`}>
       <div className="card w-full">
         <h1 className="text-2xl font-bold mb-2 text-center">
-          {challenge ? 'Verify your device' : isAdminLogin ? 'superAdmin Login' : 'Login'}
+          {challenge ? 'Verify your device' : isAdminLogin ? 'Admin Login' : 'Login'}
         </h1>
         <p className="text-sm text-gray-500 text-center mb-6">
           {challenge

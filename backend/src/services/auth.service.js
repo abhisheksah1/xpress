@@ -20,11 +20,12 @@ const OTP_MAX_ATTEMPTS = 5;
 const isDevEnvironment = () =>
   config.env === 'development' || process.env.NODE_ENV === 'development';
 
-const shouldSkipAdminOtp = () => {
-  if (process.env.ADMIN_LOGIN_REQUIRE_OTP === 'true') return false;
-  if (isDevEnvironment()) return true;
-  return process.env.ADMIN_LOGIN_SKIP_OTP === 'true';
-};
+/**
+ * Skip OTP only when explicitly enabled (local convenience).
+ * Never auto-skip just because NODE_ENV=development — that caused production
+ * logins to bypass email verification and auto-trust devices.
+ */
+const shouldSkipAdminOtp = () => process.env.ADMIN_LOGIN_SKIP_OTP === 'true';
 
 const trustAdminDevice = async ({
   userId,
@@ -42,6 +43,7 @@ const trustAdminDevice = async ({
       userAgent: userAgent || '',
       ipAddress: ipAddress || '',
       lastUsedAt: new Date(),
+      verifiedViaOtp: true,
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
@@ -147,7 +149,7 @@ const createAdminOtpChallenge = async ({
         deviceLabel: label,
         expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
         devOtp: otp,
-        devMessage: 'Brevo not configured — use this OTP or set ADMIN_LOGIN_SKIP_OTP (default in development).',
+        devMessage: 'Brevo not configured — use this OTP, or set ADMIN_LOGIN_SKIP_OTP=true for local only.',
       };
     }
 
@@ -217,6 +219,7 @@ export const login = async ({
   if (!user.isActive) throw new ApiError(403, 'Account is deactivated');
 
   if (!isStaffRole(user.role)) {
+    // Customers never use admin device OTP
     return completeLogin(user);
   }
 
@@ -226,9 +229,12 @@ export const login = async ({
   }
 
   const fingerprintHash = hashDeviceFingerprint(fingerprint, user._id);
+
+  // Trusted device (verified via OTP + "Trust this device") → login without OTP
   const trusted = await AdminTrustedDevice.findOne({
     user: user._id,
     fingerprintHash,
+    verifiedViaOtp: true,
   });
 
   if (trusted) {
@@ -240,20 +246,15 @@ export const login = async ({
     return completeLogin(user);
   }
 
+  // Local-only bypass — do NOT mark device as trusted
   if (shouldSkipAdminOtp()) {
-    await trustAdminDevice({
-      userId: user._id,
-      fingerprintHash,
-      deviceLabel: deviceLabel || parseDeviceLabel(userAgent),
-      userAgent,
-      ipAddress,
-    });
     if (isDevEnvironment()) {
-      console.log(`[dev] Admin OTP skipped for ${user.email} — device trusted automatically`);
+      console.log(`[dev] Admin OTP skipped for ${user.email} (ADMIN_LOGIN_SKIP_OTP=true)`);
     }
     return completeLogin(user);
   }
 
+  // New / untrusted device → email OTP
   return createAdminOtpChallenge({
     user,
     fingerprint,
@@ -313,18 +314,13 @@ export const verifyAdminLoginOtp = async ({
 
   const shouldTrust = trustDevice !== undefined ? trustDevice !== false : challenge.trustDevice;
   if (shouldTrust) {
-    await AdminTrustedDevice.findOneAndUpdate(
-      { user: user._id, fingerprintHash },
-      {
-        user: user._id,
-        fingerprintHash,
-        deviceLabel: challenge.deviceLabel,
-        userAgent: challenge.userAgent,
-        ipAddress: challenge.ipAddress,
-        lastUsedAt: new Date(),
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    await trustAdminDevice({
+      userId: user._id,
+      fingerprintHash,
+      deviceLabel: challenge.deviceLabel,
+      userAgent: challenge.userAgent,
+      ipAddress: challenge.ipAddress,
+    });
   }
 
   await challenge.deleteOne();

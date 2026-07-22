@@ -8,6 +8,8 @@ const adminTrustedDeviceSchema = new mongoose.Schema(
     userAgent: { type: String, default: '' },
     ipAddress: { type: String, default: '' },
     lastUsedAt: { type: Date, default: Date.now },
+    /** Only devices verified via email OTP may skip OTP on later logins. */
+    verifiedViaOtp: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
