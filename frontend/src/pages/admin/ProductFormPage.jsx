@@ -8,6 +8,8 @@ import AdminImageDropzone from '../../components/admin/AdminImageDropzone.jsx';
 import { serializeComboItemsForApi, buildComboShortDescription } from '../../utils/comboItems.js';
 import { auditSeo, generateSeoFields, generateSkuPreview, slugify } from '../../utils/seoAuditor.js';
 import AdminDescriptionPreview from '../../components/admin/AdminDescriptionPreview.jsx';
+import SeoMetaEditor from '../../components/admin/SeoMetaEditor.jsx';
+import { emptySeoMeta, mergeEntitySeoForEditor } from '../../utils/seoMeta.js';
 import {
   ADMIN_PERSONALIZATION_OPTIONS,
   defaultPersonalizationFields,
@@ -62,6 +64,7 @@ const defaultForm = () => ({
   metaDescription: '',
   metaKeywords: '',
   focusKeyword: '',
+  seo: emptySeoMeta({ schemaType: 'Product' }),
   tags: '',
 });
 
@@ -242,10 +245,21 @@ export default function ProductFormPage() {
           isHamper: p.isHamper ?? false,
           comboItems: mappedComboItems,
           optionCategories: p.optionCategories || [],
-          metaTitle: p.metaTitle || '',
-          metaDescription: p.metaDescription || '',
-          metaKeywords: (p.metaKeywords || []).join(', '),
-          focusKeyword: p.focusKeyword || '',
+          metaTitle: p.metaTitle || p.seo?.metaTitle || '',
+          metaDescription: p.metaDescription || p.seo?.metaDescription || '',
+          metaKeywords: (p.seo?.metaKeywords || p.metaKeywords || []).join(', '),
+          focusKeyword: p.seo?.focusKeyword || p.focusKeyword || '',
+          seo: mergeEntitySeoForEditor({
+            ...p,
+            seo: {
+              ...(p.seo || {}),
+              metaTitle: p.seo?.metaTitle || p.metaTitle,
+              metaDescription: p.seo?.metaDescription || p.metaDescription,
+              focusKeyword: p.seo?.focusKeyword || p.focusKeyword,
+              metaKeywords: p.seo?.metaKeywords?.length ? p.seo.metaKeywords : p.metaKeywords,
+              schemaType: p.seo?.schemaType || 'Product',
+            },
+          }),
           tags: (p.tags || []).join(', '),
         });
         setImages(
@@ -391,11 +405,37 @@ export default function ProductFormPage() {
       metaKeywords: form.metaKeywords ? form.metaKeywords.split(',').map((k) => k.trim()) : [],
       tags: form.tags ? form.tags.split(',').map((t) => t.trim()) : [],
     });
-    set('metaTitle', generated.metaTitle);
-    set('metaDescription', generated.metaDescription);
-    set('metaKeywords', generated.metaKeywords.join(', '));
-    if (!form.focusKeyword && form.name) set('focusKeyword', form.name.split(' ')[0].toLowerCase());
+    const focusKeyword = form.focusKeyword || (form.name ? form.name.split(' ')[0].toLowerCase() : '');
+    setForm((f) => ({
+      ...f,
+      metaTitle: generated.metaTitle,
+      metaDescription: generated.metaDescription,
+      metaKeywords: generated.metaKeywords.join(', '),
+      focusKeyword,
+      seo: {
+        ...emptySeoMeta({ schemaType: 'Product' }),
+        ...(f.seo || {}),
+        metaTitle: generated.metaTitle,
+        metaDescription: generated.metaDescription,
+        metaKeywords: generated.metaKeywords,
+        focusKeyword,
+        ogTitle: f.seo?.ogTitle || generated.metaTitle,
+        ogDescription: f.seo?.ogDescription || generated.metaDescription,
+        schemaType: 'Product',
+      },
+    }));
     toast.success('SEO fields generated');
+  };
+
+  const handleSeoChange = (seo) => {
+    setForm((f) => ({
+      ...f,
+      seo,
+      metaTitle: seo.metaTitle || '',
+      metaDescription: seo.metaDescription || '',
+      focusKeyword: seo.focusKeyword || '',
+      metaKeywords: Array.isArray(seo.metaKeywords) ? seo.metaKeywords.join(', ') : '',
+    }));
   };
 
   const buildPayload = () => {
@@ -445,10 +485,27 @@ export default function ProductFormPage() {
       isActive: statusOpt.isActive,
       isGiftWrappable: form.personalizationFields.giftMessage?.enabled,
       giftMessageEnabled: form.personalizationFields.giftMessage?.enabled,
-      metaTitle: form.metaTitle || undefined,
-      metaDescription: form.metaDescription || undefined,
-      metaKeywords: form.metaKeywords ? form.metaKeywords.split(',').map((k) => k.trim()).filter(Boolean) : [],
-      focusKeyword: form.focusKeyword || undefined,
+      metaTitle: form.seo?.metaTitle || form.metaTitle || undefined,
+      metaDescription: form.seo?.metaDescription || form.metaDescription || undefined,
+      metaKeywords: form.seo?.metaKeywords?.length
+        ? form.seo.metaKeywords
+        : form.metaKeywords
+          ? form.metaKeywords.split(',').map((k) => k.trim()).filter(Boolean)
+          : [],
+      focusKeyword: form.seo?.focusKeyword || form.focusKeyword || undefined,
+      seo: {
+        ...emptySeoMeta({ schemaType: 'Product' }),
+        ...(form.seo || {}),
+        metaTitle: form.seo?.metaTitle || form.metaTitle || undefined,
+        metaDescription: form.seo?.metaDescription || form.metaDescription || undefined,
+        focusKeyword: form.seo?.focusKeyword || form.focusKeyword || undefined,
+        metaKeywords: form.seo?.metaKeywords?.length
+          ? form.seo.metaKeywords
+          : form.metaKeywords
+            ? form.metaKeywords.split(',').map((k) => k.trim()).filter(Boolean)
+            : [],
+        schemaType: form.seo?.schemaType || 'Product',
+      },
       tags: [
         ...(form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : []),
         ...(form.isHamper ? ['hamper'] : []),
@@ -899,25 +956,37 @@ export default function ProductFormPage() {
                 AI SEO Generate
               </button>
             </div>
-            <div>
-              <FieldLabel>Meta Search Title</FieldLabel>
-              <input className="input-field text-sm" value={form.metaTitle} onChange={(e) => set('metaTitle', e.target.value)} />
-            </div>
-            <div>
-              <FieldLabel>Meta Description Tag</FieldLabel>
-              <textarea className="input-field text-sm" rows={2} value={form.metaDescription} onChange={(e) => set('metaDescription', e.target.value)} />
-            </div>
-            <div>
-              <FieldLabel>Meta Keywords List</FieldLabel>
-              <input className="input-field text-sm" value={form.metaKeywords} onChange={(e) => set('metaKeywords', e.target.value)} placeholder="comma-separated" />
-            </div>
+            <SeoMetaEditor
+              value={form.seo || emptySeoMeta({ schemaType: 'Product' })}
+              onChange={handleSeoChange}
+              pageTitle={form.name}
+              pageDescription={htmlToPlainText(form.description || form.longDescription || '')}
+              canonicalPreview={form.slug ? `/shop/${form.slug}` : ''}
+              defaultSchemaType="Product"
+              onUploadImage={async (file) => {
+                const { data } = await adminApi.uploadImage(file);
+                return data.data;
+              }}
+            />
           </section>
 
           <section className="card">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-3">Real-Time SEO Auditor</h2>
             <div>
               <FieldLabel>Target Focus Keyword</FieldLabel>
-              <input className="input-field text-sm mb-4" value={form.focusKeyword} onChange={(e) => set('focusKeyword', e.target.value)} placeholder="e.g. belgian chocolate gift" />
+              <input
+                className="input-field text-sm mb-4"
+                value={form.focusKeyword}
+                onChange={(e) => {
+                  const focusKeyword = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    focusKeyword,
+                    seo: { ...(f.seo || emptySeoMeta({ schemaType: 'Product' })), focusKeyword },
+                  }));
+                }}
+                placeholder="e.g. belgian chocolate gift"
+              />
             </div>
             <SeoGauge score={seoAudit.score} rating={seoAudit.rating} />
             <div className="mb-4">

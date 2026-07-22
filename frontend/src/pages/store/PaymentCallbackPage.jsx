@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { storeApi } from '../../api/store.js';
+import { useCartStore } from '../../store/cartStore.js';
 import {
   clearPendingPayment,
   loadPendingPayment,
@@ -31,8 +32,14 @@ function resolveCardCallback(params, pending) {
 export default function PaymentCallbackPage({ mode = 'khalti' }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const clearCart = useCartStore((s) => s.clearCart);
   const [status, setStatus] = useState('processing');
   const [message, setMessage] = useState('Confirming your payment with the bank...');
+
+  useEffect(() => {
+    // Cart is kept until payment redirect completes; clear it on return
+    clearCart();
+  }, [clearCart]);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,12 +79,35 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
 
       let pending = loadPendingPayment();
 
+      // Khalti return URL includes purchase_order_id even if browser storage was cleared
+      if ((!pending?.orderId || !pending?.method) && mode === 'khalti') {
+        const pidx = params.get('pidx') || params.get('token');
+        const purchaseOrderId = params.get('purchase_order_id');
+        if (pidx && (purchaseOrderId || pending?.orderId)) {
+          pending = {
+            ...(pending || {}),
+            method: 'khalti',
+            orderId: pending?.orderId,
+            orderNumber: purchaseOrderId || pending?.orderNumber,
+          };
+        }
+      }
+
       if ((!pending?.orderId || !pending?.method) && mode === 'card') {
         const cardPayload = resolveCardCallback(params, pending);
         if (cardPayload) pending = cardPayload;
       }
 
-      if (!pending?.method) {
+      if (!pending?.method || (!pending?.orderId && mode !== 'khalti' && mode !== 'card')) {
+        if (!cancelled) {
+          setStatus('error');
+          setMessage('Payment session expired. Check your orders or contact support.');
+        }
+        return;
+      }
+
+      // Khalti can verify without orderId when purchase_order_id is present
+      if (!pending?.orderId && mode === 'khalti' && !params.get('purchase_order_id') && !pending?.orderNumber) {
         if (!cancelled) {
           setStatus('error');
           setMessage('Payment session expired. Check your orders or contact support.');
@@ -91,10 +121,25 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
         if (pending.method === 'khalti') {
           const token = params.get('pidx') || params.get('token');
           const paymentStatus = params.get('status');
-          if (!token || paymentStatus === 'Canceled' || paymentStatus === 'User canceled') {
+          const purchaseOrderId = params.get('purchase_order_id') || pending.orderNumber;
+          if (!token) {
+            throw new Error('Khalti payment reference missing');
+          }
+          if (
+            paymentStatus === 'Canceled'
+            || paymentStatus === 'User canceled'
+            || paymentStatus === 'User cancelled'
+            || paymentStatus === 'Expired'
+          ) {
             throw new Error('Payment was cancelled');
           }
-          verification = { ...verification, token };
+          verification = {
+            ...verification,
+            token,
+            pidx: token,
+            merchantTxnId: purchaseOrderId || undefined,
+            purchase_order_id: purchaseOrderId || undefined,
+          };
         } else if (pending.method === 'esewa') {
           const decoded = parseEsewaCallback(params);
           if (!decoded || decoded.status !== 'COMPLETE') {

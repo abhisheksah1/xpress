@@ -130,6 +130,7 @@ export const createProductSchema = z.object({
     metaDescription: z.string().optional(),
     metaKeywords: z.array(z.string()).optional(),
     focusKeyword: z.string().optional(),
+    seo: seoMetaZod,
   }),
 });
 
@@ -248,6 +249,9 @@ export const verifyPaymentSchema = z.object({
       orderId: z.string().min(1).optional(),
       method: z.enum(['khalti', 'esewa', 'imepay', 'fonepay', 'card', 'hbl']),
       token: z.string().optional(),
+      pidx: z.string().optional(),
+      purchase_order_id: z.string().optional(),
+      purchaseOrderId: z.string().optional(),
       productCode: z.string().optional(),
       totalAmount: z.union([z.string(), z.number()]).optional(),
       transactionUuid: z.string().optional(),
@@ -258,8 +262,8 @@ export const verifyPaymentSchema = z.object({
       merchantTxnId: z.string().optional(),
       gatewayTxnId: z.string().optional(),
     })
-    .refine((data) => data.orderId || data.merchantTxnId, {
-      message: 'orderId or merchantTxnId is required',
+    .refine((data) => data.orderId || data.merchantTxnId || data.purchase_order_id || data.purchaseOrderId, {
+      message: 'orderId, merchantTxnId, or purchase_order_id is required',
     }),
 });
 

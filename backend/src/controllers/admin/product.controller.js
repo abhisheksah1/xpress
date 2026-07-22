@@ -13,7 +13,7 @@ const escapeCsv = (val) => {
 };
 
 export const createProduct = asyncHandler(async (req, res) => {
-  const product = await productService.createProduct(req.body, req.user._id);
+  const product = await productService.createProduct(mergeSeoPayload(req.body), req.user._id);
   res.status(201).json(new ApiResponse(201, product, 'Product created'));
 });
 
@@ -28,7 +28,7 @@ export const getProduct = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const product = await productService.updateProduct(req.params.id, req.body, req.user._id);
+  const product = await productService.updateProduct(req.params.id, mergeSeoPayload(req.body), req.user._id);
   res.json(new ApiResponse(200, product, 'Product updated'));
 });
 

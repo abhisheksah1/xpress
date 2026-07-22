@@ -71,8 +71,8 @@ export const buildSitemapXml = async () => {
 
   const [categories, products, blogs, pages] = await Promise.all([
     Category.find({ isActive: true }).select('slug updatedAt seo').lean(),
-    Product.find({ isActive: true }).select('slug updatedAt').lean(),
-    Blog.find({ isPublished: true }).select('slug updatedAt publishedAt').lean(),
+    Product.find({ isActive: true }).select('slug updatedAt seo').lean(),
+    Blog.find({ isPublished: true }).select('slug updatedAt publishedAt seo').lean(),
     CMSPage.find({ isPublished: true }).select('slug pageType updatedAt seo').lean(),
   ]);
 
@@ -93,12 +93,12 @@ export const buildSitemapXml = async () => {
   }
 
   for (const product of products) {
-    if (!product.slug) continue;
+    if (!product.slug || product.seo?.robotsIndex === false) continue;
     addUrl(`/shop/${product.slug}`, product.updatedAt, 'weekly', '0.7');
   }
 
   for (const blog of blogs) {
-    if (!blog.slug) continue;
+    if (!blog.slug || blog.seo?.robotsIndex === false) continue;
     addUrl(`/blog/${blog.slug}`, blog.updatedAt || blog.publishedAt, 'monthly', '0.6');
   }
 

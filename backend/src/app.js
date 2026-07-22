@@ -4,11 +4,14 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import config from './config/index.js';
 import routes from './routes/index.js';
 import * as seoController from './controllers/seo.controller.js';
+import { resolveSeoForPath } from './services/seoResolve.service.js';
+import { injectSeoIntoHtml } from './utils/htmlSeo.js';
 import { errorHandler, notFound } from './middlewares/error.middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -89,6 +92,31 @@ app.get('/robots.txt', seoController.robotsTxt);
 app.get('/sitemap.xml', seoController.sitemapXml);
 
 app.use(`/api/${config.apiVersion}`, routes);
+
+/** Serve storefront build with per-path SEO injection so crawlers see admin meta without JS. */
+if (config.frontendDist) {
+  const distPath = path.resolve(config.frontendDist);
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    app.use(express.static(distPath, { index: false, maxAge: config.env === 'production' ? '1d' : 0 }));
+
+    app.get('*', async (req, res, next) => {
+      try {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        if (req.path.startsWith('/api')) return next();
+        if (/\.[a-zA-Z0-9]+$/.test(req.path) && !req.path.endsWith('.html')) return next();
+
+        const html = await fs.promises.readFile(indexPath, 'utf8');
+        const meta = await resolveSeoForPath(req.path);
+        res.type('html').send(injectSeoIntoHtml(html, meta));
+      } catch (err) {
+        next(err);
+      }
+    });
+  } else {
+    console.warn(`[seo] FRONTEND_DIST set but index.html not found at ${indexPath}`);
+  }
+}
 
 app.use(notFound);
 app.use(errorHandler);

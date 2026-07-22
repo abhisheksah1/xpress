@@ -102,6 +102,12 @@ const config = {
   google: {
     placesApiKey: process.env.GOOGLE_PLACES_API_KEY || '',
   },
+
+  /**
+   * Optional path to frontend production build (e.g. ../frontend/dist).
+   * When set, Express serves the SPA and injects admin SEO into index.html for crawlers.
+   */
+  frontendDist: process.env.FRONTEND_DIST || '',
 };
 
 export default config;

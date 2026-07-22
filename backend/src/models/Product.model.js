@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { generateSlug, generateSKU } from '../utils/helpers.js';
+import { seoMetaSchema, syncLegacySeoFields } from './schemas/seoMeta.schema.js';
 import { deliveryGroupRuleSchema } from './schemas/deliveryGroupRule.schema.js';
 import { comboItemSchema } from './schemas/comboItem.schema.js';
 
@@ -101,6 +102,7 @@ const productSchema = new mongoose.Schema(
     metaDescription: { type: String },
     metaKeywords: [{ type: String, trim: true }],
     focusKeyword: { type: String, trim: true },
+    seo: { type: seoMetaSchema, default: () => ({}) },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
@@ -112,6 +114,21 @@ productSchema.index({ name: 'text', description: 'text', tags: 'text' });
 productSchema.pre('save', function (next) {
   if (!this.slug && this.name) this.slug = generateSlug(this.name);
   if (!this.sku) this.sku = generateSKU();
+  syncLegacySeoFields(this);
+  if (!this.seo?.schemaType) {
+    if (!this.seo) this.seo = {};
+    this.seo.schemaType = 'Product';
+  }
+  if (Array.isArray(this.metaKeywords) && this.metaKeywords.length && !this.seo?.metaKeywords?.length) {
+    this.seo.metaKeywords = this.metaKeywords;
+  }
+  if (this.focusKeyword && !this.seo?.focusKeyword) {
+    this.seo.focusKeyword = this.focusKeyword;
+  }
+  if (this.seo?.focusKeyword) this.focusKeyword = this.seo.focusKeyword;
+  if (Array.isArray(this.seo?.metaKeywords) && this.seo.metaKeywords.length) {
+    this.metaKeywords = this.seo.metaKeywords;
+  }
   next();
 });
 

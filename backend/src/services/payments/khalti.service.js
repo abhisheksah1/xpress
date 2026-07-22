@@ -6,6 +6,24 @@ const initiateUrl = (env) =>
     ? 'https://khalti.com/api/v2/epayment/initiate/'
     : 'https://dev.khalti.com/api/v2/epayment/initiate/';
 
+/** ePayment v2 lookup — never use legacy /payment/verify/ (widget API). */
+const lookupUrl = (env) => {
+  const configured = String(config.payments.khalti.verifyUrl || '').trim();
+  const isLegacyWidget = /\/payment\/verify\/?$/i.test(configured);
+  const isLookup = /epayment\/lookup/i.test(configured);
+
+  if (configured && !isLegacyWidget && isLookup) {
+    if (env === 'production') {
+      return configured.replace('https://dev.khalti.com', 'https://khalti.com');
+    }
+    return configured.replace('https://khalti.com', 'https://dev.khalti.com');
+  }
+
+  return env === 'production'
+    ? 'https://khalti.com/api/v2/epayment/lookup/'
+    : 'https://dev.khalti.com/api/v2/epayment/lookup/';
+};
+
 export const initiatePayment = async (order, creds, env) => {
   const secretKey = creds?.secretKey || config.payments.khalti.secretKey;
   const publicKey = creds?.publicKey || config.payments.khalti.publicKey;
@@ -13,7 +31,7 @@ export const initiatePayment = async (order, creds, env) => {
     throw new ApiError(503, 'Khalti is not configured');
   }
 
-  const amountPaisa = Math.round(order.total * 100);
+  const amountPaisa = Math.round(Number(order.total) * 100);
   const response = await fetch(initiateUrl(env), {
     method: 'POST',
     headers: {
@@ -29,9 +47,9 @@ export const initiatePayment = async (order, creds, env) => {
     }),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok || !data?.pidx) {
-    throw new ApiError(400, data?.detail || data?.error_key || 'Khalti payment initiation failed');
+    throw new ApiError(400, data?.detail || data?.error_key || data?.message || 'Khalti payment initiation failed');
   }
 
   return {
@@ -48,29 +66,59 @@ export const initiatePayment = async (order, creds, env) => {
   };
 };
 
-export const verifyPayment = async (token, amount, creds) => {
+/**
+ * Verify Khalti ePayment using Payment Lookup API.
+ * Body must be { pidx } only — not the legacy widget { token, amount }.
+ */
+export const verifyPayment = async (pidx, expectedAmountPaisa, creds, env = 'production') => {
   const secretKey = creds?.secretKey || config.payments.khalti.secretKey;
   if (!secretKey) {
     throw new ApiError(503, 'Khalti is not configured');
   }
+  if (!pidx) {
+    throw new ApiError(400, 'Khalti payment reference (pidx) is missing');
+  }
 
-  const verifyUrl = config.payments.khalti.verifyUrl || 'https://khalti.com/api/v2/epayment/lookup/';
+  const verifyUrl = lookupUrl(env);
   const response = await fetch(verifyUrl, {
     method: 'POST',
     headers: {
       Authorization: `Key ${secretKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ pidx: token, amount }),
+    body: JSON.stringify({ pidx }),
   });
 
-  const data = await response.json();
-  if (!response.ok || data.status !== 'Completed') {
-    throw new ApiError(400, data.detail || data.error_key || 'Khalti payment verification failed');
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new ApiError(400, data.detail || data.error_key || data.message || 'Khalti payment verification failed');
+  }
+
+  const status = String(data.status || '');
+  if (status !== 'Completed') {
+    if (['Pending', 'Initiated'].includes(status)) {
+      const err = new ApiError(202, `Khalti payment is still ${status.toLowerCase()}. Please wait a moment.`);
+      err.outcome = 'pending';
+      throw err;
+    }
+    throw new ApiError(400, `Khalti payment ${status || 'not completed'}`);
+  }
+
+  const paidPaisa = Number(data.total_amount);
+  if (
+    Number.isFinite(expectedAmountPaisa)
+    && Number.isFinite(paidPaisa)
+    && Math.abs(paidPaisa - expectedAmountPaisa) > 1
+  ) {
+    throw new ApiError(
+      400,
+      `Khalti amount mismatch (paid ${paidPaisa} paisa, expected ${expectedAmountPaisa} paisa)`
+    );
   }
 
   return {
-    transactionId: data.transaction_id || data.idx || token,
+    transactionId: data.transaction_id || data.idx || pidx,
     gatewayResponse: data,
+    outcome: 'success',
   };
 };

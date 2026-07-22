@@ -43,6 +43,7 @@ export const seoMetaSchema = new mongoose.Schema(
         'AboutPage',
         'ContactPage',
         'CollectionPage',
+        'Product',
         'LocalBusiness',
         'none',
       ],
