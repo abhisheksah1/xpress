@@ -84,6 +84,11 @@ const config = {
 
   email: {
     brevoApiKey: process.env.BREVO_API_KEY || '',
+    smtpLogin: process.env.BREVO_SMTP_LOGIN || '',
+    smtpKey: process.env.BREVO_SMTP_KEY || '',
+    senderEmail: process.env.BREVO_SENDER_EMAIL || '',
+    senderName: process.env.BREVO_SENDER_NAME || 'KoseliXpress',
+    /** Legacy fallback if BREVO_SENDER_EMAIL is not set */
     from: process.env.EMAIL_FROM || 'KoseliXpress <noreply@koselixpress.com>',
   },
 

@@ -745,7 +745,7 @@ export function SmtpSection({ values, set }) {
     <div className="space-y-6">
       <SectionCard
         title="Brevo Configuration"
-        description="Transactional email via Brevo API. Used for admin login OTP codes, order emails, and reminders. Create an API key under Brevo → SMTP & API → API Keys. The From address must be a verified sender."
+        description="Prefer .env: BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME (verified sender in Brevo). Optional overrides below. Used for admin OTP, order emails, and reminders."
         onSave={() => saveSection(emailKeys.filter((k) => k !== 'email_templates').concat(['email_templates']), values, setSaving)}
         saving={saving}
       >

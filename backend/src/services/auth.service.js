@@ -160,6 +160,18 @@ const createAdminOtpChallenge = async ({
     );
   }
 
+  // Localhost: log that OTP was emailed (code only if ADMIN_LOGIN_LOG_OTP=true).
+  const isLocalHost =
+    /localhost|127\.0\.0\.1/i.test(String(config.clientUrl || '')) ||
+    process.env.ADMIN_LOGIN_LOG_OTP === 'true';
+  if (isLocalHost) {
+    if (process.env.ADMIN_LOGIN_LOG_OTP === 'true') {
+      console.log(`[admin-otp] emailed to ${user.email} | code=${otp} | device=${label}`);
+    } else {
+      console.log(`[admin-otp] emailed to ${user.email} | device=${label}`);
+    }
+  }
+
   return {
     requiresOtp: true,
     challengeId: challenge._id,
