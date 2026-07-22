@@ -725,17 +725,17 @@ export function SmtpSection({ values, set }) {
     set('email_templates', { ...templates, [key]: { ...templates[key], [field]: val } });
   };
 
-  const smtpKeys = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_templates'];
+  const emailKeys = ['brevo_api_key', 'email_from', 'email_templates'];
 
   const sendTest = async () => {
     if (!testEmail) return toast.error('Enter test email');
     setTesting(true);
     try {
-      await adminApi.bulkUpdateSettings(smtpKeys.map((key) => ({ key, value: values[key] })));
+      await adminApi.bulkUpdateSettings(emailKeys.map((key) => ({ key, value: values[key] })));
       await adminApi.testSmtp(testEmail);
-      toast.success('Test email sent');
+      toast.success('Test email sent via Brevo');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'SMTP test failed');
+      toast.error(err.response?.data?.message || 'Brevo test failed');
     } finally {
       setTesting(false);
     }
@@ -743,14 +743,31 @@ export function SmtpSection({ values, set }) {
 
   return (
     <div className="space-y-6">
-      <SectionCard title="SMTP Configuration" description="Outgoing email server settings." onSave={() => saveSection(smtpKeys.filter((k) => k !== 'email_templates').concat(['email_templates']), values, setSaving)} saving={saving}>
+      <SectionCard
+        title="Brevo Configuration"
+        description="Transactional email via Brevo API. Used for admin login OTP codes, order emails, and reminders. Create an API key under Brevo → SMTP & API → API Keys. The From address must be a verified sender."
+        onSave={() => saveSection(emailKeys.filter((k) => k !== 'email_templates').concat(['email_templates']), values, setSaving)}
+        saving={saving}
+      >
         <div className="grid md:grid-cols-2 gap-4">
-          <Field label="SMTP Host"><input className="input-field" value={values.smtp_host || ''} onChange={(e) => set('smtp_host', e.target.value)} placeholder="smtp.gmail.com" /></Field>
-          <Field label="SMTP Port"><input type="number" className="input-field" value={values.smtp_port ?? 587} onChange={(e) => set('smtp_port', Number(e.target.value))} /></Field>
-          <Field label="SMTP Username"><input className="input-field" value={values.smtp_user || ''} onChange={(e) => set('smtp_user', e.target.value)} /></Field>
-          <Field label="SMTP Password"><input type="password" className="input-field" value={values.smtp_pass || ''} onChange={(e) => set('smtp_pass', e.target.value)} /></Field>
-          <Field label="From Address"><input className="input-field" value={values.email_from || ''} onChange={(e) => set('email_from', e.target.value)} /></Field>
-          <Toggle label="Use SSL/TLS (port 465)" checked={values.smtp_secure} onChange={(v) => set('smtp_secure', v)} />
+          <Field label="Brevo API Key">
+            <input
+              type="password"
+              className="input-field"
+              value={values.brevo_api_key || ''}
+              onChange={(e) => set('brevo_api_key', e.target.value)}
+              placeholder="xkeysib-..."
+              autoComplete="off"
+            />
+          </Field>
+          <Field label="From Address">
+            <input
+              className="input-field"
+              value={values.email_from || ''}
+              onChange={(e) => set('email_from', e.target.value)}
+              placeholder="KoseliXpress <noreply@yourdomain.com>"
+            />
+          </Field>
         </div>
         <div className="flex gap-2 items-end pt-2">
           <Field label="Send Test Email">

@@ -83,10 +83,7 @@ const config = {
   },
 
   email: {
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT, 10) || 587,
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    brevoApiKey: process.env.BREVO_API_KEY || '',
     from: process.env.EMAIL_FROM || 'KoseliXpress <noreply@koselixpress.com>',
   },
 

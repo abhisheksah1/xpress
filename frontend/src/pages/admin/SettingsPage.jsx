@@ -34,7 +34,7 @@ const TABS = [
   { id: 'compliance', label: 'Compliance & Footer', icon: '🏢' },
   { id: 'timeslots', label: 'Delivery Time Slots', icon: '🕒' },
   { id: 'admin', label: 'Admin Credentials', icon: '🔒' },
-  { id: 'smtp', label: 'SMTP & Email Templates', icon: '✉️' },
+  { id: 'smtp', label: 'Brevo & Email Templates', icon: '✉️' },
   { id: 'auth', label: 'Customer Authentication', icon: '👤' },
 ];
 

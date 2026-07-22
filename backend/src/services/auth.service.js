@@ -147,14 +147,14 @@ const createAdminOtpChallenge = async ({
         deviceLabel: label,
         expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
         devOtp: otp,
-        devMessage: 'SMTP not configured — use this OTP or set ADMIN_LOGIN_SKIP_OTP (default in development).',
+        devMessage: 'Brevo not configured — use this OTP or set ADMIN_LOGIN_SKIP_OTP (default in development).',
       };
     }
 
     await AdminLoginChallenge.deleteOne({ _id: challenge._id });
     throw new ApiError(
       err.statusCode || 503,
-      err.message || 'Could not send verification email. Check SMTP settings.'
+      err.message || 'Could not send verification email. Check Brevo settings.'
     );
   }
 

@@ -202,12 +202,8 @@ const DEFAULT_SETTINGS = [
   { key: 'product_whatsapp_help_button_text', value: 'WhatsApp Chat', group: 'product_page', label: 'WhatsApp button text' },
   { key: 'product_delivery_location_tier_label', value: 'Location Tier', group: 'product_page', label: 'Delivery table badge label' },
 
-  // SMTP & Email Templates
-  { key: 'smtp_host', value: '', group: 'email', label: 'SMTP Host' },
-  { key: 'smtp_port', value: 587, group: 'email', label: 'SMTP Port' },
-  { key: 'smtp_secure', value: false, group: 'email', label: 'Use SSL/TLS (port 465)' },
-  { key: 'smtp_user', value: '', group: 'email', label: 'SMTP Username' },
-  { key: 'smtp_pass', value: '', group: 'email', label: 'SMTP Password' },
+  // Brevo & Email Templates
+  { key: 'brevo_api_key', value: '', group: 'email', label: 'Brevo API Key' },
   { key: 'email_from', value: 'KoseliXpress <noreply@koselixpress.com>', group: 'email', label: 'From Address' },
   {
     key: 'email_templates',
