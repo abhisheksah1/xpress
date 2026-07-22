@@ -97,8 +97,34 @@ app.use(`/api/${config.apiVersion}`, routes);
 if (config.frontendDist) {
   const distPath = path.resolve(config.frontendDist);
   const indexPath = path.join(distPath, 'index.html');
+  const assetsPath = path.join(distPath, 'assets');
   if (fs.existsSync(indexPath)) {
-    app.use(express.static(distPath, { index: false, maxAge: config.env === 'production' ? '1d' : 0 }));
+    // Hashed Vite assets can be cached forever; index.html must never be stale.
+    if (fs.existsSync(assetsPath)) {
+      app.use(
+        '/assets',
+        express.static(assetsPath, {
+          maxAge: config.env === 'production' ? '1y' : 0,
+          immutable: config.env === 'production',
+          etag: true,
+          lastModified: true,
+        })
+      );
+    }
+
+    app.use(
+      express.static(distPath, {
+        index: false,
+        maxAge: 0,
+        etag: true,
+        lastModified: true,
+        setHeaders(res, filePath) {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          }
+        },
+      })
+    );
 
     app.get('*', async (req, res, next) => {
       try {
@@ -108,6 +134,9 @@ if (config.frontendDist) {
 
         const html = await fs.promises.readFile(indexPath, 'utf8');
         const meta = await resolveSeoForPath(req.path);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.type('html').send(injectSeoIntoHtml(html, meta));
       } catch (err) {
         next(err);
