@@ -248,6 +248,7 @@ export default function StoreHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef(null);
+  const headerRef = useRef(null);
 
   const storeName = settings.registry_company_name || settings.store_name || 'KoseliXpress';
   const logoUrl = resolveBrandLogoUrl({ headerNav, footerNav: null, settings, placement: 'header' });
@@ -271,6 +272,24 @@ export default function StoreHeader() {
   useEffect(() => {
     if (searchOpen && searchRef.current) searchRef.current.focus();
   }, [searchOpen]);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return undefined;
+
+    const syncHeaderHeight = () => {
+      document.documentElement.style.setProperty('--store-header-h', `${el.offsetHeight}px`);
+    };
+
+    syncHeaderHeight();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncHeaderHeight) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', syncHeaderHeight);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', syncHeaderHeight);
+    };
+  }, [announcement.enabled, announcement.text, menuBar.enabled, headerItems.length]);
 
   const goToHome = (e) => {
     e.preventDefault();
@@ -297,7 +316,7 @@ export default function StoreHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 shadow-sm">
+    <header ref={headerRef} className="sticky top-0 z-50 shadow-sm">
       {announcement.enabled && announcement.text && (
         <div
           className="text-center text-xs sm:text-sm font-semibold px-3 py-2 sm:py-2.5"

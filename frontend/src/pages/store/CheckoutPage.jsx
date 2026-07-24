@@ -98,6 +98,7 @@ export default function CheckoutPage() {
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [mobileSummaryCollapsed, setMobileSummaryCollapsed] = useState(true);
   const leavingForPaymentRef = useRef(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -105,6 +106,26 @@ export default function CheckoutPage() {
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const syncSheetState = () => {
+      const isMobile = window.matchMedia('(max-width: 767px)').matches;
+      if (!isMobile) {
+        root.removeAttribute('data-checkout-sheet');
+        return;
+      }
+      root.dataset.checkoutSheet = mobileSummaryCollapsed ? 'collapsed' : 'open';
+    };
+
+    syncSheetState();
+    const mq = window.matchMedia('(max-width: 767px)');
+    mq.addEventListener('change', syncSheetState);
+    return () => {
+      root.removeAttribute('data-checkout-sheet');
+      mq.removeEventListener('change', syncSheetState);
+    };
+  }, [mobileSummaryCollapsed]);
 
   const enabledCurrencies = useMemo(
     () => (storeCurrencies?.length ? storeCurrencies : getCheckoutDisplayCurrencies(settings)),
@@ -528,15 +549,19 @@ export default function CheckoutPage() {
   const showNprDisclaimer = selectedCurrency?.code && selectedCurrency.code !== 'NPR';
 
   return (
-    <div className="bg-[#FCF9F9] min-h-screen overflow-x-hidden">
+    <div className="bg-[#FCF9F9] min-h-screen">
       <div className="max-w-7xl mx-auto w-full min-w-0 px-3 sm:px-6 py-6 sm:py-10">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Checkout</h1>
           <p className="text-sm text-slate-500 mt-1">Enter sender & receiver details, choose add-ons and payment.</p>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-6 lg:gap-8">
-          <div className="lg:col-span-7 space-y-5 sm:space-y-6 min-w-0">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8 md:items-start">
+          <div
+            className={`md:col-span-7 space-y-5 sm:space-y-6 min-w-0 transition-[padding] duration-300 ${
+              mobileSummaryCollapsed ? 'max-md:pb-28' : 'max-md:pb-4'
+            }`}
+          >
             {/* Sender */}
             <div className="card space-y-4">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Sender details</h2>
@@ -859,13 +884,61 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* Summary */}
-          <div className="lg:col-span-5 space-y-5 sm:space-y-6 min-w-0">
-            <div className="card space-y-4 lg:sticky lg:top-6">
+          {/* Mobile backdrop — dims page above content-sized sheet */}
+          {!mobileSummaryCollapsed && (
+            <button
+              type="button"
+              className="md:hidden fixed inset-0 z-[54] bg-slate-900/40"
+              aria-label="Close payment summary"
+              onClick={() => setMobileSummaryCollapsed(true)}
+            />
+          )}
+
+          {/* Summary — sticky under header on tablet/desktop, collapsible bottom sheet on mobile */}
+          <aside
+            className={`md:col-span-5 min-w-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[55] max-md:flex max-md:flex-col max-md:max-h-[min(85dvh,40rem)] max-md:border-t max-md:border-slate-200 max-md:bg-[#FCF9F9] max-md:shadow-[0_-8px_24px_rgba(15,23,42,0.12)] max-md:transition-transform max-md:duration-300 max-md:ease-in-out md:sticky md:self-start md:overflow-y-auto md:top-[calc(var(--store-header-h,9.5rem)+0.75rem)] md:max-h-[calc(100dvh-var(--store-header-h,9.5rem)-1.5rem)] md:translate-y-0 md:z-auto ${
+              mobileSummaryCollapsed
+                ? 'max-md:translate-y-[calc(100%-5.25rem)] max-md:overflow-hidden'
+                : 'max-md:translate-y-0 max-md:overflow-hidden'
+            }`}
+          >
+            <div className="md:hidden sticky top-0 z-10 shrink-0 flex items-center gap-2 bg-[#FCF9F9] px-3 pt-1 pb-2 border-b border-slate-100">
+              <button
+                type="button"
+                onClick={() => setMobileSummaryCollapsed((v) => !v)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+                aria-expanded={!mobileSummaryCollapsed}
+                aria-label={mobileSummaryCollapsed ? 'Expand payment summary' : 'Collapse payment summary'}
+              >
+                <svg
+                  className={`w-5 h-5 transition-transform duration-300 ${mobileSummaryCollapsed ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileSummaryCollapsed((v) => !v)}
+                className="flex-1 min-w-0 text-left py-1"
+                aria-expanded={!mobileSummaryCollapsed}
+              >
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">Payment summary</p>
+                <p className="text-sm font-extrabold text-slate-900 truncate">{fmt(totalsNpr.total)}</p>
+              </button>
+            </div>
+
+            <div className="max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-contain max-md:px-3 max-md:pt-3 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] md:contents">
+            <div className="card space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Payment summary</h2>
+                <h2 className="text-sm font-black uppercase tracking-widest text-slate-800 max-md:sr-only">
+                  Payment summary
+                </h2>
                 {selectedCurrency && (
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] sm:text-xs font-bold text-slate-700">
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] sm:text-xs font-bold text-slate-700 max-md:ml-auto">
                     {selectedCurrency.code}
                   </span>
                 )}
@@ -996,7 +1069,8 @@ export default function CheckoutPage() {
                 By placing your order you agree to our terms and delivery policy.
               </p>
             </div>
-          </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
