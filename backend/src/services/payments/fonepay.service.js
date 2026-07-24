@@ -2,15 +2,25 @@ import crypto from 'crypto';
 import config from '../../config/index.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-export const initiatePayment = async (order, creds) => {
+const FONEPAY_URLS = {
+  sandbox: 'https://dev-clientapi.fonepay.com/api/merchantRequest',
+  production: 'https://clientapi.fonepay.com/api/merchantRequest',
+};
+
+function resolveEnv(env) {
+  return env === 'production' ? 'production' : 'sandbox';
+}
+
+export const initiatePayment = async (order, creds, env) => {
+  const mode = resolveEnv(env);
   const merchantCode = creds?.merchantId || config.payments.fonepay.merchantCode;
   const secretKey = creds?.secretKey || config.payments.fonepay.secretKey;
-  if (!merchantCode) {
+  if (!merchantCode || !secretKey) {
     throw new ApiError(503, 'Fonepay is not configured');
   }
 
-  const prn = order.orderNumber;
-  const amount = order.total.toFixed(2);
+  const prn = String(order.orderNumber).slice(0, 25);
+  const amount = Number(order.total).toFixed(2);
   const date = new Date().toISOString().split('T')[0];
 
   const dataToSign = `${merchantCode},${prn},${amount},${date}`;
@@ -26,17 +36,23 @@ export const initiatePayment = async (order, creds) => {
     date,
     dv,
     returnUrl: `${config.clientUrl}/checkout/fonepay/callback`,
-    paymentUrl: 'https://clientapi.fonepay.com/api/merchantRequest',
+    paymentUrl: FONEPAY_URLS[mode],
+    environment: mode,
   };
 };
 
-export const verifyPayment = async ({ prn, amount, statusCode }) => {
-  if (statusCode !== 'success' && statusCode !== '200') {
+export const verifyPayment = async ({ prn, amount, statusCode, BID, UID }) => {
+  const ok = statusCode === 'success'
+    || statusCode === '200'
+    || String(statusCode).toLowerCase() === 'true'
+    || Boolean(BID || UID);
+
+  if (!ok) {
     throw new ApiError(400, 'Fonepay payment verification failed');
   }
 
   return {
-    transactionId: prn,
-    gatewayResponse: { prn, amount, statusCode },
+    transactionId: prn || BID || UID || `fonepay-${Date.now()}`,
+    gatewayResponse: { prn, amount, statusCode, BID, UID },
   };
 };

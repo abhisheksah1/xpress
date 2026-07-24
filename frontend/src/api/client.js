@@ -22,14 +22,23 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401 && !error.config._retry) {
       error.config._retry = true;
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      const onPaymentCallback = path.startsWith('/checkout/') && path.includes('callback')
+        || path.includes('/checkout/esewa/')
+        || path.includes('/checkout/sandbox/');
+
       try {
         const { data } = await axios.post(`${apiBase}/auth/refresh`, {}, { withCredentials: true });
         localStorage.setItem('accessToken', data.data.accessToken);
         error.config.headers.Authorization = `Bearer ${data.data.accessToken}`;
         return api(error.config);
       } catch {
+        // Never force-logout during payment return — guest checkout must still verify.
+        if (onPaymentCallback) {
+          return Promise.reject(error);
+        }
         localStorage.removeItem('accessToken');
-        const loginPath = window.location.pathname.startsWith('/admin') ? '/admin/login' : '/login';
+        const loginPath = path.startsWith('/admin') ? '/admin/login' : '/login';
         window.location.href = loginPath;
       }
     }

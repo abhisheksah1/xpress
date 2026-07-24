@@ -10,6 +10,8 @@ import LoginPage from './pages/store/LoginPage';
 import RegisterPage from './pages/store/RegisterPage';
 import CartPage from './pages/store/CartPage';
 import CheckoutPage from './pages/store/CheckoutPage';
+import PaymentCallbackPage from './pages/store/PaymentCallbackPage';
+import PaymentSandboxPage from './pages/store/PaymentSandboxPage';
 import OrderHistoryPage from './pages/store/OrderHistoryPage';
 import TrackOrderPage from './pages/store/TrackOrderPage';
 import BlogPage from './pages/store/BlogPage';
@@ -39,7 +41,6 @@ import FinanceExpensesPage from './pages/admin/finance/FinanceExpensesPage';
 import FinanceVendorsPage from './pages/admin/finance/FinanceVendorsPage';
 import FinanceStockPage from './pages/admin/finance/FinanceStockPage';
 import FinanceTreasuryPage from './pages/admin/finance/FinanceTreasuryPage';
-import PaymentCallbackPage from './pages/store/PaymentCallbackPage';
 import StaffPage from './pages/admin/StaffPage';
 
 export default function App() {
@@ -59,11 +60,14 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
+        <Route path="checkout/sandbox/pay" element={<PaymentSandboxPage />} />
         <Route path="checkout/khalti/callback" element={<PaymentCallbackPage mode="khalti" />} />
         <Route path="checkout/esewa/success" element={<PaymentCallbackPage mode="esewa" />} />
         <Route path="checkout/esewa/failure" element={<PaymentCallbackPage mode="esewa-failure" />} />
         <Route path="checkout/fonepay/callback" element={<PaymentCallbackPage mode="fonepay" />} />
         <Route path="checkout/card/callback" element={<PaymentCallbackPage mode="card" />} />
+        <Route path="checkout/imepay/callback" element={<PaymentCallbackPage mode="imepay" />} />
+        <Route path="checkout/hbl/callback" element={<PaymentCallbackPage mode="hbl" />} />
         <Route path="orders" element={<OrderHistoryPage />} />
         <Route path="track" element={<TrackOrderPage />} />
         <Route path="reminders" element={<RemindersPage />} />

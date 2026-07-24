@@ -65,10 +65,22 @@ const resolveCheckoutCurrency = async (code) => {
   const setting = await Settings.findOne({ key: 'multi_currencies' });
   const multi = setting?.value || { currencies: [] };
   const enabled = (multi.currencies || []).filter((c) => c.enabled !== false);
-  const normalized = code ? String(code).toUpperCase() : null;
+  const normalized = code ? String(code).toUpperCase().trim() : null;
+
+  if (!enabled.length) {
+    return {
+      code: normalized && normalized.length === 3 ? normalized : 'NPR',
+      name: normalized && normalized !== 'NPR' ? normalized : 'Nepalese Rupee',
+      symbol: !normalized || normalized === 'NPR' ? 'Rs.' : normalized,
+      rate: 1,
+      enabled: true,
+      isDefault: true,
+    };
+  }
+
   const selected = normalized
     ? enabled.find((c) => c.code === normalized)
-    : enabled.find((c) => c.isDefault) || enabled.find((c) => c.code === 'NPR');
+    : enabled.find((c) => c.isDefault) || enabled.find((c) => c.code === 'NPR') || enabled[0];
   if (!selected) throw new ApiError(400, 'Invalid payout currency');
   return selected;
 };

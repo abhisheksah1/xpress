@@ -43,11 +43,27 @@ const resolveOrderIdForVerification = async (orderId, verificationData) => {
     verificationData?.merchantTxnId
     || verificationData?.MerchantTxnId
     || verificationData?.purchase_order_id
-    || verificationData?.purchaseOrderId;
-  if (!merchantTxnId) return null;
+    || verificationData?.purchaseOrderId
+    || verificationData?.orderNumber;
 
-  const order = await Order.findOne({ orderNumber: String(merchantTxnId) });
-  return order?._id?.toString() || null;
+  const candidates = [];
+  if (merchantTxnId) candidates.push(String(merchantTxnId));
+
+  // eSewa: transaction_uuid = `${orderNumber}-${timestamp}`
+  const txnUuid = verificationData?.transactionUuid || verificationData?.transaction_uuid;
+  if (txnUuid) {
+    const raw = String(txnUuid);
+    candidates.push(raw);
+    const matched = raw.match(/^(.*)-(\d{10,})$/);
+    if (matched?.[1]) candidates.push(matched[1]);
+  }
+
+  for (const candidate of candidates) {
+    const order = await Order.findOne({ orderNumber: candidate });
+    if (order) return order._id.toString();
+  }
+
+  return null;
 };
 
 const processCardGatewayPayment = async (order, creds, env, verificationData, options = {}) => {
@@ -129,7 +145,8 @@ export const processPaymentVerification = async (orderId, method, verificationDa
           verificationData.productCode,
           verificationData.totalAmount,
           verificationData.transactionUuid,
-          creds
+          creds,
+          env
         );
         break;
       case PAYMENT_METHODS.FONEPAY:

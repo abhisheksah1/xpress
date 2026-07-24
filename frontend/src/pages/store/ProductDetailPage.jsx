@@ -457,7 +457,7 @@ export default function ProductDetailPage() {
         const catId = cat._id || `cat-${index}`;
         const chosen = selectedOptions[catId];
         if (!chosen) return null;
-        return { category: cat.name, label: chosen.label, priceAdjustment: chosen.priceAdjustment || 0 };
+        return { category: cat.name, label: chosen.label, priceAdjustment: Number(chosen.priceAdjustment) || 0 };
       })
       .filter(Boolean);
 

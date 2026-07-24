@@ -6,6 +6,7 @@ import { useCartStore } from '../../store/cartStore.js';
 import {
   clearPendingPayment,
   loadPendingPayment,
+  orderNumberFromEsewaTransactionUuid,
   parseEsewaCallback,
 } from '../../utils/checkoutPayment.js';
 
@@ -29,6 +30,23 @@ function resolveCardCallback(params, pending) {
   };
 }
 
+function recoverEsewaPending(params, pending) {
+  const decoded = parseEsewaCallback(params);
+  if (!decoded) return pending;
+
+  const orderNumber =
+    orderNumberFromEsewaTransactionUuid(decoded.transaction_uuid)
+    || pending?.orderNumber;
+
+  return {
+    ...(pending || {}),
+    method: 'esewa',
+    orderId: pending?.orderId,
+    orderNumber,
+    esewa: decoded,
+  };
+}
+
 export default function PaymentCallbackPage({ mode = 'khalti' }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,7 +55,6 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
   const [message, setMessage] = useState('Confirming your payment with the bank...');
 
   useEffect(() => {
-    // Cart is kept until payment redirect completes; clear it on return
     clearCart();
   }, [clearCart]);
 
@@ -47,7 +64,6 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
     const finish = async () => {
       const params = new URLSearchParams(location.search);
 
-      // Server already processed NPS return and redirected here
       if (mode === 'card' && params.get('payment')) {
         const paymentResult = params.get('payment');
         const serverMessage = params.get('message') || '';
@@ -71,15 +87,14 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
           }
           return;
         }
-
-        if (paymentResult === 'pending' || paymentResult === 'error') {
-          // Fall through to client verification below
-        }
       }
 
       let pending = loadPendingPayment();
 
-      // Khalti return URL includes purchase_order_id even if browser storage was cleared
+      if (mode === 'esewa' || mode === 'esewa-failure') {
+        pending = recoverEsewaPending(params, pending);
+      }
+
       if ((!pending?.orderId || !pending?.method) && mode === 'khalti') {
         const pidx = params.get('pidx') || params.get('token');
         const purchaseOrderId = params.get('purchase_order_id');
@@ -98,7 +113,12 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
         if (cardPayload) pending = cardPayload;
       }
 
-      if (!pending?.method || (!pending?.orderId && mode !== 'khalti' && mode !== 'card')) {
+      const canVerifyWithoutOrderId =
+        (mode === 'khalti' && (pending?.orderNumber || params.get('purchase_order_id')))
+        || (mode === 'esewa' && (pending?.orderNumber || pending?.esewa?.transaction_uuid))
+        || (mode === 'card' && (pending?.merchantTxnId || params.get('MerchantTxnId')));
+
+      if (!pending?.method || (!pending?.orderId && !canVerifyWithoutOrderId)) {
         if (!cancelled) {
           setStatus('error');
           setMessage('Payment session expired. Check your orders or contact support.');
@@ -106,7 +126,6 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
         return;
       }
 
-      // Khalti can verify without orderId when purchase_order_id is present
       if (!pending?.orderId && mode === 'khalti' && !params.get('purchase_order_id') && !pending?.orderNumber) {
         if (!cancelled) {
           setStatus('error');
@@ -116,7 +135,12 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
       }
 
       const verifyOnce = async () => {
-        let verification = { orderId: pending.orderId, method: pending.method };
+        let verification = {
+          orderId: pending.orderId,
+          method: pending.method,
+          purchase_order_id: pending.orderNumber || undefined,
+          purchaseOrderId: pending.orderNumber || undefined,
+        };
 
         if (pending.method === 'khalti') {
           const token = params.get('pidx') || params.get('token');
@@ -141,15 +165,21 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
             purchase_order_id: purchaseOrderId || undefined,
           };
         } else if (pending.method === 'esewa') {
-          const decoded = parseEsewaCallback(params);
+          const decoded = pending.esewa || parseEsewaCallback(params);
           if (!decoded || decoded.status !== 'COMPLETE') {
             throw new Error('eSewa payment was not completed');
           }
+          const orderNumber =
+            pending.orderNumber
+            || orderNumberFromEsewaTransactionUuid(decoded.transaction_uuid);
           verification = {
             ...verification,
             productCode: decoded.product_code,
             totalAmount: decoded.total_amount,
             transactionUuid: decoded.transaction_uuid,
+            purchase_order_id: orderNumber || undefined,
+            purchaseOrderId: orderNumber || undefined,
+            orderNumber: orderNumber || undefined,
           };
         } else if (pending.method === 'fonepay') {
           verification = {
@@ -157,11 +187,24 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
             prn: params.get('PRN') || params.get('prn') || pending.orderNumber,
             amount: params.get('P_AMT') || params.get('amount'),
             statusCode: params.get('RC') || params.get('statusCode') || 'success',
+            BID: params.get('BID') || undefined,
+            UID: params.get('UID') || undefined,
           };
         } else if (pending.method === 'card') {
           const cardPayload = resolveCardCallback(params, pending);
           if (!cardPayload) throw new Error('Card payment reference missing');
           verification = cardPayload;
+        } else if (pending.method === 'imepay' || pending.method === 'hbl') {
+          if (params.get('payment') === 'failed') {
+            throw new Error(`${pending.method === 'hbl' ? 'HBL' : 'IME Pay'} payment was cancelled`);
+          }
+          verification = {
+            ...verification,
+            sandbox: params.get('sandbox') === '1' || undefined,
+            status: params.get('status') || undefined,
+            transactionId: params.get('transactionId') || params.get('refId') || undefined,
+            refId: params.get('refId') || undefined,
+          };
         } else {
           throw new Error('Unsupported payment callback');
         }

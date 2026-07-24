@@ -42,7 +42,7 @@ export function clearPendingPayment() {
 export function submitEsewaForm(payment) {
   const form = document.createElement('form');
   form.method = 'POST';
-  form.action = payment.paymentUrl || 'https://esewa.com.np/epay/main';
+  form.action = payment.paymentUrl || 'https://rc-epay.esewa.com.np/api/epay/main/v2/form';
   form.style.display = 'none';
 
   const fields = {
@@ -75,7 +75,7 @@ export function submitEsewaForm(payment) {
 export function submitFonepayForm(payment) {
   const form = document.createElement('form');
   form.method = 'POST';
-  form.action = payment.paymentUrl || 'https://clientapi.fonepay.com/api/merchantRequest';
+  form.action = payment.paymentUrl || 'https://dev-clientapi.fonepay.com/api/merchantRequest';
   form.style.display = 'none';
 
   ['merchantCode', 'prn', 'amount', 'date', 'dv', 'returnUrl'].forEach((key) => {
@@ -173,9 +173,24 @@ export function parseEsewaCallback(searchParams) {
   const encoded = searchParams.get('data');
   if (!encoded) return null;
   try {
-    const json = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+    const normalized = decodeURIComponent(encoded).replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const json = atob(padded);
     return JSON.parse(json);
   } catch {
-    return null;
+    try {
+      const json = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
   }
+}
+
+/** transaction_uuid is `${orderNumber}-${Date.now()}` from our initiatePayment. */
+export function orderNumberFromEsewaTransactionUuid(transactionUuid) {
+  if (!transactionUuid) return null;
+  const raw = String(transactionUuid);
+  const match = raw.match(/^(.*)-(\d{10,})$/);
+  return match?.[1] || raw;
 }

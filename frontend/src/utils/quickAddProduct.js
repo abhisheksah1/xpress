@@ -20,9 +20,9 @@ export function buildDefaultSelectedOptions(product) {
     selectedOptions.push({
       category: cat.name,
       label: chosen.label,
-      priceAdjustment: chosen.priceAdjustment || 0,
+      priceAdjustment: Number(chosen.priceAdjustment) || 0,
     });
-    priceAdjustment += chosen.priceAdjustment || 0;
+    priceAdjustment += Number(chosen.priceAdjustment) || 0;
   });
 
   return {

@@ -152,20 +152,37 @@ export default function CheckoutPage() {
   );
 
   useEffect(() => {
-    storeApi
-      .getDeliveryLocations()
-      .then((res) => {
+    let cancelled = false;
+
+    const loadLocations = async () => {
+      try {
+        const res = await storeApi.getDeliveryLocations();
+        if (cancelled) return;
         const locations = res.data.data || [];
         setDeliveryLocations(locations);
         setDeliveryLocationId((current) => {
-          if (current) return current;
+          if (current && locations.some((loc) => String(loc._id) === String(current))) {
+            return current;
+          }
           const kathmandu = locations.find(
             (loc) => String(loc.name || '').trim().toLowerCase() === 'kathmandu valley'
           );
-          return kathmandu?._id ? String(kathmandu._id) : '';
+          return kathmandu?._id ? String(kathmandu._id) : (locations[0]?._id ? String(locations[0]._id) : '');
         });
-      })
-      .catch(() => setDeliveryLocations([]));
+        if (!locations.length) {
+          toast.error('No delivery locations configured. Add them in Admin → Delivery.');
+        }
+      } catch {
+        if (cancelled) return;
+        setDeliveryLocations([]);
+        toast.error('Could not load delivery cities. Is the backend running?');
+      }
+    };
+
+    loadLocations();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const selectedDeliveryLocation = useMemo(
@@ -407,6 +424,7 @@ export default function CheckoutPage() {
     if (receiverPhoneErr) return receiverPhoneErr;
     if (!deliveryLocationId) return 'Please select a delivery district or city';
     if (!receiver.address.trim()) return 'Delivery address is required';
+    if (receiver.address.trim().length < 3) return 'Delivery address must be at least 3 characters';
     if (!paymentMethod) return 'Please select a payment method';
 
     for (const id of selectedAddonIds) {
@@ -451,8 +469,15 @@ export default function CheckoutPage() {
       const payload = {
         items: items.map((i) => ({
           productId: i.productId,
-          quantity: i.quantity,
-          selectedOptions: i.selectedOptions || [],
+          quantity: Number(i.quantity) || 1,
+          selectedOptions: (i.selectedOptions || [])
+            .filter((o) => o?.label)
+            .map((o) => ({
+              category: o.category || undefined,
+              categoryId: o.categoryId || undefined,
+              label: String(o.label),
+              priceAdjustment: Number(o.priceAdjustment) || 0,
+            })),
           personalization: resolveCartItemPersonalization(i, productUploads),
         })),
         sender: {
@@ -474,7 +499,7 @@ export default function CheckoutPage() {
         preferredDeliveryDate: preferredDate || undefined,
         timeSlotId: timeSlotId || undefined,
         serviceAddons: selectedAddonIds.length ? buildServiceAddonsPayload() : undefined,
-        checkoutCurrency: payoutCurrency,
+        checkoutCurrency: String(payoutCurrency || 'NPR').trim().toUpperCase().slice(0, 3),
       };
 
       const { data } = await storeApi.createOrder(payload);
@@ -523,7 +548,11 @@ export default function CheckoutPage() {
     } catch (err) {
       leavingForPaymentRef.current = false;
       setPlacing(false);
-      toast.error(err.response?.data?.message || 'Failed to place order');
+      const apiErrors = err.response?.data?.errors;
+      const detail = Array.isArray(apiErrors) && apiErrors.length
+        ? apiErrors.map((e) => e.message || e).filter(Boolean).join(' · ')
+        : '';
+      toast.error(detail || err.response?.data?.message || 'Failed to place order');
     }
   };
 
@@ -687,6 +716,12 @@ export default function CheckoutPage() {
                     </option>
                   ))}
                 </select>
+                {!deliveryLocations.length && (
+                  <p className="text-xs text-amber-700 mt-1.5">
+                    No cities loaded. Start the backend (`npm run dev` in `backend`), then refresh this page.
+                    Manage locations in Admin → Delivery.
+                  </p>
+                )}
               </FormField>
               <FormField id="delivery-address" label="Delivery address" required>
                 <input

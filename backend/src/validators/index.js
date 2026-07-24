@@ -157,7 +157,7 @@ const receiverBodySchema = z.object({
   fullName: z.string().min(2),
   countryCode: z.string().min(2),
   phone: z.string().min(6),
-  address: z.string().min(3),
+  address: z.string().min(3, 'Delivery address must be at least 3 characters'),
 }).superRefine((data, ctx) => {
   const digits = data.phone.replace(/\D/g, '');
   if (data.countryCode === '+977' && !/^\d{10}$/.test(digits)) {
@@ -175,20 +175,22 @@ const receiverBodySchema = z.object({
   }
 });
 
+const selectedOptionSchema = z.object({
+  category: z.string().optional(),
+  categoryId: z.string().optional(),
+  label: z.string().min(1),
+  priceAdjustment: z.coerce.number().optional(),
+});
+
 export const createOrderSchema = z.object({
   body: z.object({
     items: z
       .array(
         z.object({
-          productId: z.string(),
+          productId: z.string().min(1),
           variantId: z.string().optional(),
-          quantity: z.number().min(1),
-          selectedOptions: z.array(z.object({
-            category: z.string().optional(),
-            categoryId: z.string().optional(),
-            label: z.string(),
-            priceAdjustment: z.number().optional(),
-          })).optional(),
+          quantity: z.coerce.number().int().min(1),
+          selectedOptions: z.array(selectedOptionSchema).optional(),
           giftWrap: z.boolean().optional(),
           giftMessage: z.string().optional(),
           personalization: z.object({
@@ -209,7 +211,10 @@ export const createOrderSchema = z.object({
     deliveryLocation: z.string().optional(),
     sameDayDelivery: z.boolean().optional(),
     paymentMethod: z.enum(['khalti', 'esewa', 'imepay', 'fonepay', 'card', 'hbl', 'manual_bank', 'cod']),
-    couponCode: z.string().min(2).max(40).optional(),
+    couponCode: z.preprocess(
+      (v) => (typeof v === 'string' && !v.trim() ? undefined : v),
+      z.string().min(2).max(40).optional()
+    ),
     notes: z.string().optional(),
     guestEmail: z.string().email().optional(),
     guestPhone: z.string().optional(),
@@ -221,8 +226,18 @@ export const createOrderSchema = z.object({
       photoName: z.string().optional(),
     })).optional(),
     preferredDeliveryDate: z.union([z.string(), z.date()]).optional(),
-    timeSlotId: z.string().optional(),
-    checkoutCurrency: z.string().min(3).max(3).optional(),
+    timeSlotId: z.preprocess(
+      (v) => (typeof v === 'string' && !v.trim() ? undefined : v),
+      z.string().optional()
+    ),
+    checkoutCurrency: z.preprocess(
+      (v) => {
+        if (v == null || v === '') return 'NPR';
+        const code = String(v).trim().toUpperCase();
+        return code.length === 3 ? code : 'NPR';
+      },
+      z.string().length(3).optional()
+    ),
   }).superRefine((body, ctx) => {
     const hasLegacy = !!body.shippingAddress;
     const hasNew = !!body.sender && !!body.receiver;
@@ -261,10 +276,27 @@ export const verifyPaymentSchema = z.object({
       paymentIntentId: z.string().optional(),
       merchantTxnId: z.string().optional(),
       gatewayTxnId: z.string().optional(),
+      transactionId: z.string().optional(),
+      refId: z.string().optional(),
+      BID: z.string().optional(),
+      UID: z.string().optional(),
+      sandbox: z.boolean().optional(),
+      status: z.string().optional(),
+      orderNumber: z.string().optional(),
     })
-    .refine((data) => data.orderId || data.merchantTxnId || data.purchase_order_id || data.purchaseOrderId, {
-      message: 'orderId, merchantTxnId, or purchase_order_id is required',
-    }),
+    .refine(
+      (data) =>
+        data.orderId
+        || data.merchantTxnId
+        || data.purchase_order_id
+        || data.purchaseOrderId
+        || data.transactionUuid
+        || data.orderNumber
+        || data.prn,
+      {
+        message: 'orderId, merchantTxnId, purchase_order_id, or transactionUuid is required',
+      }
+    ),
 });
 
 export const bulkPriceSchema = z.object({

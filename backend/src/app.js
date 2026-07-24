@@ -33,10 +33,29 @@ const toOrigin = (value) => {
   }
 };
 
+/** localhost ↔ 127.0.0.1 are interchangeable in local browsers. */
+const withLocalAliases = (origin) => {
+  if (!origin) return [];
+  const aliases = [origin];
+  try {
+    const url = new URL(origin);
+    if (url.hostname === 'localhost') {
+      aliases.push(`${url.protocol}//127.0.0.1${url.port ? `:${url.port}` : ''}`);
+    }
+    if (url.hostname === '127.0.0.1') {
+      aliases.push(`${url.protocol}//localhost${url.port ? `:${url.port}` : ''}`);
+    }
+  } catch {
+    /* ignore */
+  }
+  return aliases;
+};
+
 const allowedOrigins = new Set(
   [config.clientUrl, config.adminUrl, config.serverUrl, ...(config.corsOrigins || [])]
     .map(toOrigin)
     .filter(Boolean)
+    .flatMap(withLocalAliases)
 );
 
 if (config.env !== 'production') {
