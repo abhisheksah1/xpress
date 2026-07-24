@@ -8,6 +8,23 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+function clearClientAuthState() {
+  localStorage.removeItem('accessToken');
+  try {
+    const raw = localStorage.getItem('koseli-auth');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed?.state) {
+      parsed.state.user = null;
+      parsed.state.accessToken = null;
+      localStorage.setItem('koseli-auth', JSON.stringify(parsed));
+    }
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent('auth:session-cleared'));
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -23,9 +40,11 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !error.config._retry) {
       error.config._retry = true;
       const path = typeof window !== 'undefined' ? window.location.pathname : '';
-      const onPaymentCallback = path.startsWith('/checkout/') && path.includes('callback')
+      const onPaymentCallback = path.startsWith('/checkout/') && (
+        path.includes('callback')
         || path.includes('/checkout/esewa/')
-        || path.includes('/checkout/sandbox/');
+        || path.includes('/checkout/sandbox/')
+      );
 
       try {
         const { data } = await axios.post(`${apiBase}/auth/refresh`, {}, { withCredentials: true });
@@ -37,7 +56,7 @@ api.interceptors.response.use(
         if (onPaymentCallback) {
           return Promise.reject(error);
         }
-        localStorage.removeItem('accessToken');
+        clearClientAuthState();
         const loginPath = path.startsWith('/admin') ? '/admin/login' : '/login';
         window.location.href = loginPath;
       }

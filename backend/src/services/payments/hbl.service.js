@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import config from '../../config/index.js';
 import { ApiError } from '../../utils/ApiError.js';
 
@@ -5,24 +6,26 @@ function resolveEnv(env) {
   return env === 'production' ? 'production' : 'sandbox';
 }
 
-function buildSandboxUrl(order, method) {
+function buildSandboxUrl(order, method, sandboxNonce) {
   const params = new URLSearchParams({
     method,
     orderId: String(order._id),
     orderNumber: order.orderNumber,
     amount: String(order.total),
+    sandboxNonce,
   });
   return `${config.clientUrl}/checkout/sandbox/pay?${params.toString()}`;
 }
 
 /**
- * HBL — sandbox uses local test checkout page.
- * Production requires merchant credentials from Himalayan Bank.
+ * HBL — sandbox uses local test checkout page with one-time nonce.
+ * Production requires merchant credentials; auto-verify is not supported without HBL API.
  */
 export const initiatePayment = async (order, creds, env) => {
   const mode = resolveEnv(env);
 
   if (mode === 'sandbox') {
+    const sandboxNonce = crypto.randomBytes(24).toString('hex');
     return {
       merchantId: creds?.merchantId || 'HBL-SANDBOX',
       accessKey: creds?.accessKey || '',
@@ -30,14 +33,19 @@ export const initiatePayment = async (order, creds, env) => {
       orderNumber: order.orderNumber,
       orderId: String(order._id),
       returnUrl: `${config.clientUrl}/checkout/hbl/callback`,
-      paymentUrl: buildSandboxUrl(order, 'hbl'),
+      paymentUrl: buildSandboxUrl(order, 'hbl', sandboxNonce),
       environment: 'sandbox',
       sandbox: true,
+      sandboxNonce,
     };
   }
 
   if (!creds?.merchantId) {
     throw new ApiError(503, 'HBL payment is not configured');
+  }
+
+  if (!creds.paymentUrl || /hbl\.gateway\.example/i.test(creds.paymentUrl)) {
+    throw new ApiError(503, 'HBL payment URL is not configured');
   }
 
   return {
@@ -46,15 +54,28 @@ export const initiatePayment = async (order, creds, env) => {
     amount: order.total,
     orderNumber: order.orderNumber,
     returnUrl: `${config.clientUrl}/checkout/hbl/callback`,
-    paymentUrl: creds.paymentUrl || 'https://hbl.gateway.example/checkout',
+    paymentUrl: creds.paymentUrl,
     environment: 'production',
   };
 };
 
-export const verifyPayment = async (verificationData) => {
-  if (verificationData?.sandbox === true || verificationData?.status === 'sandbox_success') {
+export const verifyPayment = async (verificationData, env = 'sandbox', order = null) => {
+  const mode = resolveEnv(env);
+  const wantsSandbox =
+    verificationData?.sandbox === true
+    || verificationData?.status === 'sandbox_success'
+    || verificationData?.status === 'sandbox_failed';
+
+  if (wantsSandbox) {
+    if (mode !== 'sandbox') {
+      throw new ApiError(400, 'Sandbox payment tokens are not valid in production');
+    }
     if (verificationData?.status === 'sandbox_failed') {
       throw new ApiError(400, 'HBL sandbox payment failed');
+    }
+    const expected = order?.payment?.gatewayResponse?.initiate?.sandboxNonce;
+    if (!expected || verificationData?.sandboxNonce !== expected) {
+      throw new ApiError(400, 'Invalid or expired sandbox payment token');
     }
     return {
       transactionId: verificationData.transactionId || `hbl-sandbox-${Date.now()}`,
@@ -62,12 +83,12 @@ export const verifyPayment = async (verificationData) => {
     };
   }
 
-  if (!verificationData.transactionId) {
-    throw new ApiError(400, 'HBL transaction reference is missing');
+  if (mode === 'sandbox') {
+    throw new ApiError(400, 'Complete the sandbox payment page to confirm this test order');
   }
 
-  return {
-    transactionId: verificationData.transactionId,
-    gatewayResponse: verificationData,
-  };
+  throw new ApiError(
+    503,
+    'HBL automatic verification is not available. Our team will confirm your payment shortly.'
+  );
 };

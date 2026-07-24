@@ -229,11 +229,13 @@ export const useCartStore = create(
               const id = String(item.productId);
               if (item.allowBackorder || remainingByProduct[id] == null) return item;
               const allowed = remainingByProduct[id];
-              if (allowed <= 0) return { ...item, quantity: 1 };
+              if (allowed <= 0) {
+                return null;
+              }
               const nextQty = Math.max(1, Math.min(item.quantity, allowed));
               remainingByProduct[id] = Math.max(0, allowed - nextQty);
               return { ...item, quantity: nextQty };
-            }),
+            }).filter(Boolean),
           };
         });
       },

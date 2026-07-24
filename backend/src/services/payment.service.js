@@ -44,7 +44,9 @@ const resolveOrderIdForVerification = async (orderId, verificationData) => {
     || verificationData?.MerchantTxnId
     || verificationData?.purchase_order_id
     || verificationData?.purchaseOrderId
-    || verificationData?.orderNumber;
+    || verificationData?.orderNumber
+    || verificationData?.prn
+    || verificationData?.PRN;
 
   const candidates = [];
   if (merchantTxnId) candidates.push(String(merchantTxnId));
@@ -140,7 +142,23 @@ export const processPaymentVerification = async (orderId, method, verificationDa
           env
         );
         break;
-      case PAYMENT_METHODS.ESEWA:
+      case PAYMENT_METHODS.ESEWA: {
+        const paidAmount = Number(verificationData.totalAmount);
+        const expectedAmount = Number(order.total);
+        if (
+          Number.isFinite(paidAmount)
+          && Number.isFinite(expectedAmount)
+          && Math.abs(paidAmount - expectedAmount) > 1
+        ) {
+          throw new ApiError(
+            400,
+            `eSewa amount mismatch (paid ${paidAmount}, expected ${expectedAmount})`
+          );
+        }
+        const txnUuid = String(verificationData.transactionUuid || '');
+        if (order.orderNumber && txnUuid && !txnUuid.startsWith(`${order.orderNumber}-`)) {
+          throw new ApiError(400, 'eSewa transaction does not match this order');
+        }
         result = await esewaService.verifyPayment(
           verificationData.productCode,
           verificationData.totalAmount,
@@ -149,14 +167,15 @@ export const processPaymentVerification = async (orderId, method, verificationDa
           env
         );
         break;
+      }
       case PAYMENT_METHODS.FONEPAY:
-        result = await fonepayService.verifyPayment(verificationData);
+        result = await fonepayService.verifyPayment(verificationData, order);
         break;
       case PAYMENT_METHODS.IMEPAY:
-        result = await imepayService.verifyPayment(verificationData);
+        result = await imepayService.verifyPayment(verificationData, env, order);
         break;
       case PAYMENT_METHODS.HBL:
-        result = await hblService.verifyPayment(verificationData);
+        result = await hblService.verifyPayment(verificationData, env, order);
         break;
       default:
         throw new ApiError(400, 'Unsupported payment method');

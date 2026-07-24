@@ -419,6 +419,8 @@ export default function CheckoutPage() {
     if (!sender.email.trim()) return 'Sender email address is required';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender.email.trim())) return 'Enter a valid email address';
     if (!sender.phone.trim()) return 'Sender mobile number is required';
+    const senderPhoneErr = validatePhoneForCountry(sender.phone, sender.countryCode);
+    if (senderPhoneErr) return `Sender: ${senderPhoneErr}`;
     if (!receiver.fullName.trim()) return 'Recipient full name is required';
     const receiverPhoneErr = validatePhoneForCountry(receiver.phone, receiver.countryCode);
     if (receiverPhoneErr) return receiverPhoneErr;
@@ -511,7 +513,12 @@ export default function CheckoutPage() {
         toast.success(data.message || 'Order placed');
         clearCart();
         clearPendingPayment();
-        navigate('/orders');
+        const trackEmail = sender.email.trim();
+        navigate(
+          order?.orderNumber
+            ? `/track?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(trackEmail)}`
+            : '/orders'
+        );
         return;
       }
 
@@ -524,27 +531,25 @@ export default function CheckoutPage() {
         method,
         orderNumber: order.orderNumber,
         total: order.total,
+        email: sender.email.trim(),
+        sandboxNonce: payment?.sandboxNonce || undefined,
       });
 
       // Hard-navigate to the gateway BEFORE any React state updates.
-      // Updating cart/UI first paints checkout/cart empty screens for a few frames.
       const redirected = redirectToPayment(method, payment);
       if (redirected) {
         leavingForPaymentRef.current = true;
-        window.setTimeout(() => {
-          try {
-            useCartStore.getState().clearCart();
-          } catch {
-            /* page may already be unloading */
-          }
-        }, 1000);
+        // Keep cart until payment callback confirms success (do not clear here).
         return;
       }
 
       clearCart();
       setPlacing(false);
       toast.success('Order created — complete payment to confirm.');
-      navigate('/orders');
+      navigate(
+        `/track?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(sender.email.trim())}`,
+        { replace: true }
+      );
     } catch (err) {
       leavingForPaymentRef.current = false;
       setPlacing(false);

@@ -61,7 +61,7 @@ export const getDefaultPaymentGateways = () => [
     id: 'imepay',
     type: GATEWAY_TYPES.IMEPAY,
     sortOrder: 3,
-    enabled: true,
+    enabled: false,
     displayLabel: 'IME Pay',
     currencies: ['NPR'],
     credentials: { merchantId: '', password: '' },

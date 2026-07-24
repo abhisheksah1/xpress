@@ -32,17 +32,19 @@ export const createOrder = asyncHandler(async (req, res) => {
     serverBaseUrl: config.serverUrl,
   });
 
-  // Persist gateway payment reference for later reconcile (especially Khalti pidx)
-  if (payment?.pidx || payment?.payment_url || payment?.paymentUrl) {
+  // Persist gateway payment reference for later reconcile (Khalti pidx, sandboxNonce, etc.)
+  if (payment && (payment.pidx || payment.payment_url || payment.paymentUrl || payment.sandboxNonce)) {
     try {
       order.payment = order.payment || {};
       order.payment.gatewayResponse = {
         ...(order.payment.gatewayResponse || {}),
         initiate: {
+          ...(typeof payment === 'object' ? payment : {}),
           pidx: payment.pidx,
           purchaseOrderId: payment.purchaseOrderId || order.orderNumber,
-          amount: payment.amount,
+          amount: payment.amount ?? order.total,
           environment: payment.environment,
+          sandboxNonce: payment.sandboxNonce,
         },
       };
       await order.save();
@@ -71,7 +73,37 @@ export const verifyPayment = asyncHandler(async (req, res) => {
 export const cardPaymentReturn = asyncHandler(async (req, res) => {
   const merchantTxnId = req.query.MerchantTxnId || req.query.merchantTxnId;
   const gatewayTxnId = req.query.GatewayTxnId || req.query.gatewayTxnId;
-  const redirectBase = String(req.query.redirect || config.clientUrl).replace(/\/$/, '');
+
+  const allowedOrigins = new Set(
+    [config.clientUrl, ...(config.corsOrigins || [])]
+      .map((v) => {
+        try {
+          const raw = String(v || '').trim();
+          if (!raw) return null;
+          return new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`).origin;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+  );
+
+  const fallbackBase = `${String(config.clientUrl || '').replace(/\/$/, '')}/checkout/card/callback`;
+  let redirectBase = fallbackBase;
+  const redirectRaw = String(req.query.redirect || '').trim();
+  if (redirectRaw) {
+    try {
+      const withProtocol = /^https?:\/\//i.test(redirectRaw) ? redirectRaw : `http://${redirectRaw}`;
+      const parsed = new URL(withProtocol);
+      if (allowedOrigins.has(parsed.origin)) {
+        redirectBase = parsed.pathname && parsed.pathname !== '/'
+          ? `${parsed.origin}${parsed.pathname}`.replace(/\/$/, '')
+          : `${parsed.origin}/checkout/card/callback`;
+      }
+    } catch {
+      redirectBase = fallbackBase;
+    }
+  }
 
   let outcome = 'pending';
   let message = 'Payment is being processed';
@@ -87,10 +119,6 @@ export const cardPaymentReturn = asyncHandler(async (req, res) => {
     outcome = 'error';
     message = err.message || 'Payment verification error';
     console.error('[card-return] error:', merchantTxnId, err.message);
-  }
-
-  if (!redirectBase) {
-    return res.json(new ApiResponse(outcome === 'success' ? 200 : 400, { outcome, message }));
   }
 
   const params = new URLSearchParams({

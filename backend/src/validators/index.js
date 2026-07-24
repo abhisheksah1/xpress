@@ -283,6 +283,7 @@ export const verifyPaymentSchema = z.object({
       sandbox: z.boolean().optional(),
       status: z.string().optional(),
       orderNumber: z.string().optional(),
+      sandboxNonce: z.string().optional(),
     })
     .refine(
       (data) =>

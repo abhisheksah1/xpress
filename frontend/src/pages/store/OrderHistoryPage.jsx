@@ -36,8 +36,14 @@ function GuestTrackForm() {
 
   const track = (e) => {
     e.preventDefault();
-    const params = new URLSearchParams({ orderNumber: orderNumber.trim() });
-    if (email.trim()) params.set('email', email.trim());
+    if (!orderNumber.trim() || !email.trim()) {
+      toast.error('Order number and email are required');
+      return;
+    }
+    const params = new URLSearchParams({
+      orderNumber: orderNumber.trim(),
+      email: email.trim(),
+    });
     navigate(`/track?${params.toString()}`);
   };
 
@@ -61,6 +67,7 @@ function GuestTrackForm() {
           placeholder="Email used at checkout"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
         />
         <button type="submit" className="btn-primary whitespace-nowrap">Track</button>
       </form>

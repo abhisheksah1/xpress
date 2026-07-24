@@ -272,8 +272,11 @@ export const lookupPartnerOrderForPayment = async (partner, orderNumber, { recei
     throw new ApiError(400, 'receiverName and receiverMobile are required');
   }
 
-  const order = await Order.findOne({ orderNumber: orderNumber.trim() });
-  if (!order) throw new ApiError(404, 'Order not found');
+  const order = await Order.findOne({
+    orderNumber: orderNumber.trim(),
+    apiPartner: partner._id,
+  });
+  if (!order) throw new ApiError(404, 'Order not found for this partner');
 
   const nameMatch = String(order.receiver?.fullName || order.shippingAddress?.fullName || '')
     .trim()
@@ -311,7 +314,12 @@ export const confirmPartnerOrderPayment = async (partner, orderNumber, payload) 
     throw new ApiError(409, 'Order total mismatch. Refresh price before confirming payment.');
   }
 
-  const order = await Order.findOne({ orderNumber: orderNumber.trim() });
+  const order = await Order.findOne({
+    orderNumber: orderNumber.trim(),
+    apiPartner: partner._id,
+  });
+  if (!order) throw new ApiError(404, 'Order not found for this partner');
+
   const txnId = payload.transactionReference || payload.transactionId || `partner-${partner.apiUsername}-${Date.now()}`;
 
   const updated = await orderService.markPaymentPaid(order._id, txnId, {

@@ -92,3 +92,9 @@ export const useAuthStore = create(
     { name: 'koseli-auth', partialize: (s) => ({ user: s.user }) }
   )
 );
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:session-cleared', () => {
+    useAuthStore.setState({ user: null, accessToken: null });
+  });
+}

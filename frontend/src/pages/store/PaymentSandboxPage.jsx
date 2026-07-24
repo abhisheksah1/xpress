@@ -14,6 +14,15 @@ const METHOD_LABELS = {
   card: 'Card (NPS)',
 };
 
+const CALLBACK_PATH = {
+  imepay: '/checkout/imepay/callback',
+  hbl: '/checkout/hbl/callback',
+  khalti: '/checkout/khalti/callback',
+  esewa: '/checkout/esewa/failure',
+  fonepay: '/checkout/fonepay/callback',
+  card: '/checkout/card/callback',
+};
+
 export default function PaymentSandboxPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -27,6 +36,8 @@ export default function PaymentSandboxPage() {
       orderId: params.get('orderId') || pending.orderId || '',
       orderNumber: params.get('orderNumber') || pending.orderNumber || '',
       amount: params.get('amount') || pending.total || '',
+      email: pending.email || '',
+      sandboxNonce: params.get('sandboxNonce') || pending.sandboxNonce || '',
     };
   }, [params]);
 
@@ -44,16 +55,21 @@ export default function PaymentSandboxPage() {
       method: session.method,
       orderNumber: session.orderNumber,
       total: session.amount,
+      email: session.email,
+      sandboxNonce: session.sandboxNonce,
     });
 
     try {
       if (!success) {
         clearPendingPayment();
         toast.error(`${label} sandbox payment cancelled`);
-        navigate(`/checkout/${session.method === 'hbl' ? 'hbl' : 'imepay'}/callback?payment=failed`, {
-          replace: true,
-        });
+        const failPath = CALLBACK_PATH[session.method] || '/checkout/imepay/callback';
+        navigate(`${failPath}?payment=failed`, { replace: true });
         return;
+      }
+
+      if (!session.sandboxNonce) {
+        throw new Error('Missing sandbox payment token. Restart checkout and try again.');
       }
 
       const { data } = await storeApi.verifyPayment({
@@ -61,15 +77,22 @@ export default function PaymentSandboxPage() {
         method: session.method,
         sandbox: true,
         status: 'sandbox_success',
+        sandboxNonce: session.sandboxNonce,
         transactionId: `${session.method}-sandbox-${Date.now()}`,
       });
 
       clearCart();
       clearPendingPayment();
       toast.success(data.message || 'Sandbox payment confirmed');
-      navigate('/orders', { replace: true });
+      const email = session.email || '';
+      navigate(
+        session.orderNumber
+          ? `/track?orderNumber=${encodeURIComponent(session.orderNumber)}&email=${encodeURIComponent(email)}`
+          : '/orders',
+        { replace: true }
+      );
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Sandbox payment verification failed');
+      toast.error(err.response?.data?.message || err.message || 'Sandbox payment verification failed');
     } finally {
       setBusy(false);
     }

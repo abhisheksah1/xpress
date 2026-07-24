@@ -47,6 +47,15 @@ function recoverEsewaPending(params, pending) {
   };
 }
 
+function successPath(pending) {
+  const orderNumber = pending?.orderNumber || '';
+  const email = pending?.email || '';
+  if (orderNumber) {
+    return `/track?orderNumber=${encodeURIComponent(orderNumber)}&email=${encodeURIComponent(email)}`;
+  }
+  return '/orders';
+}
+
 export default function PaymentCallbackPage({ mode = 'khalti' }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,11 +64,17 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
   const [message, setMessage] = useState('Confirming your payment with the bank...');
 
   useEffect(() => {
-    clearCart();
-  }, [clearCart]);
-
-  useEffect(() => {
     let cancelled = false;
+
+    const goSuccess = (pending, successMessage) => {
+      clearCart();
+      clearPendingPayment();
+      if (cancelled) return;
+      setStatus('success');
+      setMessage(successMessage || 'Payment confirmed. Thank you for your order!');
+      toast.success('Payment successful');
+      setTimeout(() => navigate(successPath(pending), { replace: true }), 1500);
+    };
 
     const finish = async () => {
       const params = new URLSearchParams(location.search);
@@ -67,18 +82,14 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
       if (mode === 'card' && params.get('payment')) {
         const paymentResult = params.get('payment');
         const serverMessage = params.get('message') || '';
-        clearPendingPayment();
+        const pending = loadPendingPayment() || {};
 
         if (paymentResult === 'success') {
-          if (!cancelled) {
-            setStatus('success');
-            setMessage('Payment confirmed. Thank you for your order!');
-            toast.success('Payment successful');
-            setTimeout(() => navigate('/orders', { replace: true }), 1500);
-          }
+          goSuccess(pending, 'Payment confirmed. Thank you for your order!');
           return;
         }
 
+        clearPendingPayment();
         if (paymentResult === 'failed') {
           if (!cancelled) {
             setStatus('error');
@@ -108,14 +119,26 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
         }
       }
 
+      if ((!pending?.orderId || !pending?.method) && mode === 'fonepay') {
+        const prn = params.get('PRN') || params.get('prn');
+        if (prn) {
+          pending = {
+            ...(pending || {}),
+            method: 'fonepay',
+            orderNumber: pending?.orderNumber || prn,
+          };
+        }
+      }
+
       if ((!pending?.orderId || !pending?.method) && mode === 'card') {
         const cardPayload = resolveCardCallback(params, pending);
-        if (cardPayload) pending = cardPayload;
+        if (cardPayload) pending = { ...(pending || {}), ...cardPayload };
       }
 
       const canVerifyWithoutOrderId =
         (mode === 'khalti' && (pending?.orderNumber || params.get('purchase_order_id')))
         || (mode === 'esewa' && (pending?.orderNumber || pending?.esewa?.transaction_uuid))
+        || (mode === 'fonepay' && (pending?.orderNumber || params.get('PRN') || params.get('prn')))
         || (mode === 'card' && (pending?.merchantTxnId || params.get('MerchantTxnId')));
 
       if (!pending?.method || (!pending?.orderId && !canVerifyWithoutOrderId)) {
@@ -202,6 +225,7 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
             ...verification,
             sandbox: params.get('sandbox') === '1' || undefined,
             status: params.get('status') || undefined,
+            sandboxNonce: pending.sandboxNonce || params.get('sandboxNonce') || undefined,
             transactionId: params.get('transactionId') || params.get('refId') || undefined,
             refId: params.get('refId') || undefined,
           };
@@ -215,13 +239,7 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
 
       try {
         const data = await verifyOnce();
-        clearPendingPayment();
-        if (!cancelled) {
-          setStatus('success');
-          setMessage(data.message || 'Payment confirmed. Thank you for your order!');
-          toast.success('Payment successful');
-          setTimeout(() => navigate('/orders', { replace: true }), 1500);
-        }
+        goSuccess(pending, data.message);
       } catch (err) {
         const statusCode = err.response?.status;
         const errMsg = err.response?.data?.message || err.message || 'Payment verification failed';
@@ -252,13 +270,7 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
             await new Promise((r) => setTimeout(r, 3000));
             try {
               const data = await verifyOnce();
-              clearPendingPayment();
-              if (!cancelled) {
-                setStatus('success');
-                setMessage(data.message || 'Payment confirmed. Thank you for your order!');
-                toast.success('Payment successful');
-                setTimeout(() => navigate('/orders', { replace: true }), 1500);
-              }
+              goSuccess(pending, data.message);
               return;
             } catch (retryErr) {
               const retryPending = retryErr.response?.status === 202
@@ -287,7 +299,7 @@ export default function PaymentCallbackPage({ mode = 'khalti' }) {
 
     finish();
     return () => { cancelled = true; };
-  }, [location.search, mode, navigate]);
+  }, [location.search, mode, navigate, clearCart]);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-20 text-center">

@@ -308,7 +308,7 @@ export const createOrder = async (data) => {
     statusHistory: [{ status: ORDER_STATUS.PENDING, note: 'Order placed' }],
   });
 
-  if (couponSnapshot?.couponId) {
+  if (couponSnapshot?.couponId && isDirectCheckoutMethod(data.paymentMethod)) {
     await couponService.recordCouponRedemption(couponSnapshot);
   }
 
@@ -510,8 +510,11 @@ export const getOrderById = async (id, userId = null) => {
     .populate('statusHistory.updatedBy', 'name email');
 
   if (!order) throw new ApiError(404, 'Order not found');
-  if (userId && order.user?.toString() !== userId.toString()) {
-    throw new ApiError(403, 'Access denied');
+  if (userId) {
+    const ownerId = order.user?._id?.toString?.() || order.user?.toString?.();
+    if (ownerId && ownerId !== userId.toString()) {
+      throw new ApiError(403, 'Access denied');
+    }
   }
   return order;
 };
@@ -522,6 +525,9 @@ export const getTrackingEmail = (order) =>
 export const getOrderByNumber = async (orderNumber, email) => {
   const normalizedNumber = String(orderNumber || '').trim();
   if (!normalizedNumber) throw new ApiError(400, 'Order number is required');
+  if (!email || !String(email).trim()) {
+    throw new ApiError(400, 'Email is required to track an order');
+  }
 
   const order = await Order.findOne({
     orderNumber: new RegExp(`^${escapeRegex(normalizedNumber)}$`, 'i'),
@@ -532,23 +538,21 @@ export const getOrderByNumber = async (orderNumber, email) => {
 
   if (!order) throw new ApiError(404, 'Order not found');
 
-  if (email && String(email).trim()) {
-    const mail = String(email).trim().toLowerCase();
-    const candidates = [
-      order.guestEmail,
-      order.sender?.email,
-      order.shippingAddress?.email,
-      order.user?.email,
-    ]
-      .filter(Boolean)
-      .map((e) => String(e).trim().toLowerCase());
+  const mail = String(email).trim().toLowerCase();
+  const candidates = [
+    order.guestEmail,
+    order.sender?.email,
+    order.shippingAddress?.email,
+    order.user?.email,
+  ]
+    .filter(Boolean)
+    .map((e) => String(e).trim().toLowerCase());
 
-    if (!candidates.includes(mail)) {
-      throw new ApiError(
-        404,
-        'Order not found. Use the email from checkout, or the account email if you ordered while logged in.'
-      );
-    }
+  if (!candidates.includes(mail)) {
+    throw new ApiError(
+      404,
+      'Order not found. Use the email from checkout, or the account email if you ordered while logged in.'
+    );
   }
 
   return order;
@@ -661,14 +665,34 @@ export const markPaymentPaid = async (orderId, transactionId, gatewayResponse) =
   const order = await Order.findById(orderId);
   if (!order) throw new ApiError(404, 'Order not found');
 
+  if (order.payment?.status === PAYMENT_STATUS.PAID) {
+    return order;
+  }
+
   order.payment.status = PAYMENT_STATUS.PAID;
   order.payment.transactionId = transactionId;
-  order.payment.gatewayResponse = gatewayResponse;
+  order.payment.gatewayResponse = {
+    ...(order.payment.gatewayResponse || {}),
+    verify: gatewayResponse,
+  };
+  // One-time sandbox tokens must not remain usable after success
+  if (order.payment.gatewayResponse?.initiate?.sandboxNonce) {
+    delete order.payment.gatewayResponse.initiate.sandboxNonce;
+  }
   order.payment.paidAt = new Date();
   order.isLead = false;
   if (order.status === ORDER_STATUS.PENDING) {
     order.status = ORDER_STATUS.CONFIRMED;
     order.statusHistory.push({ status: ORDER_STATUS.CONFIRMED, note: 'Payment confirmed' });
+  }
+
+  if (order.coupon?.couponId && !order.coupon?.redeemed) {
+    try {
+      await couponService.recordCouponRedemption(order.coupon);
+      order.coupon.redeemed = true;
+    } catch (err) {
+      console.error(`[coupon] Failed to record redemption for ${order.orderNumber}:`, err.message);
+    }
   }
 
   for (const item of order.items) {

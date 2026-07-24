@@ -41,18 +41,39 @@ export const initiatePayment = async (order, creds, env) => {
   };
 };
 
-export const verifyPayment = async ({ prn, amount, statusCode, BID, UID }) => {
-  const ok = statusCode === 'success'
-    || statusCode === '200'
-    || String(statusCode).toLowerCase() === 'true'
-    || Boolean(BID || UID);
+export const verifyPayment = async (verificationData, order = null) => {
+  const prn = String(verificationData?.prn || '').trim();
+  const expectedPrn = order?.orderNumber ? String(order.orderNumber).slice(0, 25) : '';
 
+  if (!prn) {
+    throw new ApiError(400, 'Fonepay payment reference (PRN) is missing');
+  }
+  if (expectedPrn && prn !== expectedPrn) {
+    throw new ApiError(400, 'Fonepay PRN does not match this order');
+  }
+
+  const status = String(verificationData?.statusCode || '').toLowerCase();
+  const ok = status === 'success' || status === '200' || status === 'successful' || status === '0';
   if (!ok) {
     throw new ApiError(400, 'Fonepay payment verification failed');
   }
 
+  if (verificationData?.amount != null && order?.total != null) {
+    const paid = Number(verificationData.amount);
+    const expected = Number(order.total);
+    if (Number.isFinite(paid) && Number.isFinite(expected) && Math.abs(paid - expected) > 1) {
+      throw new ApiError(400, `Fonepay amount mismatch (paid ${paid}, expected ${expected})`);
+    }
+  }
+
   return {
-    transactionId: prn || BID || UID || `fonepay-${Date.now()}`,
-    gatewayResponse: { prn, amount, statusCode, BID, UID },
+    transactionId: prn || verificationData.BID || verificationData.UID || `fonepay-${Date.now()}`,
+    gatewayResponse: {
+      prn,
+      amount: verificationData.amount,
+      statusCode: verificationData.statusCode,
+      BID: verificationData.BID,
+      UID: verificationData.UID,
+    },
   };
 };

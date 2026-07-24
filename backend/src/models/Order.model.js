@@ -145,6 +145,7 @@ const orderSchema = new mongoose.Schema(
       name: { type: String },
       discountType: { type: String },
       appliesTo: { type: String },
+      redeemed: { type: Boolean, default: false },
     },
     tax: { type: Number, default: 0 },
     total: { type: Number, required: true },

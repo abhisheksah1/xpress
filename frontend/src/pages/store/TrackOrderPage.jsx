@@ -55,17 +55,21 @@ export default function TrackOrderPage() {
       toast.error('Enter your order number');
       return;
     }
+    if (!mail.trim()) {
+      toast.error('Enter the email used at checkout');
+      return;
+    }
     setLoading(true);
     setSearched(true);
     try {
       const { data } = await storeApi.trackOrder({
         orderNumber: num.trim(),
-        email: mail.trim() || undefined,
+        email: mail.trim(),
       });
       setOrder(data.data);
       setSearchParams({
         orderNumber: num.trim(),
-        ...(mail.trim() ? { email: mail.trim() } : {}),
+        email: mail.trim(),
       });
     } catch (err) {
       setOrder(null);
@@ -78,10 +82,13 @@ export default function TrackOrderPage() {
   useEffect(() => {
     const num = searchParams.get('orderNumber');
     const mail = searchParams.get('email') || '';
-    if (num) {
+    if (num && mail) {
       setOrderNumber(num);
       setEmail(mail);
       fetchOrder(num, mail);
+    } else if (num) {
+      setOrderNumber(num);
+      setEmail(mail);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -117,6 +124,7 @@ export default function TrackOrderPage() {
             placeholder="Email used at checkout"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
         </div>
         <button type="submit" className="btn-primary" disabled={loading}>
