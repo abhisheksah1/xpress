@@ -198,16 +198,36 @@ const sendViaSmtp = async ({ cfg, recipients, subject, html, text }) => {
     },
   });
 
-  const info = await transporter.sendMail({
-    from: `"${cfg.senderName || 'KoseliXpress'}" <${cfg.senderEmail}>`,
-    to: toList,
-    subject,
-    html: html || `<p>${text || ''}</p>`,
-    text: text || (html ? html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : ''),
-  });
+  try {
+    const info = await transporter.sendMail({
+      from: `"${cfg.senderName || 'KoseliXpress'}" <${cfg.senderEmail}>`,
+      to: toList,
+      subject,
+      html: html || `<p>${text || ''}</p>`,
+      text: text || (html ? html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : ''),
+    });
 
-  console.log(`[brevo:smtp] Email sent. Message ID: ${info.messageId || 'smtp-sent'}`);
-  return { success: true, messageId: info.messageId, transport: 'smtp', info };
+    console.log(`[brevo:smtp] Email sent. Message ID: ${info.messageId || 'smtp-sent'}`);
+    return { success: true, messageId: info.messageId, transport: 'smtp', info };
+  } catch (err) {
+    const raw = err.response || err.message || String(err);
+    console.error('[brevo:smtp] send failed:', raw);
+
+    if (/Unauthorized IP/i.test(raw) || /525/.test(raw)) {
+      throw new ApiError(
+        503,
+        'Brevo blocked this server IP. In Brevo → SMTP & API → SMTP, authorize your current public IP (or allow all IPs), then retry.'
+      );
+    }
+    if (/Authentication failed|Invalid login|535/i.test(raw)) {
+      throw new ApiError(
+        503,
+        'Brevo SMTP login failed. Check BREVO_SMTP_LOGIN and BREVO_SMTP_KEY (use xsmtpsib-… key, not the short password).'
+      );
+    }
+
+    throw new ApiError(503, `Brevo SMTP error: ${raw}`);
+  }
 };
 
 const sendViaApi = async ({ cfg, recipients, subject, html, text }) => {
