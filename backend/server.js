@@ -23,4 +23,7 @@ const startServer = async () => {
   });
 };
 
-startServer();
+startServer().catch((err) => {
+  console.error('[fatal] API failed to start:', err);
+  process.exit(1);
+});

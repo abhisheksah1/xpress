@@ -31,20 +31,31 @@ npm run build
 
 echo "==> restart API (PM2 if present, else systemd hint)"
 cd "$ROOT"
+restart_pm2() {
+  local name="$1"
+  if pm2 describe "$name" >/dev/null 2>&1; then
+    echo "Restarting PM2 app: $name"
+    pm2 restart "$name" --update-env
+    return 0
+  fi
+  return 1
+}
+
 if command -v pm2 >/dev/null 2>&1; then
-  # Prefer ecosystem name; fall back to common process names
-  if pm2 describe koselixpress >/dev/null 2>&1; then
-    pm2 restart koselixpress --update-env
-  elif pm2 describe xpress >/dev/null 2>&1; then
-    pm2 restart xpress --update-env
-  elif pm2 describe backend >/dev/null 2>&1; then
-    pm2 restart backend --update-env
+  # Match common production process names (logs show koseli-api)
+  if restart_pm2 koseli-api \
+    || restart_pm2 koselixpress \
+    || restart_pm2 xpress \
+    || restart_pm2 backend \
+    || restart_pm2 koseli; then
+    pm2 save || true
+    pm2 status
   else
     echo "PM2 is installed but no known app name found."
-    echo "Restart manually, e.g.: pm2 restart <app-name> --update-env"
+    echo "Restart manually, e.g.: pm2 restart koseli-api --update-env"
     pm2 list
+    exit 1
   fi
-  pm2 save || true
 else
   echo "PM2 not found. Restart your Node process so FRONTEND_DIST is still served."
   echo "Example: systemctl restart koselixpress"
@@ -54,3 +65,4 @@ echo ""
 echo "Done. New Vite build is in frontend/dist."
 echo "Hard-refresh the browser once (Ctrl+Shift+R) if you still see an old page."
 echo "Ensure backend/.env has: FRONTEND_DIST=../frontend/dist"
+echo "Health check: curl -sI http://127.0.0.1:\${PORT:-5001}/api/v1/store/settings"
