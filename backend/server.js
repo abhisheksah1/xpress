@@ -8,7 +8,11 @@ import { logBrevoConfigStatus } from './src/services/email.service.js';
 
 const startServer = async () => {
   await connectDB();
-  await seedOnStartup();
+  try {
+    await seedOnStartup();
+  } catch (err) {
+    console.error('[seed] Startup seed failed (API will still start):', err.message);
+  }
   startForexScheduler();
   startPaymentReconcileScheduler();
   await logBrevoConfigStatus();

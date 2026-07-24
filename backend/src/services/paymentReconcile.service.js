@@ -52,7 +52,7 @@ export const reconcilePendingCardPayments = async () => {
         console.log(`[payment-reconcile] Failed ${order.orderNumber}: ${result.message}`);
       }
     } catch (err) {
-      if (!/not initialized/i.test(err.message || '')) {
+      if (!/not initialized|Unauthorized Access/i.test(err.message || '')) {
         console.warn(`[payment-reconcile] ${order.orderNumber}:`, err.message);
       }
     }

@@ -12,8 +12,11 @@ import { syncPaymentGatewaysFromEnv } from '../services/paymentGateway.service.j
 dotenv.config();
 
 const seedSuperAdmin = async () => {
-  if (process.env.NODE_ENV === 'production' && config.superAdmin.password === 'ChangeMe@123') {
-    throw new Error('Set SUPER_ADMIN_PASSWORD in production before seeding — default password is not allowed.');
+  const usingDefaultPassword = config.superAdmin.password === 'ChangeMe@123';
+  if (process.env.NODE_ENV === 'production' && usingDefaultPassword) {
+    console.error(
+      '[seed] SUPER_ADMIN_PASSWORD is still ChangeMe@123. Set a strong password in backend/.env and restart. Continuing startup without resetting the super-admin password.'
+    );
   }
 
   const { name, email, password, phone } = config.superAdmin;
@@ -67,7 +70,7 @@ const seedSuperAdmin = async () => {
       changed = true;
     }
 
-    if (password) {
+    if (password && !(process.env.NODE_ENV === 'production' && usingDefaultPassword)) {
       const passwordMatches = await target.comparePassword(password);
       if (!passwordMatches) {
         target.password = password;
@@ -88,6 +91,11 @@ const seedSuperAdmin = async () => {
       await existingSuperAdmin.save();
       console.log(`Previous super admin demoted to admin: ${existingSuperAdmin.email}`);
     }
+    return;
+  }
+
+  if (process.env.NODE_ENV === 'production' && usingDefaultPassword) {
+    console.error('[seed] Refusing to create super admin with default password ChangeMe@123. Set SUPER_ADMIN_PASSWORD and restart.');
     return;
   }
 

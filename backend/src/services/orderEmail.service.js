@@ -68,8 +68,6 @@ export const getManualBankPaymentDetails = async () => {
     const pluginSettings = await getSettings('plugins');
     const plugins = pluginSettings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
     whatsapp = plugins.plugins_config?.whatsapp_number || '';
-  }
-  // ... need more context
   } catch {
     /* optional */
   }

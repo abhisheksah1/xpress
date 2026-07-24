@@ -33,8 +33,8 @@ const toOrigin = (value) => {
   }
 };
 
-/** localhost ↔ 127.0.0.1 are interchangeable in local browsers. */
-const withLocalAliases = (origin) => {
+/** localhost ↔ 127.0.0.1 and apex ↔ www are interchangeable for CORS. */
+const withHostAliases = (origin) => {
   if (!origin) return [];
   const aliases = [origin];
   try {
@@ -44,6 +44,11 @@ const withLocalAliases = (origin) => {
     }
     if (url.hostname === '127.0.0.1') {
       aliases.push(`${url.protocol}//localhost${url.port ? `:${url.port}` : ''}`);
+    }
+    if (url.hostname.startsWith('www.')) {
+      aliases.push(`${url.protocol}//${url.hostname.slice(4)}${url.port ? `:${url.port}` : ''}`);
+    } else if (url.hostname.includes('.')) {
+      aliases.push(`${url.protocol}//www.${url.hostname}${url.port ? `:${url.port}` : ''}`);
     }
   } catch {
     /* ignore */
@@ -55,7 +60,7 @@ const allowedOrigins = new Set(
   [config.clientUrl, config.adminUrl, config.serverUrl, ...(config.corsOrigins || [])]
     .map(toOrigin)
     .filter(Boolean)
-    .flatMap(withLocalAliases)
+    .flatMap(withHostAliases)
 );
 
 if (config.env !== 'production') {
