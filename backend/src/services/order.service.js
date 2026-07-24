@@ -520,18 +520,37 @@ export const getTrackingEmail = (order) =>
   order.guestEmail || order.sender?.email || order.shippingAddress?.email || order.user?.email || '';
 
 export const getOrderByNumber = async (orderNumber, email) => {
-  const filter = { orderNumber };
-  if (email) {
-    filter.$or = [
-      { guestEmail: new RegExp(`^${email.trim()}$`, 'i') },
-      { 'shippingAddress.email': new RegExp(`^${email.trim()}$`, 'i') },
-      { 'sender.email': new RegExp(`^${email.trim()}$`, 'i') },
-    ];
-  }
-  const order = await Order.findOne(filter)
+  const normalizedNumber = String(orderNumber || '').trim();
+  if (!normalizedNumber) throw new ApiError(400, 'Order number is required');
+
+  const order = await Order.findOne({
+    orderNumber: new RegExp(`^${escapeRegex(normalizedNumber)}$`, 'i'),
+  })
     .populate('items.product', 'name slug images')
-    .populate('deliveryLocation', 'name');
+    .populate('deliveryLocation', 'name')
+    .populate('user', 'name email');
+
   if (!order) throw new ApiError(404, 'Order not found');
+
+  if (email && String(email).trim()) {
+    const mail = String(email).trim().toLowerCase();
+    const candidates = [
+      order.guestEmail,
+      order.sender?.email,
+      order.shippingAddress?.email,
+      order.user?.email,
+    ]
+      .filter(Boolean)
+      .map((e) => String(e).trim().toLowerCase());
+
+    if (!candidates.includes(mail)) {
+      throw new ApiError(
+        404,
+        'Order not found. Use the email from checkout, or the account email if you ordered while logged in.'
+      );
+    }
+  }
+
   return order;
 };
 

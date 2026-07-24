@@ -98,7 +98,7 @@ export default function TrackOrderPage() {
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-2">Track your order</h1>
       <p className="text-gray-500 mb-6 text-sm">
-        Enter your order number and the email used at checkout.{' '}
+        Enter your order number and the email used at checkout (or your account email if you ordered while logged in).{' '}
         <Link to="/orders" className="text-primary-600 hover:underline">View account orders</Link>
       </p>
 
