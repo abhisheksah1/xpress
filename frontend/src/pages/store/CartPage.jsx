@@ -51,6 +51,14 @@ export default function CartPage() {
           productId: item.productId,
           quantity: item.quantity,
           unitPrice: item.price,
+          selectedOptions: (item.selectedOptions || [])
+            .filter((o) => o?.label)
+            .map((o) => ({
+              category: o.category || undefined,
+              categoryId: o.categoryId || undefined,
+              label: String(o.label),
+              priceAdjustment: Number(o.priceAdjustment) || 0,
+            })),
         })),
       });
       setCoupon(data.data);

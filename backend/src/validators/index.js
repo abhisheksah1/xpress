@@ -362,7 +362,8 @@ export const deliveryLocationSchema = z.object({
     name: z.string().min(2),
     deliveryFee: z.number().min(0),
     isActive: z.boolean().optional(),
-    sortOrder: z.number().optional(),
+    sortOrder: z.number().int().min(0).max(15).optional(),
+    minPrepHours: z.number().min(0).max(168).optional(),
     timeSlotsEnabled: z.boolean().optional(),
     timeSlots: z.array(z.object({
       id: z.string().min(1),
@@ -392,7 +393,7 @@ export const deliveryGroupSchema = z.object({
     categories: z.array(z.string()).optional(),
     products: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
-    sortOrder: z.number().optional(),
+    sortOrder: z.number().int().min(0).max(15).optional(),
   }),
 });
 
@@ -491,6 +492,7 @@ export const validateCouponSchema = z.object({
       variantId: z.string().optional(),
       quantity: z.number().min(1),
       unitPrice: z.number().min(0).optional(),
+      selectedOptions: z.array(selectedOptionSchema).optional(),
     })).min(1),
     paymentMethod: z.enum(['khalti', 'esewa', 'imepay', 'fonepay', 'card', 'hbl', 'manual_bank', 'cod']).optional(),
     deliveryLocationId: z.string().optional(),
@@ -599,6 +601,7 @@ const partnerItemSchema = z.object({
   quantity: z.number().min(1),
   unitPrice: z.number().min(0).optional(),
   variantId: z.string().optional(),
+  selectedOptions: z.array(selectedOptionSchema).optional(),
   giftMessage: z.string().optional(),
 });
 

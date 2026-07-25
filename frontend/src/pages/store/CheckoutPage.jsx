@@ -21,6 +21,7 @@ import {
   filterAvailableTimeSlots,
   getMinPreferredDeliveryDate,
   validatePreferredDeliverySelection,
+  DELIVERY_PREP_HOURS,
 } from '../../utils/deliveryScheduling.js';
 
 function FormField({ id, label, required, optional, hint, children }) {
@@ -146,11 +147,6 @@ export default function CheckoutPage() {
     [settings?.service_addons]
   );
 
-  const minDeliveryDate = useMemo(
-    () => getMinPreferredDeliveryDate({ nowMs }),
-    [nowMs]
-  );
-
   useEffect(() => {
     let cancelled = false;
 
@@ -190,6 +186,11 @@ export default function CheckoutPage() {
     [deliveryLocations, deliveryLocationId]
   );
 
+  const prepHours = useMemo(() => {
+    const hours = Number(selectedDeliveryLocation?.minPrepHours);
+    return Number.isFinite(hours) && hours >= 0 ? hours : DELIVERY_PREP_HOURS;
+  }, [selectedDeliveryLocation]);
+
   const timeSlots = useMemo(() => {
     if (!selectedDeliveryLocation?.timeSlotsEnabled) return [];
     return (selectedDeliveryLocation.timeSlots || [])
@@ -197,9 +198,14 @@ export default function CheckoutPage() {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [selectedDeliveryLocation]);
 
+  const minDeliveryDate = useMemo(
+    () => getMinPreferredDeliveryDate({ nowMs, prepHours }),
+    [nowMs, prepHours]
+  );
+
   const availableTimeSlots = useMemo(
-    () => filterAvailableTimeSlots(timeSlots, preferredDate, { nowMs }),
-    [timeSlots, preferredDate, nowMs]
+    () => filterAvailableTimeSlots(timeSlots, preferredDate, { nowMs, prepHours }),
+    [timeSlots, preferredDate, nowMs, prepHours]
   );
 
   useEffect(() => {
@@ -252,6 +258,14 @@ export default function CheckoutPage() {
       productId: i.productId,
       quantity: i.quantity,
       unitPrice: i.price,
+      selectedOptions: (i.selectedOptions || [])
+        .filter((o) => o?.label)
+        .map((o) => ({
+          category: o.category || undefined,
+          categoryId: o.categoryId || undefined,
+          label: String(o.label),
+          priceAdjustment: Number(o.priceAdjustment) || 0,
+        })),
     })),
     paymentMethod: paymentMethod || undefined,
     deliveryLocationId: deliveryLocationId || undefined,
@@ -280,7 +294,14 @@ export default function CheckoutPage() {
   useEffect(() => {
     refreshQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deliveryLocationId, paymentMethod, selectedAddonIds, timeSlotId, items.length]);
+  }, [
+    deliveryLocationId,
+    paymentMethod,
+    selectedAddonIds,
+    timeSlotId,
+    items.length,
+    items.map((i) => `${i.productId}:${i.quantity}:${i.price}:${i.optionsKey || ''}`).join('|'),
+  ]);
 
   const applyCoupon = async (e) => {
     e.preventDefault();
@@ -446,6 +467,7 @@ export default function CheckoutPage() {
       timeSlotId,
       timeSlots,
       nowMs,
+      prepHours,
     });
     if (deliveryErrors.length) return deliveryErrors[0];
 

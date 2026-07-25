@@ -719,7 +719,13 @@ export function SmtpSection({ values, set }) {
   const [saving, setSaving] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [testing, setTesting] = useState(false);
-  const templates = values.email_templates || {};
+  const templates = {
+    ...values.email_templates,
+    staff_order_notification: values.email_templates?.staff_order_notification || {
+      subject: 'New order {{order_number}} – {{total}}',
+      body: 'New order received.\n\nOrder number: {{order_number}}\nCustomer: {{customer_name}}\nTotal: {{total}}\nPayment: {{payment_method}}\nDelivery location: {{delivery_location}}\nPreferred date: {{preferred_delivery_date}}\n\nItems:\n{{order_items}}\n\nAdmin: {{admin_order_url}}\nTrack: {{tracking_url}}',
+    },
+  };
 
   const setTemplate = (key, field, val) => {
     set('email_templates', { ...templates, [key]: { ...templates[key], [field]: val } });
@@ -776,7 +782,7 @@ export function SmtpSection({ values, set }) {
           <button type="button" onClick={sendTest} disabled={testing} className="btn-secondary mb-0">{testing ? 'Sending...' : 'Send Test'}</button>
         </div>
       </SectionCard>
-      <SectionCard title="Email Templates" description="Order confirmation placeholders: {{customer_name}}, {{order_number}}, {{total}}, {{tracking_url}}, {{payment_pending_note}}, {{payment_instructions}}, {{support_email}}, {{support_whatsapp}}. Also {{reset_link}} for password reset." onSave={() => saveSection(['email_templates'], values, setSaving)} saving={saving}>
+      <SectionCard title="Email Templates" description="Order confirmation placeholders: {{customer_name}}, {{order_number}}, {{total}}, {{tracking_url}}, {{payment_pending_note}}, {{payment_instructions}}, {{support_email}}, {{support_whatsapp}}. Staff notification also supports {{payment_method}}, {{delivery_location}}, {{preferred_delivery_date}}, {{order_items}}, {{admin_order_url}}. Also {{reset_link}} for password reset." onSave={() => saveSection(['email_templates'], values, setSaving)} saving={saving}>
         {Object.entries(templates).map(([key, tpl]) => (
           <div key={key} className="border border-gray-100 rounded-lg p-4 space-y-2">
             <p className="text-sm font-semibold capitalize">{key.replace(/_/g, ' ')}</p>
@@ -785,7 +791,59 @@ export function SmtpSection({ values, set }) {
           </div>
         ))}
       </SectionCard>
+      <StaffOrderNotificationsSection values={values} set={set} />
     </div>
+  );
+}
+
+function StaffOrderNotificationsSection({ values, set }) {
+  const [saving, setSaving] = useState(false);
+  const recipients = values.staff_order_notification_recipients || [];
+
+  const update = (i, field, val) => {
+    const next = [...recipients];
+    next[i] = { ...next[i], [field]: val };
+    set('staff_order_notification_recipients', next);
+  };
+
+  const add = () => set('staff_order_notification_recipients', [
+    ...recipients,
+    { id: `staff_${Date.now()}`, name: '', email: '', enabled: true },
+  ]);
+  const remove = (i) => set('staff_order_notification_recipients', recipients.filter((_, j) => j !== i));
+
+  return (
+    <SectionCard
+      title="Order Notification Settings"
+      description="Internal staff emails sent when a new order is placed. Separate from the customer order confirmation."
+      onSave={() => saveSection(
+        ['staff_order_notifications_enabled', 'staff_order_notification_recipients'],
+        values,
+        setSaving
+      )}
+      saving={saving}
+    >
+      <Toggle
+        label="Enable staff order notifications"
+        checked={values.staff_order_notifications_enabled !== false}
+        onChange={(v) => set('staff_order_notifications_enabled', v)}
+      />
+      <div className="space-y-3 pt-2">
+        {recipients.map((r, i) => (
+          <div key={r.id || i} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border border-gray-100 rounded-lg">
+            <Field label="Name">
+              <input className="input-field text-sm" value={r.name || ''} onChange={(e) => update(i, 'name', e.target.value)} placeholder="Ops team" />
+            </Field>
+            <Field label="Email">
+              <input type="email" className="input-field text-sm" value={r.email || ''} onChange={(e) => update(i, 'email', e.target.value)} placeholder="orders@example.com" required />
+            </Field>
+            <Toggle label="Enabled" checked={r.enabled !== false} onChange={(v) => update(i, 'enabled', v)} />
+            <button type="button" onClick={() => remove(i)} className="text-red-500 text-sm self-end">Remove</button>
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={add} className="btn-secondary text-sm">+ Add staff email</button>
+    </SectionCard>
   );
 }
 

@@ -9,6 +9,14 @@ const METHOD_LABELS = {
   courier: 'Courier',
 };
 
+const PRIORITY_OPTIONS = [
+  { value: 0, label: 'Auto (A–Z after priority list)' },
+  ...Array.from({ length: 15 }, (_, i) => ({
+    value: i + 1,
+    label: `Priority ${i + 1}`,
+  })),
+];
+
 const formatLocationTimeSlots = (loc) => {
   if (!loc.timeSlotsEnabled) return '—';
   const slots = (loc.timeSlots || []).filter((s) => s.enabled !== false);
@@ -19,14 +27,36 @@ const formatLocationTimeSlots = (loc) => {
   }).join(', ');
 };
 
+const formatPriority = (sortOrder) => {
+  const n = Number(sortOrder);
+  if (Number.isFinite(n) && n >= 1 && n <= 15) return `#${n}`;
+  return 'A–Z';
+};
+
 function LocationModal({ open, initial, onClose, onSave, saving }) {
-  const [form, setForm] = useState({ name: '', deliveryFee: 100, timeSlotsEnabled: false, timeSlots: [] });
+  const [form, setForm] = useState({
+    name: '',
+    deliveryFee: 100,
+    sortOrder: 0,
+    minPrepHours: 3,
+    timeSlotsEnabled: false,
+    timeSlots: [],
+  });
   useEffect(() => {
     if (open) {
-      const base = initial || { name: '', deliveryFee: 100, timeSlotsEnabled: false, timeSlots: [] };
+      const base = initial || {
+        name: '',
+        deliveryFee: 100,
+        sortOrder: 0,
+        minPrepHours: 3,
+        timeSlotsEnabled: false,
+        timeSlots: [],
+      };
       setForm({
         ...base,
         deliveryFee: base.deliveryFee ?? 100,
+        sortOrder: Number(base.sortOrder) >= 1 && Number(base.sortOrder) <= 15 ? Number(base.sortOrder) : 0,
+        minPrepHours: base.minPrepHours ?? 3,
         timeSlotsEnabled: !!base.timeSlotsEnabled,
         timeSlots: Array.isArray(base.timeSlots) ? base.timeSlots : [],
       });
@@ -41,8 +71,11 @@ function LocationModal({ open, initial, onClose, onSave, saving }) {
         onSubmit={(e) => {
           e.preventDefault();
           onSave({
-            ...form,
+            name: form.name,
             deliveryFee: Number(form.deliveryFee),
+            sortOrder: Number(form.sortOrder) || 0,
+            minPrepHours: Number(form.minPrepHours) || 0,
+            isActive: form.isActive !== false,
             timeSlotsEnabled: !!form.timeSlotsEnabled,
             timeSlots: (form.timeSlots || []).map((s, i) => ({
               id: s.id || `slot_${Date.now()}_${i}`,
@@ -62,9 +95,40 @@ function LocationModal({ open, initial, onClose, onSave, saving }) {
           <label className="block text-sm font-medium mb-1">District / City Location Name</label>
           <input className="input-field" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
         </div>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">Charge in Base Currency (NPR)</label>
+            <input type="number" min="0" className="input-field" value={form.deliveryFee} onChange={(e) => setForm((f) => ({ ...f, deliveryFee: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Display Priority</label>
+            <select
+              className="input-field"
+              value={Number(form.sortOrder) || 0}
+              onChange={(e) => setForm((f) => ({ ...f, sortOrder: Number(e.target.value) }))}
+            >
+              {PRIORITY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Priorities 1–15 appear first in that order. Others follow A–Z.</p>
+          </div>
+        </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Charge in Base Currency (NPR)</label>
-          <input type="number" min="0" className="input-field" value={form.deliveryFee} onChange={(e) => setForm((f) => ({ ...f, deliveryFee: e.target.value }))} required />
+          <label className="block text-sm font-medium mb-1">Minimum preparation time (hours)</label>
+          <input
+            type="number"
+            min="0"
+            max="168"
+            step="0.5"
+            className="input-field"
+            value={form.minPrepHours}
+            onChange={(e) => setForm((f) => ({ ...f, minPrepHours: e.target.value }))}
+            required
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Preferred delivery date and time slots earlier than this window are hidden on checkout.
+          </p>
         </div>
 
         <div className="pt-2 border-t border-gray-100">
@@ -324,6 +388,19 @@ function GroupModal({ open, initial, locations, categories, products, onClose, o
             <label className="block text-sm font-medium mb-1">Cut-off Time (NST)</label>
             <input className="input-field" value={form.cutoffTime} onChange={(e) => setForm((f) => ({ ...f, cutoffTime: e.target.value }))} placeholder="16:00" />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Display Priority</label>
+            <select
+              className="input-field"
+              value={Number(form.sortOrder) || 0}
+              onChange={(e) => setForm((f) => ({ ...f, sortOrder: Number(e.target.value) }))}
+            >
+              {PRIORITY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Priorities 1–15 appear first; others sort A–Z after.</p>
+          </div>
         </div>
 
         <div>
@@ -522,7 +599,7 @@ export default function DeliveryGroupsPage() {
           <div>
             <h2 className="font-semibold text-gray-800">Fulfillment Districts / Cities &amp; Shipping Rates (NPR)</h2>
             <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-              These locations populate the checkout dropdown. Enable time slots per location (e.g. Kathmandu, Pokhara) and set an additional fee per slot. Fees are shown to customers at checkout and added to delivery automatically.
+              These locations populate the checkout dropdown. Set display priority (1–15) to pin top cities, then remaining locations sort A–Z. Enable time slots and minimum preparation hours per location.
             </p>
           </div>
           <button type="button" onClick={() => setLocModal({})} className="btn-primary text-sm whitespace-nowrap">
@@ -532,8 +609,10 @@ export default function DeliveryGroupsPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-xs uppercase text-gray-500">
             <tr>
+              <th className="text-left px-4 py-3 font-semibold">Priority</th>
               <th className="text-left px-4 py-3 font-semibold">District / City Location Name</th>
               <th className="text-left px-4 py-3 font-semibold">Base Fee (NPR)</th>
+              <th className="text-left px-4 py-3 font-semibold">Prep (hrs)</th>
               <th className="text-left px-4 py-3 font-semibold">Time Slots</th>
               <th className="text-right px-4 py-3 font-semibold">Actions</th>
             </tr>
@@ -541,8 +620,10 @@ export default function DeliveryGroupsPage() {
           <tbody className="divide-y divide-gray-50">
             {locations.map((loc) => (
               <tr key={loc._id} className="hover:bg-gray-50 align-top">
+                <td className="px-4 py-3 text-gray-600">{formatPriority(loc.sortOrder)}</td>
                 <td className="px-4 py-3 font-medium">{loc.name}</td>
                 <td className="px-4 py-3">{loc.deliveryFee}</td>
+                <td className="px-4 py-3">{loc.minPrepHours ?? 3}</td>
                 <td className="px-4 py-3 text-gray-600 text-xs max-w-md">{formatLocationTimeSlots(loc)}</td>
                 <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
                   <button type="button" onClick={() => setLocModal(loc)} className="text-primary-600 text-xs font-medium">Edit</button>
@@ -551,7 +632,7 @@ export default function DeliveryGroupsPage() {
               </tr>
             ))}
             {!locations.length && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No delivery locations yet. Create your first location.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No delivery locations yet. Create your first location.</td></tr>
             )}
           </tbody>
         </table>
@@ -586,6 +667,7 @@ export default function DeliveryGroupsPage() {
           <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
+                <th className="text-left px-4 py-3 font-semibold">Priority</th>
                 <th className="text-left px-4 py-3 font-semibold">Delivery Group</th>
                 <th className="text-left px-4 py-3 font-semibold">Coverage Area</th>
                 <th className="text-left px-4 py-3 font-semibold">Method</th>
@@ -598,6 +680,7 @@ export default function DeliveryGroupsPage() {
             <tbody className="divide-y divide-gray-50">
               {groups.map((group) => (
                 <tr key={group._id} className="hover:bg-gray-50 align-top">
+                  <td className="px-4 py-3 text-gray-600">{formatPriority(group.sortOrder)}</td>
                   <td className="px-4 py-3">
                     <span className="font-medium block">{group.name}</span>
                     <span className="text-xs text-gray-400">ID: {group.code || group._id}</span>
@@ -622,7 +705,7 @@ export default function DeliveryGroupsPage() {
                 </tr>
               ))}
               {!groups.length && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No delivery groups yet.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No delivery groups yet.</td></tr>
               )}
             </tbody>
           </table>

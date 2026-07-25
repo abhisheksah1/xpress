@@ -200,3 +200,116 @@ export const sendOrderConfirmationEmail = async (order) => {
   await sendEmail({ to, subject, text: body, html });
   return { sent: true, to };
 };
+
+const DEFAULT_STAFF_ORDER_NOTIFICATION = {
+  subject: 'New order {{order_number}} – {{total}}',
+  body: `New order received.
+
+Order number: {{order_number}}
+Customer: {{customer_name}}
+Total: {{total}}
+Payment: {{payment_method}}
+Delivery location: {{delivery_location}}
+Preferred date: {{preferred_delivery_date}}
+
+Items:
+{{order_items}}
+
+Admin: {{admin_order_url}}
+Track: {{tracking_url}}`,
+};
+
+const formatOrderItemsList = (order) => {
+  const items = order.items || [];
+  if (!items.length) return '(no items)';
+  return items
+    .map((item) => {
+      const qty = Number(item.quantity) || 1;
+      const price = Number(item.price) || 0;
+      return `• ${item.name || 'Item'} × ${qty} (Rs. ${price.toLocaleString('en-NP')})`;
+    })
+    .join('\n');
+};
+
+const buildAdminOrderUrl = (order) => {
+  const base = (config.adminUrl || config.clientUrl || '').replace(/\/$/, '');
+  if (!base) return '';
+  return `${base}/orders/${order._id || order.id || ''}`;
+};
+
+/** Internal staff notification — separate from customer confirmation. */
+export const sendStaffOrderNotificationEmail = async (order) => {
+  let enabled = true;
+  let recipients = [];
+  let tpl = DEFAULT_STAFF_ORDER_NOTIFICATION;
+
+  try {
+    const emailSettings = await getSettings('email');
+    const map = emailSettings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
+    if (map.staff_order_notifications_enabled === false) {
+      return { sent: false, reason: 'disabled' };
+    }
+    enabled = map.staff_order_notifications_enabled !== false;
+    recipients = Array.isArray(map.staff_order_notification_recipients)
+      ? map.staff_order_notification_recipients
+      : [];
+    if (map.email_templates?.staff_order_notification?.subject) {
+      tpl = map.email_templates.staff_order_notification;
+    }
+  } catch {
+    /* use defaults */
+  }
+
+  if (!enabled) return { sent: false, reason: 'disabled' };
+
+  const to = recipients
+    .filter((r) => r && r.enabled !== false && r.email)
+    .map((r) => String(r.email).trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!to.length) {
+    return { sent: false, reason: 'no_recipients' };
+  }
+
+  const trackingUrl = buildOrderTrackingUrl(order);
+  const baseVars = await buildTemplateVars(order, trackingUrl);
+  const preferredDate = order.preferredDeliveryDate
+    ? String(order.preferredDeliveryDate).slice(0, 10)
+    : '';
+
+  let deliveryLocationName = '';
+  if (order.deliveryLocation && typeof order.deliveryLocation === 'object' && order.deliveryLocation.name) {
+    deliveryLocationName = order.deliveryLocation.name;
+  } else if (order.deliveryLocation) {
+    try {
+      const { DeliveryLocation } = await import('../models/index.js');
+      const loc = await DeliveryLocation.findById(order.deliveryLocation).select('name');
+      deliveryLocationName = loc?.name || '';
+    } catch {
+      /* optional */
+    }
+  }
+
+  const vars = {
+    ...baseVars,
+    payment_method: order.payment?.method || '',
+    delivery_location: deliveryLocationName || '—',
+    preferred_delivery_date: preferredDate || '—',
+    order_items: formatOrderItemsList(order),
+    admin_order_url: buildAdminOrderUrl(order),
+  };
+
+  const subject = renderTemplate(tpl.subject || DEFAULT_STAFF_ORDER_NOTIFICATION.subject, vars);
+  let body = renderTemplate(tpl.body || DEFAULT_STAFF_ORDER_NOTIFICATION.body, vars);
+  body = body.replace(/\n{3,}/g, '\n\n').trim();
+
+  const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:8px 0;">${body
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p style="margin:0 0 8px;line-height:1.5;color:#334155;">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
+    .join('')}</div>`;
+
+  await sendEmail({ to, subject, text: body, html });
+  return { sent: true, to };
+};
