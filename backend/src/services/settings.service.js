@@ -214,10 +214,6 @@ const DEFAULT_SETTINGS = [
         subject: 'Order received – {{order_number}} | Koseli Xpress',
         body: 'Hi {{customer_name}},\n\nThank you for ordering with Koseli Xpress.\n\nOrder number: {{order_number}}\nTotal: {{total}}\n\nTrack your order anytime:\n{{tracking_url}}\n\n{{payment_pending_note}}\n\n{{payment_instructions}}\n\nIf you need help, contact us at {{support_email}} or WhatsApp: {{support_whatsapp}}.\n\nThank you,\nKoseli Xpress',
       },
-      staff_order_notification: {
-        subject: 'New order {{order_number}} – {{total}}',
-        body: 'New order received.\n\nOrder number: {{order_number}}\nCustomer: {{customer_name}}\nTotal: {{total}}\nPayment: {{payment_method}}\nDelivery location: {{delivery_location}}\nPreferred date: {{preferred_delivery_date}}\n\nItems:\n{{order_items}}\n\nAdmin: {{admin_order_url}}\nTrack: {{tracking_url}}',
-      },
       welcome: {
         subject: 'Welcome to KoseliXpress!',
         body: 'Hi {{customer_name}},\n\nWelcome to KoseliXpress — Nepal\'s gift portal. Start browsing gifts today!',
@@ -232,18 +228,6 @@ const DEFAULT_SETTINGS = [
           'Hi {{customer_name}},\n\nThis is a reminder for {{title}} ({{relation}}) on {{occasion_date}}.\nDelivery location note: {{delivery_location}}\n\nYou can place your order anytime from our store.\n\n{{custom_message}}',
       },
     },
-  },
-  {
-    key: 'staff_order_notifications_enabled',
-    value: true,
-    group: 'email',
-    label: 'Staff Order Notifications Enabled',
-  },
-  {
-    key: 'staff_order_notification_recipients',
-    value: [],
-    group: 'email',
-    label: 'Staff Order Notification Recipients',
   },
 
   // Customer Authentication
@@ -282,15 +266,6 @@ export const seedDefaultSettings = async () => {
       { $setOnInsert: setting },
       { upsert: true }
     );
-  }
-
-  // Ensure staff notification template exists on upgraded installs
-  const emailTpl = await Settings.findOne({ key: 'email_templates' });
-  const staffTpl = DEFAULT_SETTINGS.find((s) => s.key === 'email_templates')?.value?.staff_order_notification;
-  if (emailTpl && staffTpl && !emailTpl.value?.staff_order_notification) {
-    emailTpl.value = { ...emailTpl.value, staff_order_notification: staffTpl };
-    emailTpl.markModified('value');
-    await emailTpl.save();
   }
 };
 

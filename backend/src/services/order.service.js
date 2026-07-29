@@ -212,12 +212,10 @@ export const createOrder = async (data) => {
 
   if (data.preferredDeliveryDate || data.timeSlotId) {
     try {
-      const prepHours = Number(deliveryLocationDoc?.minPrepHours);
       assertPreferredDeliverySelection({
         preferredDeliveryDate: data.preferredDeliveryDate,
         timeSlotId: data.timeSlotId,
         timeSlots: deliveryLocationDoc?.timeSlots || [],
-        prepHours: Number.isFinite(prepHours) && prepHours >= 0 ? prepHours : undefined,
       });
     } catch (prepErr) {
       throw new ApiError(400, prepErr.message);
@@ -249,7 +247,6 @@ export const createOrder = async (data) => {
         productId: item.productId,
         variantId: item.variantId,
         quantity: item.quantity,
-        selectedOptions: item.selectedOptions,
         unitPrice: orderItems.find((o) => String(o.product) === String(item.productId))?.price,
       })),
       paymentMethod: data.paymentMethod,
@@ -320,13 +317,6 @@ export const createOrder = async (data) => {
     await sendOrderConfirmationEmail(order);
   } catch (err) {
     console.error(`[orderEmail] Confirmation email failed for ${order.orderNumber}:`, err.message);
-  }
-
-  try {
-    const { sendStaffOrderNotificationEmail } = await import('./orderEmail.service.js');
-    await sendStaffOrderNotificationEmail(order);
-  } catch (err) {
-    console.error(`[orderEmail] Staff notification failed for ${order.orderNumber}:`, err.message);
   }
 
   return order;

@@ -198,7 +198,6 @@ export const buildPartnerQuote = async (partner, payload) => {
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       variantId: i.variantId,
-      selectedOptions: i.selectedOptions,
     })),
     paymentMethod: API_PARTNER_FIXED_PAYMENT_METHOD,
     deliveryLocationId,

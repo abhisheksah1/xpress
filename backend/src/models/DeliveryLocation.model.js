@@ -18,10 +18,7 @@ const deliveryLocationSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     deliveryFee: { type: Number, required: true, min: 0 },
     isActive: { type: Boolean, default: true },
-    /** 1–15 = pinned display priority; 0 / unset = alphabetical after priority list */
     sortOrder: { type: Number, default: 0 },
-    /** Minimum hours before preferred delivery date/slot can be selected */
-    minPrepHours: { type: Number, default: 3, min: 0 },
     timeSlotsEnabled: { type: Boolean, default: false },
     timeSlots: { type: [timeSlotSchema], default: [] },
   },

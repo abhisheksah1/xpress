@@ -6,37 +6,11 @@ const idStr = (id) => String(id);
 const findRule = (rules, groupId) =>
   (rules || []).find((rule) => idStr(rule.group) === idStr(groupId));
 
-/** Priority slots 1–15 stay pinned; everything else sorts A–Z after them. */
-export const PRIORITY_SORT_MAX = 15;
-
-export const sortByPriorityThenName = (docs = []) => {
-  const list = [...docs];
-  const nameOf = (doc) => String(doc?.name || '').trim().toLocaleLowerCase('en');
-  const priority = list
-    .filter((doc) => {
-      const order = Number(doc?.sortOrder);
-      return Number.isFinite(order) && order >= 1 && order <= PRIORITY_SORT_MAX;
-    })
-    .sort((a, b) => {
-      const diff = Number(a.sortOrder) - Number(b.sortOrder);
-      if (diff !== 0) return diff;
-      return nameOf(a).localeCompare(nameOf(b), 'en');
-    });
-  const rest = list
-    .filter((doc) => {
-      const order = Number(doc?.sortOrder);
-      return !(Number.isFinite(order) && order >= 1 && order <= PRIORITY_SORT_MAX);
-    })
-    .sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'en'));
-  return [...priority, ...rest];
-};
-
 // ─── Delivery Locations ───────────────────────────────────────────
 
 export const getDeliveryLocations = async ({ includeInactive = false } = {}) => {
   const filter = includeInactive ? {} : { isActive: true };
-  const locations = await DeliveryLocation.find(filter);
-  return sortByPriorityThenName(locations);
+  return DeliveryLocation.find(filter).sort({ sortOrder: 1, name: 1 });
 };
 
 export const createDeliveryLocation = async (data) => DeliveryLocation.create(data);
@@ -66,9 +40,8 @@ const populateGroup = (query) =>
 
 export const getDeliveryGroups = async ({ includeInactive = false } = {}) => {
   const filter = includeInactive ? {} : { isActive: true };
-  const groups = await populateGroup(DeliveryGroup.find(filter));
-  const sorted = sortByPriorityThenName(groups);
-  return Promise.all(sorted.map(async (g) => ({
+  const groups = await populateGroup(DeliveryGroup.find(filter).sort({ sortOrder: 1, name: 1 }));
+  return Promise.all(groups.map(async (g) => ({
     ...g.toObject(),
     productCount: await countProductsInGroup(g),
   })));
@@ -212,14 +185,12 @@ export const getGroupsForLocation = async (locationId) => {
   const groups = await DeliveryGroup.find({
     isActive: true,
     coverageLocations: locationId,
-  });
-  return sortByPriorityThenName(groups);
+  }).sort({ sortOrder: 1 });
+  return groups;
 };
 
 export const findGroupsCoveringLocation = async (locationId) =>
-  sortByPriorityThenName(
-    await DeliveryGroup.find({ isActive: true, coverageLocations: locationId })
-  );
+  DeliveryGroup.find({ isActive: true, coverageLocations: locationId }).sort({ sortOrder: 1 });
 
 export const validateOrderDelivery = async (
   items,
