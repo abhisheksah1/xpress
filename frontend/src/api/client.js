@@ -17,12 +17,32 @@ function clearClientAuthState() {
     if (parsed?.state) {
       parsed.state.user = null;
       parsed.state.accessToken = null;
-      localStorage.setItem('koseli-auth', JSON.stringify(parsed));
     }
+    localStorage.setItem('koseli-auth', JSON.stringify(parsed));
   } catch {
     /* ignore */
   }
   window.dispatchEvent(new CustomEvent('auth:session-cleared'));
+}
+
+/** Single in-flight refresh so concurrent 401s share one rotation. */
+let refreshPromise = null;
+
+export async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${apiBase}/auth/refresh`, {}, { withCredentials: true })
+      .then((res) => {
+        const accessToken = res.data?.data?.accessToken;
+        if (!accessToken) throw new Error('No access token in refresh response');
+        localStorage.setItem('accessToken', accessToken);
+        return accessToken;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
 }
 
 api.interceptors.request.use((config) => {
@@ -47,9 +67,8 @@ api.interceptors.response.use(
       );
 
       try {
-        const { data } = await axios.post(`${apiBase}/auth/refresh`, {}, { withCredentials: true });
-        localStorage.setItem('accessToken', data.data.accessToken);
-        error.config.headers.Authorization = `Bearer ${data.data.accessToken}`;
+        const accessToken = await refreshAccessToken();
+        error.config.headers.Authorization = `Bearer ${accessToken}`;
         return api(error.config);
       } catch {
         // Never force-logout during payment return — guest checkout must still verify.

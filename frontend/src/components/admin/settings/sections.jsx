@@ -450,6 +450,7 @@ export function MultiCurrenciesSection({ values, set, setValues }) {
 
 export function ServiceAddonsSection({ values, set }) {
   const [saving, setSaving] = useState(false);
+  const [locations, setLocations] = useState([]);
   const addons = values.service_addons || [];
 
   const INPUT_TYPE_OPTIONS = [
@@ -459,10 +460,46 @@ export function ServiceAddonsSection({ values, set }) {
     { value: 'both', label: 'Collect text & photo' },
   ];
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await adminApi.getDeliveryLocations({ includeInactive: true });
+        if (!cancelled) setLocations(data.data || []);
+      } catch {
+        if (!cancelled) setLocations([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const update = (i, field, val) => {
     const next = [...addons];
     next[i] = { ...next[i], [field]: val };
     set('service_addons', next);
+  };
+
+  const getLocationRule = (addon, locationId) =>
+    (addon.locationRules || []).find((r) => String(r.locationId) === String(locationId)) || {
+      locationId: String(locationId),
+      // "All locations" defaults to available; "Selected" defaults to off until ticked
+      available: addon.availabilityScope === 'selected' ? false : true,
+      minPrepHours: '',
+      minDays: '',
+    };
+
+  const updateLocationRule = (addonIndex, locationId, patch) => {
+    const addon = addons[addonIndex];
+    const existing = getLocationRule(addon, locationId);
+    const rest = (addon.locationRules || []).filter((r) => String(r.locationId) !== String(locationId));
+    update(addonIndex, 'locationRules', [
+      ...rest,
+      {
+        ...existing,
+        locationId: String(locationId),
+        ...patch,
+      },
+    ]);
   };
 
   const add = () => set('service_addons', [...addons, {
@@ -472,27 +509,149 @@ export function ServiceAddonsSection({ values, set }) {
     description: '',
     enabled: true,
     inputType: 'none',
+    availabilityScope: 'all',
+    minPrepHours: 3,
+    minDays: '',
+    locationRules: [],
   }]);
   const remove = (i) => set('service_addons', addons.filter((_, j) => j !== i));
 
   return (
-    <SectionCard title="Service Add-ons" description="Optional extras customers can add at checkout. Choose whether to collect text, photo, or both per add-on." onSave={() => saveSection(['service_addons'], values, setSaving)} saving={saving}>
-      {addons.map((a, i) => (
-        <div key={a.id || i} className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 border border-gray-100 rounded-lg">
-          <Field label="Name"><input className="input-field text-sm" value={a.name} onChange={(e) => update(i, 'name', e.target.value)} /></Field>
-          <Field label="Price (NPR)"><input type="number" className="input-field text-sm" value={a.price} onChange={(e) => update(i, 'price', Number(e.target.value))} /></Field>
-          <Field label="Customer input">
-            <select className="input-field text-sm" value={a.inputType || 'none'} onChange={(e) => update(i, 'inputType', e.target.value)}>
-              {INPUT_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Description"><input className="input-field text-sm" value={a.description} onChange={(e) => update(i, 'description', e.target.value)} /></Field>
-          <Toggle label="Enabled" checked={a.enabled} onChange={(v) => update(i, 'enabled', v)} />
-          <button type="button" onClick={() => remove(i)} className="text-red-500 text-sm self-end">Remove</button>
-        </div>
-      ))}
+    <SectionCard
+      title="Service Add-ons"
+      description="Optional extras at checkout. Set availability and minimum required time per location (same idea as products). Customers only see add-ons that match their delivery location and date."
+      onSave={() => saveSection(['service_addons'], values, setSaving)}
+      saving={saving}
+    >
+      {addons.map((a, i) => {
+        const scope = a.availabilityScope === 'selected' ? 'selected' : 'all';
+        return (
+          <div key={a.id || i} className="p-4 border border-gray-100 rounded-lg space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+              <Field label="Name"><input className="input-field text-sm" value={a.name} onChange={(e) => update(i, 'name', e.target.value)} /></Field>
+              <Field label="Price (NPR)"><input type="number" className="input-field text-sm" value={a.price} onChange={(e) => update(i, 'price', Number(e.target.value))} /></Field>
+              <Field label="Customer input">
+                <select className="input-field text-sm" value={a.inputType || 'none'} onChange={(e) => update(i, 'inputType', e.target.value)}>
+                  {INPUT_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Description"><input className="input-field text-sm" value={a.description || ''} onChange={(e) => update(i, 'description', e.target.value)} /></Field>
+              <Toggle label="Enabled" checked={a.enabled !== false} onChange={(v) => update(i, 'enabled', v)} />
+              <button type="button" onClick={() => remove(i)} className="text-red-500 text-sm self-end">Remove</button>
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 space-y-3">
+              <p className="text-sm font-semibold text-slate-800">Availability &amp; minimum required time</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Field label="Availability scope">
+                  <select
+                    className="input-field text-sm"
+                    value={scope}
+                    onChange={(e) => update(i, 'availabilityScope', e.target.value)}
+                  >
+                    <option value="all">All delivery locations</option>
+                    <option value="selected">Only selected locations below</option>
+                  </select>
+                </Field>
+                <Field label="Default min prep (hours)">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className="input-field text-sm"
+                    value={a.minPrepHours ?? ''}
+                    onChange={(e) => update(i, 'minPrepHours', e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="e.g. 3"
+                  />
+                </Field>
+                <Field label="Default min days">
+                  <input
+                    type="number"
+                    min="0"
+                    className="input-field text-sm"
+                    value={a.minDays ?? ''}
+                    onChange={(e) => update(i, 'minDays', e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0 = same day, 1 = next day"
+                  />
+                </Field>
+              </div>
+              <p className="text-xs text-gray-400">
+                Example: all locations in 3 hours → scope All, prep hours 3. Kathmandu same day / other cities 1–3 days → scope All, set Min days per location. Kathmandu only → scope Selected and tick Kathmandu.
+              </p>
+
+              {locations.length === 0 ? (
+                <p className="text-xs text-amber-600">No delivery locations found. Create them under Admin → Delivery first.</p>
+              ) : (
+                <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Location</th>
+                        <th className="text-left px-3 py-2 font-semibold">Available</th>
+                        <th className="text-left px-3 py-2 font-semibold">Min hours</th>
+                        <th className="text-left px-3 py-2 font-semibold">Min days</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {locations.map((loc) => {
+                        const rule = getLocationRule(a, loc._id);
+                        return (
+                          <tr key={loc._id}>
+                            <td className="px-3 py-2 font-medium">{loc.name}</td>
+                            <td className="px-3 py-2">
+                              {scope === 'selected' ? (
+                                <input
+                                  type="checkbox"
+                                  checked={!!rule.available}
+                                  onChange={(e) => updateLocationRule(i, loc._id, { available: e.target.checked })}
+                                />
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  checked={rule.available !== false}
+                                  onChange={(e) => updateLocationRule(i, loc._id, { available: e.target.checked })}
+                                  title="Uncheck to hide this add-on for this location even when scope is All"
+                                />
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                className="input-field text-sm w-24"
+                                value={rule.minPrepHours ?? ''}
+                                onChange={(e) => updateLocationRule(i, loc._id, {
+                                  minPrepHours: e.target.value === '' ? '' : Number(e.target.value),
+                                })}
+                                placeholder="default"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                className="input-field text-sm w-24"
+                                value={rule.minDays ?? ''}
+                                onChange={(e) => updateLocationRule(i, loc._id, {
+                                  minDays: e.target.value === '' ? '' : Number(e.target.value),
+                                })}
+                                placeholder="default"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
       <button type="button" onClick={add} className="btn-secondary text-sm">+ Add Service</button>
     </SectionCard>
   );
@@ -861,7 +1020,15 @@ export function CustomerAuthSection({ values, set }) {
       </div>
       <div className="grid md:grid-cols-3 gap-4 pt-4 border-t">
         <Field label="Min Password Length"><input type="number" className="input-field" value={values.min_password_length ?? 8} onChange={(e) => set('min_password_length', Number(e.target.value))} /></Field>
-        <Field label="Session Timeout (min)"><input type="number" className="input-field" value={values.session_timeout_minutes ?? 10080} onChange={(e) => set('session_timeout_minutes', Number(e.target.value))} /></Field>
+        <Field label="Admin Idle Logout (min)">
+          <input
+            type="number"
+            min="1"
+            className="input-field"
+            value={values.session_timeout_minutes ?? 10}
+            onChange={(e) => set('session_timeout_minutes', Number(e.target.value))}
+          />
+        </Field>
         <Field label="Max Login Attempts"><input type="number" className="input-field" value={values.login_attempts_max ?? 5} onChange={(e) => set('login_attempts_max', Number(e.target.value))} /></Field>
       </div>
     </SectionCard>

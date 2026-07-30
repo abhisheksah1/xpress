@@ -236,7 +236,7 @@ const DEFAULT_SETTINGS = [
   { key: 'social_google_enabled', value: false, group: 'auth', label: 'Google Sign-In' },
   { key: 'social_facebook_enabled', value: false, group: 'auth', label: 'Facebook Sign-In' },
   { key: 'min_password_length', value: 8, group: 'auth', label: 'Minimum Password Length' },
-  { key: 'session_timeout_minutes', value: 10080, group: 'auth', label: 'Session Timeout (minutes)' },
+  { key: 'session_timeout_minutes', value: 10, group: 'auth', label: 'Admin Idle Logout (minutes)' },
   { key: 'login_attempts_max', value: 5, group: 'auth', label: 'Max Login Attempts' },
 
   // SEO & Social

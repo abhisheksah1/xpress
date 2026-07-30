@@ -1,6 +1,8 @@
 import { Coupon, Product, Order, Settings } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import * as deliveryService from './delivery.service.js';
+import { resolveServiceAddonAvailability } from '../utils/serviceAddonAvailability.js';
+import { DELIVERY_PREP_HOURS } from '../utils/deliveryScheduling.js';
 
 const normalizeCode = (code) => String(code || '').trim().toUpperCase();
 
@@ -128,7 +130,16 @@ const normalizeAddonEntries = (entries = []) => {
   return entries.map((entry) => (typeof entry === 'string' ? { id: entry } : entry));
 };
 
-export const resolveServiceAddons = async (entries = [], { validateInputs = true } = {}) => {
+export const resolveServiceAddons = async (
+  entries = [],
+  {
+    validateInputs = true,
+    deliveryLocationId,
+    preferredDeliveryDate,
+    timeSlotId,
+    enforceAvailability = false,
+  } = {}
+) => {
   const normalized = normalizeAddonEntries(entries);
   if (!normalized.length) return { addons: [], total: 0 };
 
@@ -137,9 +148,42 @@ export const resolveServiceAddons = async (entries = [], { validateInputs = true
   const addons = [];
   let total = 0;
 
+  let locationMinPrepHours = DELIVERY_PREP_HOURS;
+  let locationTimeSlots = [];
+  if (deliveryLocationId) {
+    try {
+      const locations = await deliveryService.getDeliveryLocations();
+      const loc = locations.find((l) => String(l._id) === String(deliveryLocationId));
+      const hours = Number(loc?.minPrepHours);
+      if (Number.isFinite(hours) && hours >= 0) locationMinPrepHours = hours;
+      if (loc?.timeSlotsEnabled) {
+        locationTimeSlots = (loc.timeSlots || []).filter((s) => s.enabled !== false);
+      }
+    } catch {
+      /* use default */
+    }
+  }
+
   for (const entry of normalized) {
     const addon = catalog.find((a) => a.id === entry.id);
     if (!addon) throw new ApiError(400, `Invalid service add-on: ${entry.id}`);
+
+    if (enforceAvailability || deliveryLocationId) {
+      const availability = resolveServiceAddonAvailability(addon, {
+        deliveryLocationId,
+        preferredDeliveryDate,
+        timeSlotId,
+        timeSlots: locationTimeSlots,
+        locationMinPrepHours,
+      });
+      if (!availability.available) {
+        const reason =
+          availability.reason === 'prep_time' || availability.reason === 'time_slot'
+            ? `"${addon.name}" is not available for the selected delivery date/time`
+            : `"${addon.name}" is not available for the selected delivery location`;
+        throw new ApiError(400, reason);
+      }
+    }
 
     const inputType = addon.inputType || 'none';
     const text = entry.text?.trim() || '';
@@ -177,11 +221,18 @@ export const validateCouponForCheckout = async ({
   deliveryGroupId,
   serviceAddonIds,
   timeSlotId,
+  preferredDeliveryDate,
   userId,
 }) => {
   const lineItems = await resolveLineItems(items);
   const itemsSubtotal = lineItems.reduce((sum, item) => sum + item.lineTotal, 0);
-  const { addons, total: addonsTotal } = await resolveServiceAddons(serviceAddonIds, { validateInputs: false });
+  const { addons, total: addonsTotal } = await resolveServiceAddons(serviceAddonIds, {
+    validateInputs: false,
+    deliveryLocationId,
+    preferredDeliveryDate,
+    timeSlotId,
+    enforceAvailability: Boolean(deliveryLocationId && serviceAddonIds?.length),
+  });
   const subtotal = itemsSubtotal + addonsTotal;
 
   let shippingFee = 0;

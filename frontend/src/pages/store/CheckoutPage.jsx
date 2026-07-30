@@ -23,6 +23,7 @@ import {
   validatePreferredDeliverySelection,
   DELIVERY_PREP_HOURS,
 } from '../../utils/deliveryScheduling.js';
+import { filterAvailableServiceAddons } from '../../utils/serviceAddonAvailability.js';
 
 function FormField({ id, label, required, optional, hint, children }) {
   return (
@@ -142,7 +143,7 @@ export default function CheckoutPage() {
     [enabledCurrencies, payoutCurrency]
   );
 
-  const serviceAddons = useMemo(
+  const serviceAddonsCatalog = useMemo(
     () => (settings?.service_addons || []).filter((a) => a.enabled !== false),
     [settings?.service_addons]
   );
@@ -197,6 +198,26 @@ export default function CheckoutPage() {
       .filter((s) => s.enabled !== false)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [selectedDeliveryLocation]);
+
+  const serviceAddons = useMemo(() => {
+    if (!deliveryLocationId) return [];
+    return filterAvailableServiceAddons(serviceAddonsCatalog, {
+      deliveryLocationId,
+      preferredDeliveryDate: preferredDate || undefined,
+      timeSlotId: timeSlotId || undefined,
+      timeSlots,
+      nowMs,
+      locationMinPrepHours: prepHours,
+    });
+  }, [serviceAddonsCatalog, deliveryLocationId, preferredDate, timeSlotId, timeSlots, nowMs, prepHours]);
+
+  useEffect(() => {
+    const allowed = new Set(serviceAddons.map((a) => a.id));
+    setSelectedAddonIds((prev) => {
+      const next = prev.filter((id) => allowed.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [serviceAddons]);
 
   const minDeliveryDate = useMemo(
     () => getMinPreferredDeliveryDate({ nowMs, prepHours }),
@@ -271,6 +292,7 @@ export default function CheckoutPage() {
     deliveryLocationId: deliveryLocationId || undefined,
     serviceAddonIds: selectedAddonIds.length ? selectedAddonIds : undefined,
     timeSlotId: timeSlotId || undefined,
+    preferredDeliveryDate: preferredDate || undefined,
   });
 
   const refreshQuote = async () => {
@@ -299,6 +321,7 @@ export default function CheckoutPage() {
     paymentMethod,
     selectedAddonIds,
     timeSlotId,
+    preferredDate,
     items.length,
     items.map((i) => `${i.productId}:${i.quantity}:${i.price}:${i.optionsKey || ''}`).join('|'),
   ]);
@@ -824,9 +847,16 @@ export default function CheckoutPage() {
             </div>
 
             {/* Service add-ons */}
-            {serviceAddons.length > 0 && (
-              <div className="card space-y-4">
-                <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Service add-ons</h2>
+            <div className="card space-y-4">
+              <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Service add-ons</h2>
+              {!deliveryLocationId ? (
+                <p className="text-sm text-slate-500">Select a delivery location to see available add-ons.</p>
+              ) : serviceAddons.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  No service add-ons are available for the selected location
+                  {preferredDate ? ' and delivery date' : ''}.
+                </p>
+              ) : (
                 <div className="space-y-3">
                   {serviceAddons.map((addon) => {
                     const selected = selectedAddonIds.includes(addon.id);
@@ -921,8 +951,8 @@ export default function CheckoutPage() {
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Currency & payment methods */}
             <div className="space-y-4">

@@ -2,6 +2,7 @@ import { Outlet, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../api/admin.js';
 import { useAuthStore } from '../store/authStore.js';
+import useAdminSessionKeepAlive from '../hooks/useAdminSessionKeepAlive.js';
 import {
   canAccessAdminNav,
   canAccessAdminPath,
@@ -75,6 +76,9 @@ export default function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const [leadCount, setLeadCount] = useState(0);
+
+  // Stay logged in while working; auto-logout after 10 minutes idle
+  useAdminSessionKeepAlive({ idleMinutes: 10 });
 
   const refreshLeadCount = () => {
     if (!canAccessAdminNav(user, { permissions: ['orders:read'] })) return;

@@ -388,7 +388,11 @@ export const refreshAccessToken = async (refreshToken) => {
   user.refreshToken = tokens.refreshToken;
   await user.save({ validateBeforeSave: false });
 
-  return tokens;
+  return {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    user: user.toSafeObject(),
+  };
 };
 
 export const logout = async (userId) => {

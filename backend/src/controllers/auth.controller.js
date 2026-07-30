@@ -54,12 +54,20 @@ export const resendAdminOtp = asyncHandler(async (req, res) => {
 export const refreshToken = asyncHandler(async (req, res) => {
   const token = req.cookies?.refreshToken || req.body.refreshToken;
   const tokens = await authService.refreshAccessToken(token);
-  res.json(new ApiResponse(200, tokens, 'Token refreshed'));
+  // Must update the httpOnly cookie — refresh rotates the token in DB
+  setAuthCookie(res, tokens.refreshToken)
+    .json(new ApiResponse(200, { accessToken: tokens.accessToken, user: tokens.user }, 'Token refreshed'));
 });
 
 export const logout = asyncHandler(async (req, res) => {
   await authService.logout(req.user._id);
-  res.clearCookie('refreshToken').json(new ApiResponse(200, null, 'Logged out'));
+  res
+    .clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: REFRESH_COOKIE.secure,
+      sameSite: REFRESH_COOKIE.sameSite,
+    })
+    .json(new ApiResponse(200, null, 'Logged out'));
 });
 
 export const getProfile = asyncHandler(async (req, res) => {

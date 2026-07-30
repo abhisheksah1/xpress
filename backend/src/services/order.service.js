@@ -242,7 +242,12 @@ export const createOrder = async (data) => {
   const addonEntries = data.serviceAddons?.length
     ? data.serviceAddons
     : (data.serviceAddonIds || []).map((id) => ({ id }));
-  const { addons, total: addonsTotal } = await couponService.resolveServiceAddons(addonEntries);
+  const { addons, total: addonsTotal } = await couponService.resolveServiceAddons(addonEntries, {
+    deliveryLocationId: locationId,
+    preferredDeliveryDate: data.preferredDeliveryDate,
+    timeSlotId: data.timeSlotId,
+    enforceAvailability: true,
+  });
   const normalizedAddons = addons.map((addon) => ({
     ...addon,
     photoUrl: addon.photoUrl ? toStoredMediaUrl(addon.photoUrl) : undefined,
@@ -272,6 +277,7 @@ export const createOrder = async (data) => {
       deliveryGroupId: data.deliveryGroupId,
       serviceAddonIds: addonIdsForQuote,
       timeSlotId: data.timeSlotId,
+      preferredDeliveryDate: data.preferredDeliveryDate,
       userId,
     });
     subtotal = quote.subtotal;

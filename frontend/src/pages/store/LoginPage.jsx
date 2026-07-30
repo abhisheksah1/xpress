@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore.js';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const isAdminLogin = location.pathname === '/admin/login';
   const login = useAuthStore((s) => s.login);
   const verifyAdminOtp = useAuthStore((s) => s.verifyAdminOtp);
@@ -18,6 +19,12 @@ export default function LoginPage() {
   const [challenge, setChallenge] = useState(null);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+
+  useEffect(() => {
+    if (isAdminLogin && searchParams.get('reason') === 'idle') {
+      toast.error('Signed out after 10 minutes of inactivity');
+    }
+  }, [isAdminLogin, searchParams]);
 
   const finishLogin = (user) => {
     const staffRoles = ['super_admin', 'admin', 'staff'];

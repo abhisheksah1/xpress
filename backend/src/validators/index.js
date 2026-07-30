@@ -499,6 +499,7 @@ export const validateCouponSchema = z.object({
     deliveryGroupId: z.string().optional(),
     serviceAddonIds: z.array(z.string()).optional(),
     timeSlotId: z.string().optional(),
+    preferredDeliveryDate: z.union([z.string(), z.date()]).optional(),
   }),
 });
 
