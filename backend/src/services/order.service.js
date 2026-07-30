@@ -49,13 +49,28 @@ const resolveProductUnitPrice = (product, item) => {
 
   let price = product.price;
   const selections = item.selectedOptions || [];
-  if (selections.length && product.optionCategories?.length) {
+  if (selections.length) {
+    let matchedAny = false;
     for (const sel of selections) {
-      const category = product.optionCategories.find(
-        (cat) => cat.name === sel.category || String(cat._id) === String(sel.categoryId)
+      const selLabel = String(sel.label || '').trim().toLowerCase();
+      const category = product.optionCategories?.find(
+        (cat) =>
+          (sel.categoryId && String(cat._id) === String(sel.categoryId))
+          || (sel.category && String(cat.name || '').trim().toLowerCase() === String(sel.category).trim().toLowerCase())
       );
-      const option = category?.options?.find((opt) => opt.label === sel.label);
-      if (option) price += Number(option.priceAdjustment) || 0;
+      const option = category?.options?.find(
+        (opt) => String(opt.label || '').trim().toLowerCase() === selLabel
+      );
+      if (option) {
+        price += Number(option.priceAdjustment) || 0;
+        matchedAny = true;
+      } else if (sel.priceAdjustment != null) {
+        price += Number(sel.priceAdjustment) || 0;
+        matchedAny = true;
+      }
+    }
+    if (!matchedAny && item.unitPrice != null && Number.isFinite(Number(item.unitPrice))) {
+      return Number(item.unitPrice);
     }
   }
   return price;
@@ -212,10 +227,12 @@ export const createOrder = async (data) => {
 
   if (data.preferredDeliveryDate || data.timeSlotId) {
     try {
+      const prepHours = Number(deliveryLocationDoc?.minPrepHours);
       assertPreferredDeliverySelection({
         preferredDeliveryDate: data.preferredDeliveryDate,
         timeSlotId: data.timeSlotId,
         timeSlots: deliveryLocationDoc?.timeSlots || [],
+        prepHours: Number.isFinite(prepHours) && prepHours >= 0 ? prepHours : undefined,
       });
     } catch (prepErr) {
       throw new ApiError(400, prepErr.message);
@@ -247,6 +264,7 @@ export const createOrder = async (data) => {
         productId: item.productId,
         variantId: item.variantId,
         quantity: item.quantity,
+        selectedOptions: item.selectedOptions,
         unitPrice: orderItems.find((o) => String(o.product) === String(item.productId))?.price,
       })),
       paymentMethod: data.paymentMethod,

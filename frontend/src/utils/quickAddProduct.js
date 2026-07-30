@@ -19,6 +19,7 @@ export function buildDefaultSelectedOptions(product) {
     if (!chosen) return;
     selectedOptions.push({
       category: cat.name,
+      categoryId: cat._id ? String(cat._id) : undefined,
       label: chosen.label,
       priceAdjustment: Number(chosen.priceAdjustment) || 0,
     });

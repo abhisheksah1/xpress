@@ -360,18 +360,19 @@ export const updateBlogSchema = z.object({
 export const deliveryLocationSchema = z.object({
   body: z.object({
     name: z.string().min(2),
-    deliveryFee: z.number().min(0),
+    deliveryFee: z.coerce.number().min(0),
     isActive: z.boolean().optional(),
-    sortOrder: z.number().optional(),
+    sortOrder: z.coerce.number().int().min(0).max(15).optional(),
+    minPrepHours: z.coerce.number().min(0).max(168).optional(),
     timeSlotsEnabled: z.boolean().optional(),
     timeSlots: z.array(z.object({
       id: z.string().min(1),
       label: z.string().min(1),
       start: z.string().optional(),
       end: z.string().optional(),
-      fee: z.number().min(0).optional(),
+      fee: z.coerce.number().min(0).optional(),
       enabled: z.boolean().optional(),
-      sortOrder: z.number().optional(),
+      sortOrder: z.coerce.number().optional(),
     })).optional(),
   }),
 });
@@ -384,15 +385,15 @@ export const deliveryGroupSchema = z.object({
     deliveryMethod: z.enum(['local_arrangement', 'courier_local', 'courier']).optional(),
     estimatedDeliveryLabel: z.string().optional(),
     estimatedDays: z.object({
-      min: z.number().min(0).optional(),
-      max: z.number().min(0).optional(),
+      min: z.coerce.number().min(0).optional(),
+      max: z.coerce.number().min(0).optional(),
     }).optional(),
-    estimatedHours: z.number().min(0).optional(),
+    estimatedHours: z.coerce.number().min(0).optional(),
     cutoffTime: z.string().optional(),
     categories: z.array(z.string()).optional(),
     products: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
-    sortOrder: z.number().optional(),
+    sortOrder: z.coerce.number().int().min(0).max(15).optional(),
   }),
 });
 
@@ -489,8 +490,9 @@ export const validateCouponSchema = z.object({
     items: z.array(z.object({
       productId: z.string(),
       variantId: z.string().optional(),
-      quantity: z.number().min(1),
-      unitPrice: z.number().min(0).optional(),
+      quantity: z.coerce.number().min(1),
+      unitPrice: z.coerce.number().min(0).optional(),
+      selectedOptions: z.array(selectedOptionSchema).optional(),
     })).min(1),
     paymentMethod: z.enum(['khalti', 'esewa', 'imepay', 'fonepay', 'card', 'hbl', 'manual_bank', 'cod']).optional(),
     deliveryLocationId: z.string().optional(),

@@ -60,14 +60,34 @@ const resolveLineItems = async (items = []) => {
       const variant = product.variants.id(item.variantId);
       if (!variant || !variant.isActive) throw new ApiError(400, 'Variant not found');
       price = variant.price;
-    } else if (item.selectedOptions?.length && product.optionCategories?.length) {
+    } else if (item.selectedOptions?.length) {
+      let matchedAny = false;
       for (const sel of item.selectedOptions) {
-        const category = product.optionCategories.find(
-          (cat) => cat.name === sel.category || String(cat._id) === String(sel.categoryId)
+        const selLabel = String(sel.label || '').trim().toLowerCase();
+        const category = product.optionCategories?.find(
+          (cat) =>
+            (sel.categoryId && String(cat._id) === String(sel.categoryId))
+            || (sel.category && String(cat.name || '').trim().toLowerCase() === String(sel.category).trim().toLowerCase())
         );
-        const option = category?.options?.find((opt) => opt.label === sel.label);
-        if (option) price += Number(option.priceAdjustment) || 0;
+        const option = category?.options?.find(
+          (opt) => String(opt.label || '').trim().toLowerCase() === selLabel
+        );
+        if (option) {
+          price += Number(option.priceAdjustment) || 0;
+          matchedAny = true;
+        } else if (sel.priceAdjustment != null) {
+          // Fallback when catalog match fails but cart already has the adjustment
+          price += Number(sel.priceAdjustment) || 0;
+          matchedAny = true;
+        }
       }
+      if (!matchedAny && item.unitPrice != null && Number.isFinite(Number(item.unitPrice))) {
+        price = Number(item.unitPrice);
+      }
+    } else if (item.unitPrice != null && Number.isFinite(Number(item.unitPrice))) {
+      // Trust client unit price only when no variant/options were provided
+      const clientPrice = Number(item.unitPrice);
+      if (clientPrice >= 0) price = clientPrice;
     }
 
     const qty = Math.max(1, Number(item.quantity) || 1);
