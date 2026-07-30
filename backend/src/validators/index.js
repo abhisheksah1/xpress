@@ -601,6 +601,7 @@ const partnerItemSchema = z.object({
   quantity: z.number().min(1),
   unitPrice: z.number().min(0).optional(),
   variantId: z.string().optional(),
+  selectedOptions: z.array(selectedOptionSchema).optional(),
   giftMessage: z.string().optional(),
 });
 

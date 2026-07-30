@@ -20,7 +20,7 @@ function ScheduleCard({ row }) {
       </h3>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ScheduleField label="Location" value={row.coverageText} />
-        <ScheduleField label="Estimated Delivery Time" value={row.estimatedTimeLabel} emphasize />
+        <ScheduleField label="Minimum Required Time" value={row.estimatedTimeLabel} emphasize />
         <ScheduleField label="Cut-off Time" value={row.cutoffTimeLabel} emphasize />
       </dl>
     </article>
@@ -64,9 +64,9 @@ export function ProductDeliverySchedule({
   return (
     <section className={`w-full max-w-none min-w-0 rounded-2xl border-2 border-amber-400 overflow-hidden bg-amber-50 shadow-sm ${className}`.trim()}>
       <div className="bg-amber-400 px-3 sm:px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
-        <h2 className="text-xs sm:text-sm font-black uppercase tracking-wide text-slate-900 flex items-center gap-2">
+        <h2 className="text-xs sm:text-sm font-black tracking-wide text-slate-900 flex items-center gap-2">
           <span aria-hidden>⚡</span>
-          Product Delivery Schedule
+          Product availability and minimum required time for delivery.
         </h2>
         {tierLabel && (
           <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-amber-300 px-2.5 py-1 rounded-full shrink-0">
@@ -82,7 +82,7 @@ export function ProductDeliverySchedule({
             <thead>
               <tr className="bg-amber-100/80 text-[10px] uppercase tracking-wider text-slate-700 border-b border-amber-300">
                 <th className="px-3 py-2 font-bold w-[58%]">Location</th>
-                <th className="px-3 py-2 font-bold w-[42%]">Estimated Delivery Time</th>
+                <th className="px-3 py-2 font-bold w-[42%]">Minimum Required Time</th>
               </tr>
             </thead>
             <tbody>
@@ -105,7 +105,7 @@ export function ProductDeliverySchedule({
             <tr className="bg-amber-100/80 text-[10px] uppercase tracking-wider text-slate-700 border-b border-amber-300">
               <th className="px-4 py-2.5 font-bold">Delivery Group</th>
               <th className="px-4 py-2.5 font-bold">Location</th>
-              <th className="px-4 py-2.5 font-bold">Estimated Delivery Time</th>
+              <th className="px-4 py-2.5 font-bold">Minimum Required Time</th>
               <th className="px-4 py-2.5 font-bold">Cut-off Time</th>
             </tr>
           </thead>
