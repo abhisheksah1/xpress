@@ -1,8 +1,13 @@
 import WhatsAppIcon from './WhatsAppIcon.jsx';
 import { buildWhatsAppChatUrl } from '../../utils/whatsapp.js';
 
-export default function WhatsAppFloatingButton({ number, className = '' }) {
-  const href = buildWhatsAppChatUrl(number);
+export default function WhatsAppFloatingButton({
+  number,
+  href: hrefOverride,
+  title = 'Chat on WhatsApp',
+  className = '',
+}) {
+  const href = hrefOverride || buildWhatsAppChatUrl(number);
   if (!href) return null;
 
   return (
@@ -11,8 +16,8 @@ export default function WhatsAppFloatingButton({ number, className = '' }) {
       target="_blank"
       rel="noopener noreferrer"
       className={`whatsapp-fab fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-[opacity,transform,bottom] duration-300 hover:scale-105 hover:bg-[#20BD5A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 ${className}`.trim()}
-      title="Chat on WhatsApp"
-      aria-label="Chat on WhatsApp"
+      title={title}
+      aria-label={title}
     >
       <WhatsAppIcon className="h-8 w-8" />
     </a>
