@@ -1,5 +1,13 @@
 import mongoose from 'mongoose';
 
+const purchaseSelectedOptionSchema = new mongoose.Schema(
+  {
+    category: { type: String, required: true, trim: true },
+    label: { type: String, required: true, trim: true },
+  },
+  { _id: false }
+);
+
 const purchaseItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -8,6 +16,8 @@ const purchaseItemSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: 1 },
     unitCost: { type: Number, required: true, min: 0 },
     lineTotal: { type: Number, required: true, min: 0 },
+    variantId: { type: mongoose.Schema.Types.ObjectId },
+    selectedOptions: { type: [purchaseSelectedOptionSchema], default: undefined },
   },
   { _id: true }
 );

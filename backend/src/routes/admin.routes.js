@@ -49,10 +49,14 @@ import {
   updateVendorSchema,
   createPurchaseSchema,
   createExpenseSchema,
+  updateExpenseSchema,
   createTreasuryAccountSchema,
   createTreasuryTransactionSchema,
   adjustTreasuryBalanceSchema,
+  createProductVariableTemplateSchema,
+  updateProductVariableTemplateSchema,
 } from '../validators/index.js';
+import * as productVariableTemplateController from '../controllers/admin/productVariableTemplate.controller.js';
 
 const router = Router();
 
@@ -80,6 +84,23 @@ router.get('/categories', productController.getCategories);
 router.post('/categories', hasPermission('products:write'), validate(createCategorySchema), productController.createCategory);
 router.patch('/categories/:id', hasPermission('products:write'), validate(updateCategorySchema), productController.updateCategory);
 router.delete('/categories/:id', hasPermission('products:write'), productController.deleteCategory);
+
+// Product variable presets (reusable Size / Weight option sets)
+router.get('/product-variable-templates', hasPermission('products:read'), productVariableTemplateController.listTemplates);
+router.get('/product-variable-templates/:id', hasPermission('products:read'), productVariableTemplateController.getTemplate);
+router.post(
+  '/product-variable-templates',
+  hasPermission('products:write'),
+  validate(createProductVariableTemplateSchema),
+  productVariableTemplateController.createTemplate
+);
+router.patch(
+  '/product-variable-templates/:id',
+  hasPermission('products:write'),
+  validate(updateProductVariableTemplateSchema),
+  productVariableTemplateController.updateTemplate
+);
+router.delete('/product-variable-templates/:id', hasPermission('products:write'), productVariableTemplateController.deleteTemplate);
 
 // Inventory
 router.get('/inventory/logs', hasPermission('inventory:read'), inventoryController.getLogs);
@@ -226,11 +247,12 @@ router.get('/finance/purchases/report', isAdmin, financeController.getPurchaseRe
 router.get('/finance/purchases/report/export', isAdmin, financeController.exportPurchaseReportCsv);
 router.post('/finance/purchases', isAdmin, validate(createPurchaseSchema), financeController.createPurchase);
 router.get('/finance/purchases/:id', isAdmin, financeController.getPurchase);
+router.patch('/finance/purchases/:id', isAdmin, validate(createPurchaseSchema), financeController.updatePurchase);
 router.delete('/finance/purchases/:id', isAdmin, financeController.deletePurchase);
 router.get('/finance/expenses', isAdmin, financeController.listExpenses);
 router.get('/finance/expenses/export', isAdmin, financeController.exportExpensesCsv);
 router.post('/finance/expenses', isAdmin, validate(createExpenseSchema), financeController.createExpense);
-router.patch('/finance/expenses/:id', isAdmin, financeController.updateExpense);
+router.patch('/finance/expenses/:id', isAdmin, validate(updateExpenseSchema), financeController.updateExpense);
 router.delete('/finance/expenses/:id', isAdmin, financeController.deleteExpense);
 router.get('/finance/treasury/accounts', isAdmin, financeController.listTreasuryAccounts);
 router.post('/finance/treasury/accounts', isAdmin, validate(createTreasuryAccountSchema), financeController.createTreasuryAccount);

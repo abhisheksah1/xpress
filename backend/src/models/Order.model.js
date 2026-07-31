@@ -13,10 +13,20 @@ const orderItemPersonalizationSchema = new mongoose.Schema(
   { _id: false, minimize: false }
 );
 
+const orderSelectedOptionSchema = new mongoose.Schema(
+  {
+    category: { type: String, required: true, trim: true },
+    label: { type: String, required: true, trim: true },
+    priceAdjustment: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const orderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     variantId: { type: mongoose.Schema.Types.ObjectId },
+    selectedOptions: { type: [orderSelectedOptionSchema], default: undefined },
     name: { type: String, required: true },
     sku: { type: String },
     image: { type: String },

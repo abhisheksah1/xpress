@@ -93,10 +93,10 @@ export function mergeProductSeo(product = {}) {
   const fromSeo = product.seo && typeof product.seo === 'object' ? product.seo : {};
   const rawDesc = fromSeo.metaDescription
     || product.metaDescription
+    || product.longDescription
     || (product.shortDescriptionEnabled && product.shortDescription)
     || product.shortDescription
     || product.description
-    || product.longDescription
     || '';
   const description = fromSeo.metaDescription || product.metaDescription || stripHtmlText(rawDesc).slice(0, 160);
   const title = fromSeo.metaTitle

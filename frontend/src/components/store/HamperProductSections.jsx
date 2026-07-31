@@ -165,10 +165,25 @@ export function HamperProductInfoSections({
   onAddRelated,
 }) {
   const deliverySchedules = product.deliveryInfo || [];
+  const longDescription =
+    product.longDescription
+    || (!product.shortDescriptionEnabled ? product.description : '');
 
   return (
     <div className="mt-10 space-y-6 w-full min-w-0">
       <HamperComboIncludes comboItems={comboItems} />
+      {product.shortDescriptionEnabled && (product.shortDescription || product.description) && (
+        <section className="rounded-xl border border-rose-100 bg-white p-4 sm:p-5">
+          <SectionHeading>About this combo</SectionHeading>
+          <ProductRichText content={product.shortDescription || product.description} />
+        </section>
+      )}
+      {longDescription && (
+        <section className="rounded-xl border border-rose-100 bg-white p-4 sm:p-5">
+          <SectionHeading>Product details</SectionHeading>
+          <ProductRichText content={longDescription} />
+        </section>
+      )}
       <HamperComplianceSla message={settings.product_page_alert_message} />
       <ProductDeliverySchedule
         schedules={deliverySchedules}

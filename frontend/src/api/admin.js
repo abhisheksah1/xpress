@@ -19,6 +19,11 @@ export const adminApi = {
   updateCategory: (id, data) => api.patch(`/admin/categories/${id}`, data),
   deleteCategory: (id, params) => api.delete(`/admin/categories/${id}`, { params }),
 
+  getProductVariableTemplates: (params) => api.get('/admin/product-variable-templates', { params }),
+  createProductVariableTemplate: (data) => api.post('/admin/product-variable-templates', data),
+  updateProductVariableTemplate: (id, data) => api.patch(`/admin/product-variable-templates/${id}`, data),
+  deleteProductVariableTemplate: (id) => api.delete(`/admin/product-variable-templates/${id}`),
+
   getSettings: (group) => api.get('/admin/settings', { params: group ? { group } : {} }),
   bulkUpdateSettings: (settings) => api.patch('/admin/settings/bulk', { settings }),
   testSmtp: (email) => api.post('/admin/settings/test-smtp', { email }),
@@ -166,10 +171,13 @@ export const adminApi = {
   exportFinanceSalesLedgerCsv: (params) =>
     api.get('/admin/finance/sales/export', { params, responseType: 'blob' }),
   createFinancePurchase: (data) => api.post('/admin/finance/purchases', data),
+  updateFinancePurchase: (id, data) => api.patch(`/admin/finance/purchases/${id}`, data),
+  getFinancePurchase: (id) => api.get(`/admin/finance/purchases/${id}`),
   deleteFinancePurchase: (id) => api.delete(`/admin/finance/purchases/${id}`),
   getFinanceExpenses: (params) => api.get('/admin/finance/expenses', { params }),
   exportFinanceExpensesCsv: (params) => api.get('/admin/finance/expenses/export', { params, responseType: 'blob' }),
   createFinanceExpense: (data) => api.post('/admin/finance/expenses', data),
+  updateFinanceExpense: (id, data) => api.patch(`/admin/finance/expenses/${id}`, data),
   deleteFinanceExpense: (id) => api.delete(`/admin/finance/expenses/${id}`),
   getTreasuryAccounts: () => api.get('/admin/finance/treasury/accounts'),
   createTreasuryAccount: (data) => api.post('/admin/finance/treasury/accounts', data),

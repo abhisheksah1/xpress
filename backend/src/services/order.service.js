@@ -1,5 +1,11 @@
 import * as comboService from './combo.service.js';
 import { allowsBackorder } from '../utils/productStock.js';
+import {
+  formatSelectedOptionsLabel,
+  getLineAvailableStock,
+  productTracksOptionInventory,
+  resolveInventoryOption,
+} from '../utils/optionInventory.js';
 import * as couponService from './coupon.service.js';
 import * as deliveryService from './delivery.service.js';
 import { Product, Order, Settings } from '../models/index.js';
@@ -8,6 +14,7 @@ import { normalizeItemPersonalization, toStoredMediaUrl } from '../utils/mediaUr
 import { ApiError } from '../utils/ApiError.js';
 import { assertPreferredDeliverySelection } from '../utils/deliveryScheduling.js';
 import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHODS } from '../config/constants.js';
+import * as inventoryService from './inventory.service.js';
 
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -149,22 +156,45 @@ export const createOrder = async (data) => {
     }
 
     let price = resolveProductUnitPrice(product, item);
-    let stock = product.stock;
     let sku = product.sku;
     let image = product.images?.find((i) => i.isPrimary)?.url || product.images?.[0]?.url;
+    const selectedOptions = Array.isArray(item.selectedOptions)
+      ? item.selectedOptions
+          .map((opt) => ({
+            category: String(opt.category || '').trim(),
+            label: String(opt.label || '').trim(),
+            priceAdjustment: Number(opt.priceAdjustment) || 0,
+          }))
+          .filter((opt) => opt.category && opt.label)
+      : undefined;
 
     if (item.variantId) {
       const variant = product.variants.id(item.variantId);
-      stock = variant.stock;
       sku = variant.sku;
       if (variant.image?.url) image = variant.image.url;
     }
+
+    if (productTracksOptionInventory(product) && !item.variantId) {
+      const resolved = resolveInventoryOption(product, selectedOptions);
+      if (!resolved) {
+        throw new ApiError(400, `Select a stock variation for ${product.name}`);
+      }
+    }
+
+    const stock = getLineAvailableStock(product, {
+      variantId: item.variantId,
+      selectedOptions,
+    });
 
     if (!allowsBackorder(product)) {
       if (product.isHamper && product.comboItems?.length) {
         await comboService.assertComboStock(product, item.quantity);
       } else if (stock < item.quantity) {
-        throw new ApiError(400, `Insufficient stock for ${product.name}`);
+        const variation = formatSelectedOptionsLabel(selectedOptions);
+        throw new ApiError(
+          400,
+          `Insufficient stock for ${product.name}${variation ? ` (${variation})` : ''}`
+        );
       }
     }
 
@@ -179,10 +209,15 @@ export const createOrder = async (data) => {
       );
     }
 
+    const displayName = selectedOptions?.length
+      ? `${product.name} (${formatSelectedOptionsLabel(selectedOptions)})`
+      : product.name;
+
     orderItems.push({
       product: product._id,
       variantId: item.variantId,
-      name: product.name,
+      selectedOptions: selectedOptions?.length ? selectedOptions : undefined,
+      name: displayName,
       sku,
       image,
       price,
@@ -735,12 +770,40 @@ export const markPaymentPaid = async (orderId, transactionId, gatewayResponse) =
       continue;
     }
 
-    if (item.variantId) {
-      const variant = product.variants.id(item.variantId);
-      if (variant) variant.stock = Math.max(0, variant.stock - item.quantity);
-    } else {
-      product.stock = Math.max(0, product.stock - item.quantity);
+    if (item.variantId || (productTracksOptionInventory(product) && item.selectedOptions?.length)) {
+      await inventoryService.adjustStock({
+        productId: product._id,
+        variantId: item.variantId,
+        selectedOptions: item.selectedOptions,
+        type: 'out',
+        quantity: item.quantity,
+        reason: 'Order sale',
+        reference: order.orderNumber,
+        userId: null,
+      });
+      continue;
     }
+
+    // Legacy orders / non-variation lines: product-level stock
+    if (productTracksOptionInventory(product)) {
+      // No selection on order — reduce first tracking option that has stock, else product.stock
+      const firstCat = (product.optionCategories || []).find((c) => c.tracksInventory);
+      const firstOpt = (firstCat?.options || []).find((o) => (Number(o.stock) || 0) > 0) || firstCat?.options?.[0];
+      if (firstCat && firstOpt) {
+        await inventoryService.adjustStock({
+          productId: product._id,
+          selectedOptions: [{ category: firstCat.name, label: firstOpt.label }],
+          type: 'out',
+          quantity: item.quantity,
+          reason: 'Order sale (legacy line without variation)',
+          reference: order.orderNumber,
+          userId: null,
+        });
+        continue;
+      }
+    }
+
+    product.stock = Math.max(0, product.stock - item.quantity);
     await product.save();
   }
 

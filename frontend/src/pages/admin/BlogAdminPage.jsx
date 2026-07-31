@@ -10,6 +10,7 @@ import { isHtmlContent } from '../../utils/productHtml.js';
 
 const emptyBlog = () => ({
   title: '',
+  slug: '',
   excerpt: '',
   content: '',
   category: '',
@@ -45,6 +46,7 @@ export default function BlogAdminPage() {
     setEditing(b._id);
     setForm({
       title: b.title,
+      slug: b.slug || '',
       excerpt: b.excerpt || '',
       content: b.content || '',
       category: b.category || '',
@@ -86,14 +88,15 @@ export default function BlogAdminPage() {
 
   const buildPayload = () => ({
     title: form.title,
-    excerpt: form.excerpt,
-    content: form.content,
+    slug: form.slug || undefined,
+    excerpt: form.excerpt ?? '',
+    content: form.content ?? '',
     category: form.category || undefined,
     isPublished: form.isPublished,
     tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
     featuredImage: form.featuredImage?.url ? form.featuredImage : undefined,
-    metaTitle: form.seo?.metaTitle,
-    metaDescription: form.seo?.metaDescription,
+    metaTitle: form.seo?.metaTitle || undefined,
+    metaDescription: form.seo?.metaDescription || undefined,
     seo: form.seo,
   });
 
@@ -135,6 +138,12 @@ export default function BlogAdminPage() {
           <div className="card space-y-4">
             <h2 className="font-semibold">{editing ? 'Edit Post' : 'New Post'}</h2>
             <input className="input-field" placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+            <input
+              className="input-field font-mono text-sm"
+              placeholder="URL slug (optional — auto from title)"
+              value={form.slug}
+              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+            />
             <input className="input-field" placeholder="Category" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} />
             <input className="input-field" placeholder="Excerpt" value={form.excerpt} onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))} />
 
@@ -183,14 +192,15 @@ export default function BlogAdminPage() {
               onChange={(seo) => setForm((f) => ({ ...f, seo }))}
               pageTitle={form.title}
               pageDescription={form.excerpt || plainTextPreview(form.content)}
-              canonicalPreview={form.title ? `/blog/${form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '/blog'}
+              canonicalPreview={form.slug || form.title ? `/blog/${form.slug || form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '/blog'}
               defaultSchemaType="BlogPosting"
               auditContext={{
                 type: 'blog',
                 title: form.title,
-                slug: form.title
-                  ? form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-                  : '',
+                slug: form.slug
+                  || (form.title
+                    ? form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                    : ''),
                 contentHtml: form.content,
                 excerpt: form.excerpt,
                 images: form.featuredImage?.url

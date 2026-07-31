@@ -1,11 +1,22 @@
 import { Product, Category, DeliveryGroup } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { normalizePersonalizationFields } from '../utils/personalization.js';
+import {
+  productTracksOptionInventory,
+  syncProductStockFromOptions,
+} from '../utils/optionInventory.js';
 import * as deliveryService from './delivery.service.js';
 import * as comboService from './combo.service.js';
 import * as productImportService from './productImport.service.js';
 import { productInCategoryFilter } from '../utils/productCategories.js';
 import { enrichProductMedia } from '../utils/mediaUrl.js';
+
+const withSyncedOptionStock = (data) => {
+  if (!data || !productTracksOptionInventory(data)) return data;
+  const next = { ...data };
+  syncProductStockFromOptions(next);
+  return next;
+};
 
 const PRODUCT_SORT_MAP = {
   newest: '-createdAt',
@@ -28,17 +39,116 @@ const withNormalizedPersonalization = (data) => {
   };
 };
 
+const stripUndefined = (obj = {}) => {
+  const next = { ...obj };
+  Object.keys(next).forEach((key) => {
+    if (next[key] === undefined) delete next[key];
+  });
+  return next;
+};
+
+/** Text fields that must persist even when cleared to empty string. */
+const applyProductContentFields = (product, data) => {
+  const textFields = [
+    'name',
+    'slug',
+    'sku',
+    'description',
+    'shortDescription',
+    'longDescription',
+    'additionalNote',
+    'brand',
+    'barcode',
+    'productGroup',
+    'skuVariant',
+    'standardSize',
+    'metaTitle',
+    'metaDescription',
+    'focusKeyword',
+  ];
+  for (const field of textFields) {
+    if (Object.prototype.hasOwnProperty.call(data, field)) {
+      product[field] = data[field] == null ? '' : data[field];
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'shortDescriptionEnabled')) {
+    product.shortDescriptionEnabled = Boolean(data.shortDescriptionEnabled);
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'metaKeywords')) {
+    product.metaKeywords = Array.isArray(data.metaKeywords) ? data.metaKeywords : [];
+  }
+  if (data.seo && typeof data.seo === 'object') {
+    const currentSeo = product.seo?.toObject?.() || product.seo || {};
+    product.set('seo', { ...currentSeo, ...data.seo });
+    product.markModified('seo');
+  }
+};
+
 export const createProduct = async (data, userId) => {
-  const prepared = await comboService.prepareComboProductData(withNormalizedPersonalization(data));
-  const product = await Product.create({ ...prepared, createdBy: userId, updatedBy: userId });
+  const prepared = withSyncedOptionStock(
+    await comboService.prepareComboProductData(withNormalizedPersonalization(data))
+  );
+  const product = await Product.create({
+    ...stripUndefined(prepared),
+    createdBy: userId,
+    updatedBy: userId,
+  });
   return Product.findById(product._id).populate('comboItems.product', 'name slug sku price stock images');
 };
 
 export const updateProduct = async (id, data, userId) => {
   const existing = await Product.findById(id);
   if (!existing) throw new ApiError(404, 'Product not found');
-  const prepared = await comboService.prepareComboProductData(withNormalizedPersonalization(data), id);
-  Object.assign(existing, prepared, { updatedBy: userId });
+  const prepared = withSyncedOptionStock(
+    await comboService.prepareComboProductData(withNormalizedPersonalization(data), id)
+  );
+  const clean = stripUndefined(prepared);
+
+  // Apply content/SEO explicitly so empty clears and nested seo always stick
+  applyProductContentFields(existing, clean);
+
+  const skipKeys = new Set([
+    'name',
+    'slug',
+    'sku',
+    'description',
+    'shortDescription',
+    'longDescription',
+    'additionalNote',
+    'brand',
+    'barcode',
+    'productGroup',
+    'skuVariant',
+    'standardSize',
+    'metaTitle',
+    'metaDescription',
+    'focusKeyword',
+    'metaKeywords',
+    'seo',
+    '_id',
+    'id',
+    'createdAt',
+    'updatedAt',
+    'createdBy',
+    '__v',
+  ]);
+
+  Object.keys(clean).forEach((key) => {
+    if (skipKeys.has(key)) return;
+    existing[key] = clean[key];
+  });
+
+  if (clean.optionCategories) existing.markModified('optionCategories');
+  if (clean.images) existing.markModified('images');
+  if (clean.comboItems) existing.markModified('comboItems');
+  if (clean.deliveryGroupRules) existing.markModified('deliveryGroupRules');
+  if (clean.personalizationFields) existing.markModified('personalizationFields');
+  if (clean.dimensions) existing.markModified('dimensions');
+
+  existing.updatedBy = userId;
+  if (productTracksOptionInventory(existing)) {
+    syncProductStockFromOptions(existing);
+  }
   await existing.save();
   if (!existing.isHamper) {
     await comboService.syncComboProductsContaining([existing._id]);
@@ -302,8 +412,19 @@ export const getCategories = async (isActive, options = {}) => {
 export const createCategory = async (data) => Category.create(data);
 
 export const updateCategory = async (id, data) => {
-  const category = await Category.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+  const category = await Category.findById(id);
   if (!category) throw new ApiError(404, 'Category not found');
+
+  const { seo, ...rest } = data || {};
+  Object.keys(rest).forEach((key) => {
+    if (rest[key] !== undefined) category[key] = rest[key];
+  });
+  if (seo && typeof seo === 'object') {
+    const currentSeo = category.seo?.toObject?.() || category.seo || {};
+    category.set('seo', { ...currentSeo, ...seo });
+    category.markModified('seo');
+  }
+  await category.save();
   return category;
 };
 

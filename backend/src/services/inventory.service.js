@@ -1,8 +1,36 @@
 import { Product, InventoryLog } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
+import {
+  productTracksOptionInventory,
+  resolveInventoryOption,
+  syncProductStockFromOptions,
+} from '../utils/optionInventory.js';
 import * as comboService from './combo.service.js';
 
-export const adjustStock = async ({ productId, variantId, type, quantity, reason, reference, userId }) => {
+const calculateNewStock = (current, type, quantity) => {
+  switch (type) {
+    case 'in':
+    case 'return':
+      return current + quantity;
+    case 'out':
+      return Math.max(0, current - quantity);
+    case 'adjustment':
+      return quantity;
+    default:
+      throw new ApiError(400, 'Invalid inventory type');
+  }
+};
+
+export const adjustStock = async ({
+  productId,
+  variantId,
+  selectedOptions,
+  type,
+  quantity,
+  reason,
+  reference,
+  userId,
+}) => {
   const product = await Product.findById(productId);
   if (!product) throw new ApiError(404, 'Product not found');
   if (product.isHamper && product.comboItems?.length && !variantId) {
@@ -11,6 +39,8 @@ export const adjustStock = async ({ productId, variantId, type, quantity, reason
 
   let previousStock;
   let newStock;
+  let optionCategory;
+  let optionLabel;
 
   if (variantId) {
     const variant = product.variants.id(variantId);
@@ -18,6 +48,20 @@ export const adjustStock = async ({ productId, variantId, type, quantity, reason
     previousStock = variant.stock;
     newStock = calculateNewStock(previousStock, type, quantity);
     variant.stock = newStock;
+  } else if (productTracksOptionInventory(product)) {
+    const resolved = resolveInventoryOption(product, selectedOptions);
+    if (!resolved) {
+      throw new ApiError(
+        400,
+        `Select a stock variation for ${product.name} (e.g. size or weight)`
+      );
+    }
+    previousStock = Number(resolved.option.stock) || 0;
+    newStock = calculateNewStock(previousStock, type, quantity);
+    resolved.option.stock = newStock;
+    optionCategory = resolved.categoryName;
+    optionLabel = resolved.label;
+    syncProductStockFromOptions(product);
   } else {
     previousStock = product.stock;
     newStock = calculateNewStock(previousStock, type, quantity);
@@ -33,6 +77,8 @@ export const adjustStock = async ({ productId, variantId, type, quantity, reason
   const log = await InventoryLog.create({
     product: productId,
     variantId,
+    optionCategory,
+    optionLabel,
     type,
     quantity,
     previousStock,
@@ -43,20 +89,6 @@ export const adjustStock = async ({ productId, variantId, type, quantity, reason
   });
 
   return { product, log };
-};
-
-const calculateNewStock = (current, type, quantity) => {
-  switch (type) {
-    case 'in':
-    case 'return':
-      return current + quantity;
-    case 'out':
-      return Math.max(0, current - quantity);
-    case 'adjustment':
-      return quantity;
-    default:
-      throw new ApiError(400, 'Invalid inventory type');
-  }
 };
 
 export const getInventoryLogs = async ({ page = 1, limit = 20, productId }) => {
@@ -78,13 +110,19 @@ export const getInventoryLogs = async ({ page = 1, limit = 20, productId }) => {
 };
 
 export const getLowStockProducts = async (threshold) => {
-  return Product.find({
-    isActive: true,
-    $or: [
-      { stock: { $lte: threshold || 5 } },
-      { $expr: { $lte: ['$stock', '$lowStockThreshold'] } },
-    ],
-  })
+  const products = await Product.find({ isActive: true })
     .populate('category', 'name')
     .sort({ stock: 1 });
+
+  const limit = Number(threshold) || 5;
+  return products.filter((p) => {
+    if (productTracksOptionInventory(p)) {
+      return (p.optionCategories || []).some(
+        (cat) =>
+          cat.tracksInventory &&
+          (cat.options || []).some((opt) => (Number(opt.stock) || 0) <= (p.lowStockThreshold ?? limit))
+      );
+    }
+    return (p.stock ?? 0) <= (p.lowStockThreshold ?? limit) || (p.stock ?? 0) <= limit;
+  });
 };

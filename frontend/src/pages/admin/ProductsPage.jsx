@@ -5,6 +5,7 @@ import { adminApi } from '../../api/admin.js';
 import { CategoryDeliveryRulesEditor } from '../../components/admin/DeliveryGroupRulesEditor.jsx';
 import CategoryEditModal from '../../components/admin/CategoryEditModal.jsx';
 import StockAdjustModal from '../../components/admin/StockAdjustModal.jsx';
+import ProductVariablesTab from '../../components/admin/ProductVariablesTab.jsx';
 
 const formatPrice = (n) => `Rs. ${Number(n).toLocaleString('en-NP')}`;
 
@@ -256,7 +257,11 @@ function CategoriesTab({ categories, onRefresh }) {
 
 export default function ProductsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState('products');
+  const [tab, setTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('tab');
+    return t === 'categories' || t === 'variables' ? t : 'products';
+  });
   const [stats, setStats] = useState({ total: 0, inStock: 0, outOfStock: 0, inactive: 0, orderableOverrides: 0 });
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -436,26 +441,32 @@ export default function ProductsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Catalog Registry</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Add products, manage categories, and control inventory from one place.
+          Add products, manage categories and reusable size/weight variables, and control inventory from one place.
         </p>
       </div>
 
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-        {['products', 'categories'].map((t) => (
+        {[
+          { id: 'products', label: 'products' },
+          { id: 'categories', label: 'categories' },
+          { id: 'variables', label: 'variables' },
+        ].map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={t.id}
+            onClick={() => setTab(t.id)}
             className={`px-5 py-2 rounded-md text-sm font-medium capitalize transition-colors ${
-              tab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              tab === t.id ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t}
+            {t.label}
           </button>
         ))}
       </div>
 
       {tab === 'categories' ? (
         <CategoriesTab categories={categories} onRefresh={loadCategories} />
+      ) : tab === 'variables' ? (
+        <ProductVariablesTab />
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

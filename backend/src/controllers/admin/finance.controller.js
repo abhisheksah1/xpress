@@ -61,8 +61,13 @@ export const createPurchase = asyncHandler(async (req, res) => {
   res.status(201).json(new ApiResponse(201, data, 'Purchase recorded'));
 });
 
+export const updatePurchase = asyncHandler(async (req, res) => {
+  const data = await financeService.updatePurchase(req.params.id, req.body, req.user._id);
+  res.json(new ApiResponse(200, data, 'Purchase updated'));
+});
+
 export const deletePurchase = asyncHandler(async (req, res) => {
-  await financeService.deletePurchase(req.params.id);
+  await financeService.deletePurchase(req.params.id, req.user._id);
   res.json(new ApiResponse(200, null, 'Purchase deleted'));
 });
 
@@ -87,12 +92,12 @@ export const createExpense = asyncHandler(async (req, res) => {
 });
 
 export const updateExpense = asyncHandler(async (req, res) => {
-  const data = await financeService.updateExpense(req.params.id, req.body);
+  const data = await financeService.updateExpense(req.params.id, req.body, req.user._id);
   res.json(new ApiResponse(200, data, 'Expense updated'));
 });
 
 export const deleteExpense = asyncHandler(async (req, res) => {
-  await financeService.deleteExpense(req.params.id);
+  await financeService.deleteExpense(req.params.id, req.user._id);
   res.json(new ApiResponse(200, null, 'Expense deleted'));
 });
 

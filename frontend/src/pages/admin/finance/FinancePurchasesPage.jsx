@@ -36,6 +36,22 @@ function productImage(product) {
   return product?.images?.find((i) => i.isPrimary)?.url || product?.images?.[0]?.url || '';
 }
 
+function getTrackingCategories(product) {
+  return (product?.optionCategories || []).filter((cat) => cat?.tracksInventory && cat.options?.length);
+}
+
+function formatOptionsLabel(selectedOptions = []) {
+  if (!selectedOptions?.length) return '';
+  return selectedOptions.map((o) => `${o.category}: ${o.label}`).join(' · ');
+}
+
+function optionsMatchKey(selectedOptions = []) {
+  return selectedOptions
+    .map((o) => `${o.category}:${o.label}`)
+    .sort()
+    .join('|');
+}
+
 export default function FinancePurchasesPage() {
   const [{ startDate, endDate }, setRange] = useState(defaultDateRange);
   const [reportRange, setReportRange] = useState(defaultDateRange);
@@ -49,6 +65,8 @@ export default function FinancePurchasesPage() {
 
   const [header, setHeader] = useState(emptyDraft);
   const [draftItems, setDraftItems] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editingNumber, setEditingNumber] = useState('');
 
   const [productQuery, setProductQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -57,6 +75,8 @@ export default function FinancePurchasesPage() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [lineQty, setLineQty] = useState('1');
   const [lineRate, setLineRate] = useState('');
+  /** category name -> option label for inventory variations */
+  const [lineOptions, setLineOptions] = useState({});
 
   const purchaseTypeMeta = PURCHASE_TYPES.find((t) => t.value === header.purchaseType) || PURCHASE_TYPES[0];
 
@@ -139,6 +159,11 @@ export default function FinancePurchasesPage() {
     setSearchOpen(false);
     setLineQty('1');
     setLineRate(String(product.costPrice ?? product.price ?? ''));
+    const defaults = {};
+    getTrackingCategories(product).forEach((cat) => {
+      if (cat.options?.[0]) defaults[cat.name] = cat.options[0].label;
+    });
+    setLineOptions(defaults);
   };
 
   const clearProductPicker = () => {
@@ -148,6 +173,15 @@ export default function FinancePurchasesPage() {
     setSearchOpen(false);
     setLineQty('1');
     setLineRate('');
+    setLineOptions({});
+  };
+
+  const buildLineSelectedOptions = () => {
+    if (!selectedProduct) return [];
+    return getTrackingCategories(selectedProduct).map((cat) => ({
+      category: cat.name,
+      label: lineOptions[cat.name] || cat.options[0]?.label,
+    })).filter((o) => o.label);
   };
 
   const addLineToDraft = () => {
@@ -157,7 +191,26 @@ export default function FinancePurchasesPage() {
     if (!quantity || quantity < 1) return toast.error('Enter a valid quantity');
     if (!Number.isFinite(unitCost) || unitCost < 0) return toast.error('Enter a valid rate');
 
-    const existingIndex = draftItems.findIndex((item) => item.product === selectedProduct._id);
+    const tracking = getTrackingCategories(selectedProduct);
+    if (tracking.length) {
+      const missing = tracking.find((cat) => !lineOptions[cat.name]);
+      if (missing) return toast.error(`Select ${missing.name} before adding`);
+    }
+
+    const selectedOptions = buildLineSelectedOptions();
+    const oKey = optionsMatchKey(selectedOptions);
+    const variationLabel = formatOptionsLabel(selectedOptions);
+    const displayStock =
+      tracking.length === 1
+        ? Number(
+            (tracking[0].options || []).find((o) => o.label === lineOptions[tracking[0].name])
+              ?.stock
+          ) || 0
+        : selectedProduct.stock ?? 0;
+
+    const existingIndex = draftItems.findIndex(
+      (item) => item.product === selectedProduct._id && (item.optionsKey || '') === oKey
+    );
     if (existingIndex >= 0) {
       setDraftItems((items) =>
         items.map((item, index) =>
@@ -170,14 +223,16 @@ export default function FinancePurchasesPage() {
       setDraftItems((items) => [
         ...items,
         {
-          key: `${selectedProduct._id}-${Date.now()}`,
+          key: `${selectedProduct._id}-${oKey || 'base'}-${Date.now()}`,
           product: selectedProduct._id,
-          name: selectedProduct.name,
+          name: variationLabel ? `${selectedProduct.name} (${variationLabel})` : selectedProduct.name,
           sku: selectedProduct.sku || '',
           image: productImage(selectedProduct),
-          stock: selectedProduct.stock ?? 0,
+          stock: displayStock,
           quantity,
           unitCost,
+          selectedOptions: selectedOptions.length ? selectedOptions : undefined,
+          optionsKey: oKey,
         },
       ]);
     }
@@ -190,6 +245,12 @@ export default function FinancePurchasesPage() {
     setDraftItems((items) => items.filter((item) => item.key !== key));
   };
 
+  const updateDraftItem = (key, patch) => {
+    setDraftItems((items) =>
+      items.map((item) => (item.key === key ? { ...item, ...patch } : item))
+    );
+  };
+
   const clearBill = () => {
     if (draftItems.length && !window.confirm('Clear all items from this bill draft?')) return;
     setDraftItems([]);
@@ -198,7 +259,72 @@ export default function FinancePurchasesPage() {
   const resetEntry = () => {
     setHeader(emptyDraft());
     setDraftItems([]);
+    setEditingId(null);
+    setEditingNumber('');
     clearProductPicker();
+  };
+
+  const beginEdit = async (row) => {
+    try {
+      const res = await adminApi.getFinancePurchase(row._id);
+      const purchase = res.data.data;
+      const vendorId = purchase.vendor?._id || purchase.vendor || '';
+      const treasuryId = purchase.treasuryAccount?._id || purchase.treasuryAccount || '';
+      setEditingId(purchase._id);
+      setEditingNumber(purchase.purchaseNumber || '');
+      setHeader({
+        vendor: vendorId,
+        invoiceRef: purchase.invoiceRef || '',
+        purchaseType: purchase.purchaseType === 'non_vat' || purchase.purchaseType === 'pan_bill'
+          ? 'pan_bill'
+          : purchase.purchaseType === 'zero_rated' || purchase.purchaseType === 'normal_bill'
+            ? 'normal_bill'
+            : 'vat_13',
+        purchaseDate: purchase.purchaseDate
+          ? new Date(purchase.purchaseDate).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10),
+        treasuryAccount: treasuryId,
+        stockReceived: purchase.stockReceived !== false,
+      });
+      setDraftItems(
+        (purchase.items || []).map((item, index) => {
+          const selectedOptions = item.selectedOptions || [];
+          const oKey = optionsMatchKey(selectedOptions);
+          return {
+            key: `${item.product || 'line'}-${oKey || index}-${index}`,
+            product: item.product?._id || item.product || undefined,
+            name: item.name,
+            sku: item.sku || item.product?.sku || '',
+            image: productImage(item.product) || '',
+            stock: item.product?.stock ?? 0,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            selectedOptions: selectedOptions.length ? selectedOptions : undefined,
+            optionsKey: oKey,
+          };
+        })
+      );
+      clearProductPicker();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success(`Editing ${purchase.purchaseNumber} — update fields then save`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load purchase for editing');
+    }
+  };
+
+  const removePurchase = async (row) => {
+    if (!window.confirm(`Delete purchase ${row.purchaseNumber}? Stock and treasury will be reversed.`)) {
+      return;
+    }
+    try {
+      await adminApi.deleteFinancePurchase(row._id);
+      toast.success('Purchase deleted');
+      if (editingId === row._id) resetEntry();
+      load();
+      loadReport();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed');
+    }
   };
 
   const lodgeBill = async () => {
@@ -207,26 +333,34 @@ export default function FinancePurchasesPage() {
     if (!draftItems.length) return toast.error('Add at least one product to the bill draft');
     if (!header.treasuryAccount) return toast.error('Select a source treasury account');
 
+    const payload = {
+      vendor: header.vendor,
+      invoiceRef: header.invoiceRef.trim(),
+      purchaseType: header.purchaseType,
+      purchaseDate: header.purchaseDate,
+      treasuryAccount: header.treasuryAccount,
+      stockReceived: header.stockReceived,
+      paidAmount: grandTotal,
+      paymentStatus: 'paid',
+      items: draftItems.map((item) => ({
+        product: item.product,
+        name: item.name,
+        sku: item.sku,
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+        selectedOptions: item.selectedOptions,
+      })),
+    };
+
     setSaving(true);
     try {
-      await adminApi.createFinancePurchase({
-        vendor: header.vendor,
-        invoiceRef: header.invoiceRef.trim(),
-        purchaseType: header.purchaseType,
-        purchaseDate: header.purchaseDate,
-        treasuryAccount: header.treasuryAccount,
-        stockReceived: header.stockReceived,
-        paidAmount: grandTotal,
-        paymentStatus: 'paid',
-        items: draftItems.map((item) => ({
-          product: item.product,
-          name: item.name,
-          sku: item.sku,
-          quantity: item.quantity,
-          unitCost: item.unitCost,
-        })),
-      });
-      toast.success('Wholesale bill saved and lodged');
+      if (editingId) {
+        await adminApi.updateFinancePurchase(editingId, payload);
+        toast.success('Wholesale bill updated');
+      } else {
+        await adminApi.createFinancePurchase(payload);
+        toast.success('Wholesale bill saved and lodged');
+      }
       resetEntry();
       load();
       loadReport();
@@ -245,6 +379,17 @@ export default function FinancePurchasesPage() {
           Lodge supplier wholesale bills, then review the purchase ledger report and export CSV.
         </p>
       </div>
+
+      {editingId && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-amber-900">
+            Editing bill <span className="font-mono font-semibold">{editingNumber}</span>. Change any field or line items, then save.
+          </p>
+          <button type="button" className="btn-secondary text-xs" onClick={resetEntry}>
+            Cancel edit
+          </button>
+        </div>
+      )}
 
       {/* Bill header */}
       <div className="card p-4 sm:p-5">
@@ -400,9 +545,41 @@ export default function FinancePurchasesPage() {
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-900 text-sm leading-snug">{selectedProduct.name}</p>
                   <p className="text-xs text-slate-500 mt-0.5">SKU: {selectedProduct.sku || '—'}</p>
-                  <p className="text-xs text-slate-500">Current stock: {selectedProduct.stock ?? 0}</p>
+                  <p className="text-xs text-slate-500">
+                    Current stock:{' '}
+                    {getTrackingCategories(selectedProduct).length
+                      ? `${selectedProduct.stock ?? 0} total (per variation below)`
+                      : (selectedProduct.stock ?? 0)}
+                  </p>
                 </div>
               </div>
+              {getTrackingCategories(selectedProduct).map((cat) => (
+                <div key={cat._id || cat.name}>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500 block mb-1">
+                    {cat.name} (stock variation) *
+                  </label>
+                  <select
+                    className="input-field text-sm"
+                    value={lineOptions[cat.name] || ''}
+                    onChange={(e) =>
+                      setLineOptions((prev) => ({ ...prev, [cat.name]: e.target.value }))
+                    }
+                  >
+                    {(cat.options || []).map((opt) => (
+                      <option key={opt.label} value={opt.label}>
+                        {opt.label} — stock {opt.stock ?? 0}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              {!getTrackingCategories(selectedProduct).length &&
+                (selectedProduct.optionCategories || []).length > 0 && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2">
+                    This product has variables but none track inventory. Enable &ldquo;Track stock per option&rdquo;
+                    on Size / Weight in the product form to stock variations separately.
+                  </p>
+                )}
               {(selectedProduct.images || []).length > 1 && (
                 <div>
                   <p className="text-[10px] font-bold uppercase text-slate-500 mb-1.5">Product gallery</p>
@@ -502,8 +679,33 @@ export default function FinancePurchasesPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 pr-3 text-center tabular-nums">{item.quantity}</td>
-                        <td className="py-3 pr-3 text-right tabular-nums">{fmtNpr(item.unitCost)}</td>
+                        <td className="py-3 pr-3 text-center">
+                          <input
+                            type="number"
+                            min={1}
+                            className="input-field text-sm w-16 py-1 text-center mx-auto"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateDraftItem(item.key, {
+                                quantity: Math.max(1, Number(e.target.value) || 1),
+                              })
+                            }
+                          />
+                        </td>
+                        <td className="py-3 pr-3 text-right">
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="input-field text-sm w-24 py-1 text-right ml-auto"
+                            value={item.unitCost}
+                            onChange={(e) =>
+                              updateDraftItem(item.key, {
+                                unitCost: Math.max(0, Number(e.target.value) || 0),
+                              })
+                            }
+                          />
+                        </td>
                         <td className="py-3 pr-3 text-right tabular-nums font-semibold">{fmtNpr(sub)}</td>
                         <td className="py-3 text-right">
                           <button type="button" onClick={() => removeDraftItem(item.key)} className="text-slate-400 hover:text-rose-600" aria-label="Remove">
@@ -552,8 +754,17 @@ export default function FinancePurchasesPage() {
               disabled={saving || !draftItems.length}
               className="w-full min-h-[48px] mt-2 rounded-lg bg-[#e11d48] text-white text-sm sm:text-base font-bold hover:bg-[#be123c] disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : '✓ Save & lodge wholesale bill'}
+              {saving
+                ? 'Saving...'
+                : editingId
+                  ? `✓ Update bill ${editingNumber}`
+                  : '✓ Save & lodge wholesale bill'}
             </button>
+            {editingId && (
+              <button type="button" onClick={resetEntry} className="w-full btn-secondary text-sm mt-2">
+                Cancel edit / start new bill
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -660,7 +871,8 @@ export default function FinancePurchasesPage() {
                   <th className="py-2 pr-3">Subtotal</th>
                   <th className="py-2 pr-3">VAT</th>
                   <th className="py-2 pr-3">Total</th>
-                  <th className="py-2">Status</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -675,7 +887,23 @@ export default function FinancePurchasesPage() {
                     <td className="py-3 pr-3 tabular-nums">{fmtNpr(row.subtotal)}</td>
                     <td className="py-3 pr-3 tabular-nums">{fmtNpr(row.tax)}</td>
                     <td className="py-3 pr-3 font-semibold tabular-nums">{fmtNpr(row.total)}</td>
-                    <td className="py-3 capitalize">{row.paymentStatus}</td>
+                    <td className="py-3 pr-3 capitalize">{row.paymentStatus}</td>
+                    <td className="py-3 whitespace-nowrap">
+                      <button
+                        type="button"
+                        className="text-xs text-primary-600 font-medium mr-3"
+                        onClick={() => beginEdit(row)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-rose-600 font-medium"
+                        onClick={() => removePurchase(row)}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

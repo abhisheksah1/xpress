@@ -97,10 +97,46 @@ export function computeComboStockFromProduct(product) {
   return min === Infinity ? 0 : Math.max(0, min);
 }
 
+function productTracksOptionInventory(product) {
+  return (product?.optionCategories || []).some((cat) => cat?.tracksInventory);
+}
+
+function sumTrackedOptionStock(product) {
+  let total = 0;
+  for (const cat of product?.optionCategories || []) {
+    if (!cat?.tracksInventory) continue;
+    for (const opt of cat.options || []) {
+      total += Number(opt.stock) || 0;
+    }
+  }
+  return total;
+}
+
+/** Total catalog stock (sum of variation stocks when inventory is per-option). */
 export function resolveProductStock(product) {
   if (!product) return 0;
   if (product.isHamper) return computeComboStockFromProduct(product);
+  if (productTracksOptionInventory(product)) return sumTrackedOptionStock(product);
   return product.stock ?? 0;
+}
+
+/** Stock for a specific option selection (purchase/sale line). */
+export function resolveLineStock(product, selectedOptions = []) {
+  if (!product) return 0;
+  if (product.isHamper) return computeComboStockFromProduct(product);
+  if (!productTracksOptionInventory(product)) return product.stock ?? 0;
+
+  const tracking = (product.optionCategories || []).filter((c) => c.tracksInventory);
+  const selections = Array.isArray(selectedOptions) ? selectedOptions : [];
+  for (const cat of tracking) {
+    const catName = String(cat.name || '').trim().toLowerCase();
+    const match = selections.find((s) => String(s.category || '').trim().toLowerCase() === catName);
+    if (!match) continue;
+    const label = String(match.label || '').trim().toLowerCase();
+    const option = (cat.options || []).find((o) => String(o.label || '').trim().toLowerCase() === label);
+    if (option) return Number(option.stock) || 0;
+  }
+  return 0;
 }
 
 export function isProductSoldOut(product) {
@@ -109,7 +145,11 @@ export function isProductSoldOut(product) {
 }
 
 /** Max quantity selectable on product page (backorder allows ordering above stock). */
-export function resolveOrderableQuantity(product) {
+export function resolveOrderableQuantity(product, selectedOptions) {
   if (allowsBackorder(product)) return 99;
-  return Math.max(1, resolveProductStock(product));
+  const stock =
+    selectedOptions != null
+      ? resolveLineStock(product, selectedOptions)
+      : resolveProductStock(product);
+  return Math.max(1, stock);
 }

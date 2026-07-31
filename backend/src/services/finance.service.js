@@ -8,6 +8,10 @@ import {
   TreasuryTransaction,
 } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
+import {
+  productTracksOptionInventory,
+  resolveInventoryOption,
+} from '../utils/optionInventory.js';
 import * as inventoryService from './inventory.service.js';
 
 const parseDateRange = (startDate, endDate) => {
@@ -39,6 +43,17 @@ const PURCHASE_TYPE_VAT = {
   normal_bill: 0,
 };
 
+const normalizeSelectedOptions = (selectedOptions) => {
+  if (!Array.isArray(selectedOptions) || !selectedOptions.length) return undefined;
+  const normalized = selectedOptions
+    .map((opt) => ({
+      category: String(opt.category || '').trim(),
+      label: String(opt.label || '').trim(),
+    }))
+    .filter((opt) => opt.category && opt.label);
+  return normalized.length ? normalized : undefined;
+};
+
 const normalizePurchaseItems = (items = []) =>
   items.map((item) => {
     const qty = Number(item.quantity) || 0;
@@ -50,6 +65,8 @@ const normalizePurchaseItems = (items = []) =>
       quantity: qty,
       unitCost,
       lineTotal: qty * unitCost,
+      variantId: item.variantId || undefined,
+      selectedOptions: normalizeSelectedOptions(item.selectedOptions),
     };
   }).filter((item) => item.name && item.quantity > 0);
 
@@ -112,24 +129,119 @@ const recordTreasuryMovement = async ({
   return { account, transaction: tx };
 };
 
-const applyPurchaseStock = async (items, purchaseNumber, userId) => {
+const applyPurchaseStock = async (items, purchaseNumber, userId, type = 'in') => {
   for (const item of items) {
     if (!item.product) continue;
     await inventoryService.adjustStock({
       productId: item.product,
-      type: 'in',
+      variantId: item.variantId,
+      selectedOptions: item.selectedOptions,
+      type,
       quantity: item.quantity,
-      reason: 'Supplier wholesale purchase',
+      reason:
+        type === 'in'
+          ? 'Supplier wholesale purchase'
+          : 'Purchase bill edit/delete reversal',
       reference: purchaseNumber,
       userId,
     });
 
-    const product = await Product.findById(item.product);
-    if (product && item.unitCost > 0) {
-      product.costPrice = item.unitCost;
-      await product.save({ validateBeforeSave: false });
+    if (type === 'in') {
+      const product = await Product.findById(item.product);
+      if (product && item.unitCost > 0) {
+        product.costPrice = item.unitCost;
+        await product.save({ validateBeforeSave: false });
+      }
     }
   }
+};
+
+const reversePurchaseStock = async (items, purchaseNumber, userId) =>
+  applyPurchaseStock(items, purchaseNumber, userId, 'out');
+
+const validatePurchaseLineItems = async (items) => {
+  for (const item of items) {
+    if (!item.product) continue;
+    const product = await Product.findById(item.product).select('name optionCategories');
+    if (!product) throw new ApiError(400, `Product not found for line: ${item.name}`);
+    if (productTracksOptionInventory(product) && !item.selectedOptions?.length) {
+      throw new ApiError(
+        400,
+        `Select a stock variation for ${product.name} (e.g. size or weight) before lodging the bill`
+      );
+    }
+    if (productTracksOptionInventory(product) && item.selectedOptions?.length) {
+      const resolved = resolveInventoryOption(product, item.selectedOptions);
+      if (!resolved) {
+        throw new ApiError(400, `Invalid stock variation for ${product.name}`);
+      }
+    }
+  }
+};
+
+/** Undo net treasury effect linked to a purchase/expense (per account). */
+const reverseRelatedTreasury = async (relatedModel, relatedId, userId, note) => {
+  const txs = await TreasuryTransaction.find({ relatedModel, relatedId }).sort({ createdAt: 1 });
+  if (!txs.length) return;
+
+  const netByAccount = new Map();
+  for (const tx of txs) {
+    const accountId = String(tx.account);
+    const isOutflow =
+      tx.type === 'withdrawal' || tx.type === 'transfer_out' || tx.type === 'adjustment_out';
+    const isInflow =
+      tx.type === 'deposit' || tx.type === 'transfer_in' || tx.type === 'adjustment_in';
+    const prev = netByAccount.get(accountId) || 0;
+    if (isOutflow) netByAccount.set(accountId, prev + Number(tx.amount || 0));
+    else if (isInflow) netByAccount.set(accountId, prev - Number(tx.amount || 0));
+  }
+
+  for (const [accountId, netOutflow] of netByAccount.entries()) {
+    if (!netOutflow) continue;
+    try {
+      if (netOutflow > 0) {
+        await recordTreasuryMovement({
+          accountId,
+          type: 'deposit',
+          amount: netOutflow,
+          description: note || `Reversal for ${relatedModel}`,
+          relatedModel,
+          relatedId,
+          transactionDate: new Date(),
+          userId,
+        });
+      } else {
+        await recordTreasuryMovement({
+          accountId,
+          type: 'withdrawal',
+          amount: Math.abs(netOutflow),
+          description: note || `Reversal for ${relatedModel}`,
+          relatedModel,
+          relatedId,
+          transactionDate: new Date(),
+          userId,
+        });
+      }
+    } catch (err) {
+      throw new ApiError(
+        400,
+        `Could not reverse treasury movement (${err.message}). Fix treasury balance and try again.`
+      );
+    }
+  }
+};
+
+const resolvePurchasePayment = (data, total) => {
+  const treasuryAccount = data.treasuryAccount || undefined;
+  let paidAmount = Number(data.paidAmount);
+  if (!Number.isFinite(paidAmount) && treasuryAccount) paidAmount = total;
+  if (!Number.isFinite(paidAmount)) paidAmount = 0;
+
+  let paymentStatus = data.paymentStatus || 'pending';
+  if (paidAmount >= total && total > 0) paymentStatus = 'paid';
+  else if (paidAmount > 0) paymentStatus = 'partial';
+
+  return { treasuryAccount, paidAmount, paymentStatus };
 };
 
 // ——— Vendors ———
@@ -207,7 +319,7 @@ export const getPurchaseById = async (id) => {
   const purchase = await SupplierPurchase.findById(id)
     .populate('vendor')
     .populate('treasuryAccount')
-    .populate('items.product', 'name sku stock costPrice');
+    .populate('items.product', 'name sku stock costPrice images optionCategories');
   if (!purchase) throw new ApiError(404, 'Purchase not found');
   return purchase;
 };
@@ -215,16 +327,10 @@ export const getPurchaseById = async (id) => {
 export const createPurchase = async (data, userId) => {
   const items = normalizePurchaseItems(data.items);
   if (!items.length) throw new ApiError(400, 'At least one purchase line item is required');
+  await validatePurchaseLineItems(items);
 
   const { subtotal, tax, vatRate, total } = sumPurchaseTotals(items, data);
-  const treasuryAccount = data.treasuryAccount || undefined;
-  let paidAmount = Number(data.paidAmount);
-  if (!Number.isFinite(paidAmount) && treasuryAccount) paidAmount = total;
-  if (!Number.isFinite(paidAmount)) paidAmount = 0;
-
-  let paymentStatus = data.paymentStatus || 'pending';
-  if (paidAmount >= total && total > 0) paymentStatus = 'paid';
-  else if (paidAmount > 0) paymentStatus = 'partial';
+  const { treasuryAccount, paidAmount, paymentStatus } = resolvePurchasePayment(data, total);
 
   const purchase = await SupplierPurchase.create({
     purchaseNumber: await nextPurchaseNumber(),
@@ -247,7 +353,7 @@ export const createPurchase = async (data, userId) => {
   });
 
   if (purchase.stockReceived) {
-    await applyPurchaseStock(items, purchase.purchaseNumber, userId);
+    await applyPurchaseStock(items, purchase.purchaseNumber, userId, 'in');
   }
 
   if (treasuryAccount && paidAmount > 0) {
@@ -267,9 +373,84 @@ export const createPurchase = async (data, userId) => {
   return getPurchaseById(purchase._id);
 };
 
-export const deletePurchase = async (id) => {
-  const purchase = await SupplierPurchase.findByIdAndDelete(id);
+export const updatePurchase = async (id, data, userId) => {
+  const existing = await SupplierPurchase.findById(id);
+  if (!existing) throw new ApiError(404, 'Purchase not found');
+
+  const items = normalizePurchaseItems(data.items);
+  if (!items.length) throw new ApiError(400, 'At least one purchase line item is required');
+  await validatePurchaseLineItems(items);
+
+  const { subtotal, tax, vatRate, total } = sumPurchaseTotals(items, data);
+  const { treasuryAccount, paidAmount, paymentStatus } = resolvePurchasePayment(data, total);
+  const stockReceived = data.stockReceived !== false;
+
+  // Reverse previous stock receipt
+  if (existing.stockReceived) {
+    await reversePurchaseStock(existing.items || [], existing.purchaseNumber, userId);
+  }
+
+  // Reverse previous treasury withdrawals for this bill
+  await reverseRelatedTreasury(
+    'SupplierPurchase',
+    existing._id,
+    userId,
+    `Reversal before edit of ${existing.purchaseNumber}`
+  );
+
+  existing.vendor = data.vendor;
+  existing.purchaseDate = data.purchaseDate || existing.purchaseDate;
+  existing.items = items;
+  existing.subtotal = subtotal;
+  existing.purchaseType = data.purchaseType || existing.purchaseType || 'vat_13';
+  existing.vatRate = vatRate;
+  existing.tax = tax;
+  existing.shipping = Number(data.shipping) || 0;
+  existing.total = total;
+  existing.paymentStatus = paymentStatus;
+  existing.paidAmount = paidAmount;
+  existing.treasuryAccount = treasuryAccount;
+  existing.invoiceRef = data.invoiceRef;
+  existing.notes = data.notes;
+  existing.stockReceived = stockReceived;
+  await existing.save();
+
+  if (stockReceived) {
+    await applyPurchaseStock(items, existing.purchaseNumber, userId, 'in');
+  }
+
+  if (treasuryAccount && paidAmount > 0) {
+    await recordTreasuryMovement({
+      accountId: treasuryAccount,
+      type: 'withdrawal',
+      amount: paidAmount,
+      description: `Supplier purchase ${existing.purchaseNumber} (updated)`,
+      reference: existing.invoiceRef || existing.purchaseNumber,
+      relatedModel: 'SupplierPurchase',
+      relatedId: existing._id,
+      transactionDate: existing.purchaseDate,
+      userId,
+    });
+  }
+
+  return getPurchaseById(existing._id);
+};
+
+export const deletePurchase = async (id, userId) => {
+  const purchase = await SupplierPurchase.findById(id);
   if (!purchase) throw new ApiError(404, 'Purchase not found');
+
+  if (purchase.stockReceived) {
+    await reversePurchaseStock(purchase.items || [], purchase.purchaseNumber, userId);
+  }
+  await reverseRelatedTreasury(
+    'SupplierPurchase',
+    purchase._id,
+    userId,
+    `Reversal on delete of ${purchase.purchaseNumber}`
+  );
+
+  await SupplierPurchase.findByIdAndDelete(id);
 };
 
 export const getPurchaseReport = async ({ startDate, endDate, vendorId } = {}) => {
@@ -364,17 +545,67 @@ export const createExpense = async (data, userId) => {
   return OverheadExpense.findById(expense._id).populate('vendor', 'name').populate('treasuryAccount', 'name');
 };
 
-export const updateExpense = async (id, data) => {
-  const expense = await OverheadExpense.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+export const updateExpense = async (id, data, userId) => {
+  const existing = await OverheadExpense.findById(id);
+  if (!existing) throw new ApiError(404, 'Expense not found');
+
+  await reverseRelatedTreasury(
+    'OverheadExpense',
+    existing._id,
+    userId,
+    `Reversal before edit of overhead: ${existing.title}`
+  );
+
+  const next = {
+    category: data.category ?? existing.category,
+    title: data.title ?? existing.title,
+    description: data.description ?? existing.description,
+    amount: data.amount != null ? Number(data.amount) || 0 : existing.amount,
+    expenseDate: data.expenseDate || existing.expenseDate,
+    paymentStatus: data.paymentStatus ?? existing.paymentStatus,
+    vendor: data.vendor !== undefined ? data.vendor || undefined : existing.vendor,
+    treasuryAccount:
+      data.treasuryAccount !== undefined
+        ? data.treasuryAccount || undefined
+        : existing.treasuryAccount,
+    reference: data.reference !== undefined ? data.reference : existing.reference,
+    notes: data.notes !== undefined ? data.notes : existing.notes,
+  };
+
+  Object.assign(existing, next);
+  await existing.save();
+
+  if (existing.treasuryAccount && existing.paymentStatus === 'paid' && existing.amount > 0) {
+    await recordTreasuryMovement({
+      accountId: existing.treasuryAccount,
+      type: 'withdrawal',
+      amount: existing.amount,
+      description: `Overhead: ${existing.title} (updated)`,
+      reference: existing.reference,
+      relatedModel: 'OverheadExpense',
+      relatedId: existing._id,
+      transactionDate: existing.expenseDate,
+      userId,
+    });
+  }
+
+  return OverheadExpense.findById(existing._id)
     .populate('vendor', 'name')
     .populate('treasuryAccount', 'name');
-  if (!expense) throw new ApiError(404, 'Expense not found');
-  return expense;
 };
 
-export const deleteExpense = async (id) => {
-  const expense = await OverheadExpense.findByIdAndDelete(id);
+export const deleteExpense = async (id, userId) => {
+  const expense = await OverheadExpense.findById(id);
   if (!expense) throw new ApiError(404, 'Expense not found');
+
+  await reverseRelatedTreasury(
+    'OverheadExpense',
+    expense._id,
+    userId,
+    `Reversal on delete of overhead: ${expense.title}`
+  );
+
+  await OverheadExpense.findByIdAndDelete(id);
 };
 
 // ——— Treasury ———

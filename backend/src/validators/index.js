@@ -91,9 +91,11 @@ export const createProductSchema = z.object({
     })).optional(),
     optionCategories: z.array(z.object({
       name: z.string(),
+      tracksInventory: z.boolean().optional(),
       options: z.array(z.object({
         label: z.string(),
         priceAdjustment: z.number().optional(),
+        stock: z.number().min(0).optional(),
       })),
     })).optional(),
     personalizationFields: z.object({
@@ -322,6 +324,7 @@ export const createStaffSchema = z.object({
 export const createBlogSchema = z.object({
   body: z.object({
     title: z.string().min(3),
+    slug: z.string().min(1).optional(),
     content: z.string().min(10),
     excerpt: z.string().optional(),
     tags: z.array(z.string()).optional(),
@@ -341,6 +344,7 @@ export const createBlogSchema = z.object({
 export const updateBlogSchema = z.object({
   body: z.object({
     title: z.string().min(3).optional(),
+    slug: z.string().min(1).optional(),
     content: z.string().min(10).optional(),
     excerpt: z.string().optional(),
     tags: z.array(z.string()).optional(),
@@ -702,6 +706,11 @@ const purchaseItemSchema = z.object({
   sku: z.string().optional(),
   quantity: z.number().min(1),
   unitCost: z.number().min(0),
+  variantId: z.string().optional(),
+  selectedOptions: z.array(z.object({
+    category: z.string().min(1),
+    label: z.string().min(1),
+  })).optional(),
 });
 
 export const createVendorSchema = z.object({
@@ -740,6 +749,41 @@ export const createPurchaseSchema = z.object({
   }),
 });
 
+export const createProductVariableTemplateSchema = z.object({
+  body: z.object({
+    name: z.string().min(1).max(120),
+    tracksInventory: z.boolean().optional(),
+    options: z
+      .array(
+        z.object({
+          label: z.string().min(1).max(120),
+          priceAdjustment: z.number().optional(),
+        })
+      )
+      .min(1),
+    isActive: z.boolean().optional(),
+    sortOrder: z.number().optional(),
+  }),
+});
+
+export const updateProductVariableTemplateSchema = z.object({
+  body: z.object({
+    name: z.string().min(1).max(120).optional(),
+    tracksInventory: z.boolean().optional(),
+    options: z
+      .array(
+        z.object({
+          label: z.string().min(1).max(120),
+          priceAdjustment: z.number().optional(),
+        })
+      )
+      .min(1)
+      .optional(),
+    isActive: z.boolean().optional(),
+    sortOrder: z.number().optional(),
+  }),
+});
+
 export const createExpenseSchema = z.object({
   body: z.object({
     category: z.enum(['rent', 'utilities', 'salaries', 'marketing', 'logistics', 'maintenance', 'other']).optional(),
@@ -754,6 +798,8 @@ export const createExpenseSchema = z.object({
     notes: z.string().optional(),
   }),
 });
+
+export const updateExpenseSchema = createExpenseSchema;
 
 export const createTreasuryAccountSchema = z.object({
   body: z.object({

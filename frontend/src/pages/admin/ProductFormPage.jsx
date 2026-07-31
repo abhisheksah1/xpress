@@ -140,6 +140,9 @@ export default function ProductFormPage() {
   const [uploading, setUploading] = useState(false);
   const [comboStockPreview, setComboStockPreview] = useState(null);
   const [newOptionName, setNewOptionName] = useState('');
+  const [variableTemplates, setVariableTemplates] = useState([]);
+  const [applyTemplateId, setApplyTemplateId] = useState('');
+  const [savingTemplateCat, setSavingTemplateCat] = useState(null);
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
   const setPersonalization = (key, patch) =>
@@ -160,7 +163,64 @@ export default function ProductFormPage() {
       setCategories(catRes.data.data);
       setDeliveryZones(zoneRes.data.data);
     });
+    adminApi
+      .getProductVariableTemplates()
+      .then((res) => setVariableTemplates(res.data.data || []))
+      .catch(() => setVariableTemplates([]));
   }, []);
+
+  const applyVariableTemplate = () => {
+    const tpl = variableTemplates.find((t) => t._id === applyTemplateId);
+    if (!tpl) return toast.error('Choose a saved variable first');
+    if (form.optionCategories.some((c) => c.name.toLowerCase() === tpl.name.toLowerCase())) {
+      return toast.error(`"${tpl.name}" is already on this product`);
+    }
+    setForm((f) => ({
+      ...f,
+      optionCategories: [
+        ...f.optionCategories,
+        {
+          name: tpl.name,
+          tracksInventory: Boolean(tpl.tracksInventory),
+          options: (tpl.options || []).map((opt) => ({
+            label: opt.label,
+            priceAdjustment: Number(opt.priceAdjustment) || 0,
+            stock: 0,
+          })),
+        },
+      ],
+    }));
+    setApplyTemplateId('');
+    toast.success(`Added "${tpl.name}" — set stock per option below`);
+  };
+
+  const saveCategoryAsTemplate = async (cat) => {
+    const name = String(cat.name || '').trim();
+    const options = (cat.options || [])
+      .map((o) => ({
+        label: String(o.label || '').trim(),
+        priceAdjustment: Number(o.priceAdjustment) || 0,
+      }))
+      .filter((o) => o.label);
+    if (!name) return toast.error('Category needs a name');
+    if (!options.length) return toast.error('Add at least one option before saving');
+
+    setSavingTemplateCat(name);
+    try {
+      await adminApi.createProductVariableTemplate({
+        name,
+        tracksInventory: Boolean(cat.tracksInventory),
+        options,
+      });
+      const res = await adminApi.getProductVariableTemplates();
+      setVariableTemplates(res.data.data || []);
+      toast.success(`Saved "${name}" for reuse on other products`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not save variable preset');
+    } finally {
+      setSavingTemplateCat(null);
+    }
+  };
 
   useEffect(() => {
     if (!deliveryZones.length) return;
@@ -383,7 +443,10 @@ export default function ProductFormPage() {
     if (!newOptionName.trim()) return;
     setForm((f) => ({
       ...f,
-      optionCategories: [...f.optionCategories, { name: newOptionName.trim(), options: [] }],
+      optionCategories: [
+        ...f.optionCategories,
+        { name: newOptionName.trim(), tracksInventory: false, options: [] },
+      ],
     }));
     setNewOptionName('');
   };
@@ -393,7 +456,48 @@ export default function ProductFormPage() {
       const cats = [...f.optionCategories];
       cats[catIndex] = {
         ...cats[catIndex],
-        options: [...cats[catIndex].options, { label: 'New Option', priceAdjustment: 0 }],
+        options: [
+          ...cats[catIndex].options,
+          { label: 'New Option', priceAdjustment: 0, stock: 0 },
+        ],
+      };
+      return { ...f, optionCategories: cats };
+    });
+  };
+
+  const updateOptionCategory = (catIndex, patch) => {
+    setForm((f) => {
+      const cats = [...f.optionCategories];
+      cats[catIndex] = { ...cats[catIndex], ...patch };
+      return { ...f, optionCategories: cats };
+    });
+  };
+
+  const removeOptionCategory = (catIndex) => {
+    const cat = form.optionCategories[catIndex];
+    const label = cat?.name || 'this variable';
+    if (
+      !window.confirm(
+        `Remove variable "${label}" from this product? Option stock for it will be cleared on save.`
+      )
+    ) {
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      optionCategories: f.optionCategories.filter((_, i) => i !== catIndex),
+    }));
+  };
+
+  const removeOptionFromCategory = (catIndex, optIndex) => {
+    const opt = form.optionCategories[catIndex]?.options?.[optIndex];
+    const label = opt?.label || 'this option';
+    if (!window.confirm(`Remove option "${label}"?`)) return;
+    setForm((f) => {
+      const cats = [...f.optionCategories];
+      cats[catIndex] = {
+        ...cats[catIndex],
+        options: (cats[catIndex].options || []).filter((_, i) => i !== optIndex),
       };
       return { ...f, optionCategories: cats };
     });
@@ -445,11 +549,11 @@ export default function ProductFormPage() {
       name: form.name,
       slug: form.slug || slugify(form.name),
       sku: form.sku || undefined,
-      description: form.description || undefined,
-      shortDescription: form.description?.slice(0, 200) || undefined,
+      description: form.description ?? '',
+      shortDescription: (form.description || '').slice(0, 200),
       shortDescriptionEnabled: Boolean(form.shortDescriptionEnabled),
-      longDescription: form.longDescription || undefined,
-      additionalNote: form.additionalNote || undefined,
+      longDescription: form.longDescription ?? '',
+      additionalNote: form.additionalNote ?? '',
       category: form.categoryIds[0],
       categories: form.categoryIds,
       brand: form.brand,
@@ -473,15 +577,23 @@ export default function ProductFormPage() {
       productGroup: form.productGroup || undefined,
       skuVariant: form.skuVariant || undefined,
       standardSize: form.standardSize || undefined,
-      optionCategories: (form.optionCategories || []).map((cat) => ({
-        name: cat.name,
-        options: (cat.options || []).map((opt) => ({
-          label: opt.label,
-          ...(toOptionalNumber(opt.priceAdjustment) !== undefined
-            ? { priceAdjustment: toOptionalNumber(opt.priceAdjustment) }
-            : {}),
-        })),
-      })),
+      optionCategories: (form.optionCategories || [])
+        .map((cat) => ({
+          name: String(cat.name || '').trim(),
+          tracksInventory: Boolean(cat.tracksInventory),
+          options: (cat.options || [])
+            .map((opt) => ({
+              label: String(opt.label || '').trim(),
+              ...(toOptionalNumber(opt.priceAdjustment) !== undefined
+                ? { priceAdjustment: toOptionalNumber(opt.priceAdjustment) }
+                : {}),
+              ...(cat.tracksInventory
+                ? { stock: Math.max(0, Number(opt.stock) || 0) }
+                : {}),
+            }))
+            .filter((opt) => opt.label),
+        }))
+        .filter((cat) => cat.name && cat.options.length > 0),
       isActive: statusOpt.isActive,
       isGiftWrappable: form.personalizationFields.giftMessage?.enabled,
       giftMessageEnabled: form.personalizationFields.giftMessage?.enabled,
@@ -599,16 +711,32 @@ export default function ProductFormPage() {
               </div>
               <div>
                 <FieldLabel>
-                  {form.isHamper ? 'Combo Stock (auto-calculated)' : 'Remaining Stock'}
+                  {form.isHamper
+                    ? 'Combo Stock (auto-calculated)'
+                    : form.optionCategories.some((c) => c.tracksInventory)
+                      ? 'Total Stock (from variations)'
+                      : 'Remaining Stock'}
                 </FieldLabel>
                 <input
                   type="number"
                   min="0"
                   className="input-field"
-                  value={form.isHamper ? (comboStockPreview ?? form.stock) : form.stock}
+                  value={
+                    form.isHamper
+                      ? (comboStockPreview ?? form.stock)
+                      : form.optionCategories.some((c) => c.tracksInventory)
+                        ? form.optionCategories
+                            .filter((c) => c.tracksInventory)
+                            .reduce(
+                              (sum, c) =>
+                                sum + (c.options || []).reduce((s, o) => s + (Number(o.stock) || 0), 0),
+                              0
+                            )
+                        : form.stock
+                  }
                   onChange={(e) => set('stock', e.target.value)}
-                  readOnly={form.isHamper}
-                  disabled={form.isHamper}
+                  readOnly={form.isHamper || form.optionCategories.some((c) => c.tracksInventory)}
+                  disabled={form.isHamper || form.optionCategories.some((c) => c.tracksInventory)}
                 />
               </div>
               <div>
@@ -880,30 +1008,141 @@ export default function ProductFormPage() {
           </section>
 
           <section className="card space-y-3">
-            <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Product Variables</h2>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Product Variables</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Reuse saved sizes/weights, then set stock per option for this product.
+                </p>
+              </div>
+              <Link to="/admin/products?tab=variables" className="text-xs text-primary-600 hover:underline whitespace-nowrap">
+                Manage saved variables →
+              </Link>
+            </div>
+
+            {variableTemplates.length > 0 && (
+              <div className="flex flex-wrap gap-2 items-end p-3 rounded-lg bg-slate-50 border border-slate-100">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
+                    Apply saved variable
+                  </label>
+                  <select
+                    className="input-field text-sm"
+                    value={applyTemplateId}
+                    onChange={(e) => setApplyTemplateId(e.target.value)}
+                  >
+                    <option value="">Choose e.g. Cake Size…</option>
+                    {variableTemplates.map((tpl) => (
+                      <option key={tpl._id} value={tpl._id}>
+                        {tpl.name} ({(tpl.options || []).map((o) => o.label).join(', ')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button type="button" onClick={applyVariableTemplate} className="btn-primary text-sm whitespace-nowrap">
+                  Add to product
+                </button>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <input
                 className="input-field text-sm flex-1"
-                placeholder="Option category e.g. Size"
+                placeholder="Or new category e.g. Size"
                 value={newOptionName}
                 onChange={(e) => setNewOptionName(e.target.value)}
               />
-              <button type="button" onClick={addOptionCategory} className="btn-secondary text-sm whitespace-nowrap">Add Category</button>
+              <button type="button" onClick={addOptionCategory} className="btn-secondary text-sm whitespace-nowrap">
+                Add Category
+              </button>
             </div>
             {form.optionCategories.map((cat, ci) => (
               <div key={ci} className="border border-gray-100 rounded-lg p-3">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">{cat.name}</span>
-                  <button type="button" onClick={() => addOptionToCategory(ci)} className="text-xs text-primary-600">+ Option</button>
+                <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
+                      Variable name
+                    </label>
+                    <input
+                      className="input-field text-sm py-1.5 font-medium"
+                      value={cat.name}
+                      onChange={(e) => updateOptionCategory(ci, { name: e.target.value })}
+                      placeholder="e.g. Cake Size"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap pt-5">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(cat.tracksInventory)}
+                        onChange={(e) => {
+                          const tracksInventory = e.target.checked;
+                          updateOptionCategory(ci, {
+                            tracksInventory,
+                            options: (cat.options || []).map((o) => ({
+                              ...o,
+                              stock: tracksInventory ? Number(o.stock) || 0 : o.stock,
+                            })),
+                          });
+                        }}
+                      />
+                      Track stock
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => saveCategoryAsTemplate(cat)}
+                      disabled={savingTemplateCat === cat.name}
+                      className="text-xs text-slate-600 hover:text-primary-600"
+                      title="Save this variable name and options for other products"
+                    >
+                      {savingTemplateCat === cat.name ? 'Saving…' : 'Save for reuse'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addOptionToCategory(ci)}
+                      className="text-xs text-primary-600"
+                    >
+                      + Option
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeOptionCategory(ci)}
+                      className="text-xs text-red-600 font-medium hover:text-red-700"
+                    >
+                      Remove variable
+                    </button>
+                  </div>
+                </div>
+                {cat.tracksInventory && (
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Stock is kept separately for each option (e.g. M / L / XL or 1 lb / 2 lb). Price-only options like candles should use a category without this checked.
+                  </p>
+                )}
+                <div
+                  className={`grid gap-2 mb-1 text-[10px] font-bold uppercase text-slate-400 ${
+                    cat.tracksInventory
+                      ? 'grid-cols-[1fr_5rem_5rem_2rem]'
+                      : 'grid-cols-[1fr_5rem_2rem]'
+                  }`}
+                >
+                  <span>Option label</span>
+                  <span>+NPR</span>
+                  {cat.tracksInventory ? <span>Stock</span> : null}
+                  <span className="sr-only">Remove</span>
                 </div>
                 {cat.options.map((opt, oi) => (
-                  <div key={oi} className="flex gap-2 mb-1">
+                  <div key={oi} className="flex gap-2 mb-1 items-center">
                     <input
                       className="input-field text-sm flex-1 py-1"
                       value={opt.label}
                       onChange={(e) => {
                         const cats = [...form.optionCategories];
-                        cats[ci].options[oi].label = e.target.value;
+                        cats[ci] = {
+                          ...cats[ci],
+                          options: cats[ci].options.map((o, idx) =>
+                            idx === oi ? { ...o, label: e.target.value } : o
+                          ),
+                        };
                         set('optionCategories', cats);
                       }}
                     />
@@ -913,13 +1152,57 @@ export default function ProductFormPage() {
                       value={opt.priceAdjustment}
                       onChange={(e) => {
                         const cats = [...form.optionCategories];
-                        cats[ci].options[oi].priceAdjustment = Number(e.target.value);
+                        cats[ci] = {
+                          ...cats[ci],
+                          options: cats[ci].options.map((o, idx) =>
+                            idx === oi
+                              ? { ...o, priceAdjustment: Number(e.target.value) }
+                              : o
+                          ),
+                        };
                         set('optionCategories', cats);
                       }}
                       placeholder="+NPR"
+                      title="Price adjustment"
                     />
+                    {cat.tracksInventory && (
+                      <input
+                        type="number"
+                        min="0"
+                        className="input-field text-sm w-20 py-1"
+                        value={opt.stock ?? 0}
+                        onChange={(e) => {
+                          const cats = [...form.optionCategories];
+                          cats[ci] = {
+                            ...cats[ci],
+                            options: cats[ci].options.map((o, idx) =>
+                              idx === oi
+                                ? { ...o, stock: Math.max(0, Number(e.target.value) || 0) }
+                                : o
+                            ),
+                          };
+                          set('optionCategories', cats);
+                        }}
+                        placeholder="Stock"
+                        title="Stock for this option"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeOptionFromCategory(ci, oi)}
+                      className="text-red-500 hover:text-red-700 text-lg leading-none px-1 shrink-0"
+                      title="Remove option"
+                      aria-label={`Remove option ${opt.label || oi + 1}`}
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
+                {!cat.options?.length && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No options yet — add one or remove this variable.
+                  </p>
+                )}
               </div>
             ))}
             <label className="flex items-center gap-2 text-sm border-t border-gray-100 pt-3">

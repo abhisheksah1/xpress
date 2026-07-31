@@ -32,7 +32,15 @@ const variantSchema = new mongoose.Schema(
 const optionCategorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    options: [{ label: { type: String, required: true }, priceAdjustment: { type: Number, default: 0 } }],
+    /** When true, each option holds its own stock (Size M/L/XL, cake 1 lb / 2 lb). */
+    tracksInventory: { type: Boolean, default: false },
+    options: [
+      {
+        label: { type: String, required: true },
+        priceAdjustment: { type: Number, default: 0 },
+        stock: { type: Number, default: 0, min: 0 },
+      },
+    ],
   },
   { _id: true }
 );

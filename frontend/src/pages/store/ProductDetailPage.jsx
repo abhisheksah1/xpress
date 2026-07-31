@@ -6,7 +6,7 @@ import { useStore } from '../../context/StoreContext.jsx';
 import { useCartStore } from '../../store/cartStore.js';
 import SeoHead from '../../components/store/SeoHead.jsx';
 import { categoryShopPath, mergeProductSeo } from '../../utils/seoMeta.js';
-import { isProductSoldOut, resolveOrderableQuantity } from '../../utils/comboItems.js';
+import { allowsBackorder, resolveLineStock, resolveOrderableQuantity } from '../../utils/comboItems.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import ProductPersonalization from '../../components/store/ProductPersonalization.jsx';
 import {
@@ -141,7 +141,10 @@ function BuyPanelExtended({
   if (isHamper) return null;
 
   const hasDelivery = (deliverySchedules || []).length > 0;
-  const hasLongDescription = product.longDescription || (!product.shortDescriptionEnabled && product.description);
+  const hasLongDescription = Boolean(
+    product.longDescription
+    || (!product.shortDescriptionEnabled && product.description)
+  );
   const hasContent =
     hasDelivery ||
     product.additionalNote ||
@@ -257,15 +260,22 @@ function BuyPanel({
             <div className="flex flex-wrap gap-2">
               {(cat.options || []).map((opt) => {
                 const active = chosen?.label === opt.label;
+                const optionOut =
+                  cat.tracksInventory &&
+                  !allowsBackorder(product) &&
+                  (Number(opt.stock) || 0) <= 0;
                 return (
                   <button
                     key={opt.label}
                     type="button"
+                    disabled={optionOut}
                     onClick={() => setSelectedOptions((prev) => ({ ...prev, [catId]: opt }))}
                     className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all ${
-                      active
-                        ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md ring-2 ring-amber-500/20'
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      optionOut
+                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                        : active
+                          ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md ring-2 ring-amber-500/20'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {opt.label}
@@ -273,6 +283,11 @@ function BuyPanel({
                       <span className="ml-1 font-mono text-[10px]">
                         {opt.priceAdjustment > 0 ? '+' : ''}
                         {formatPriceNpr(opt.priceAdjustment)}
+                      </span>
+                    ) : null}
+                    {cat.tracksInventory ? (
+                      <span className="ml-1 text-[10px] font-semibold opacity-70">
+                        {optionOut ? '(sold out)' : `(${opt.stock ?? 0})`}
                       </span>
                     ) : null}
                   </button>
@@ -428,8 +443,37 @@ export default function ProductDetailPage() {
   const unitPrice = basePrice + optionAdjustment;
   const displayCompare = hasDiscount ? comparePrice + optionAdjustment : null;
   const discountPct = hasDiscount ? Math.round(((comparePrice - basePrice) / comparePrice) * 100) : 0;
-  const availableStock = resolveOrderableQuantity(product);
-  const soldOut = isProductSoldOut(product);
+
+  const optionsList = useMemo(
+    () =>
+      (product?.optionCategories || [])
+        .map((cat, index) => {
+          const catId = cat._id || `cat-${index}`;
+          const chosen = selectedOptions[catId];
+          if (!chosen) return null;
+          return {
+            category: cat.name,
+            categoryId: cat._id ? String(cat._id) : undefined,
+            label: chosen.label,
+            priceAdjustment: Number(chosen.priceAdjustment) || 0,
+          };
+        })
+        .filter(Boolean),
+    [product, selectedOptions]
+  );
+
+  const lineStock = useMemo(
+    () => (product ? resolveLineStock(product, optionsList) : 0),
+    [product, optionsList]
+  );
+  const availableStock = product ? resolveOrderableQuantity(product, optionsList) : 1;
+  const soldOut = product
+    ? !allowsBackorder(product) && lineStock <= 0
+    : false;
+
+  useEffect(() => {
+    setQty((q) => Math.min(Math.max(1, q), availableStock || 1));
+  }, [availableStock]);
 
   const handleAddToCart = () => {
     const mergedPersonalization = mergePersonalization(
@@ -452,7 +496,7 @@ export default function ProductDetailPage() {
       }
     }
 
-    const optionsList = (product.optionCategories || [])
+    const optionsListForCart = (product.optionCategories || [])
       .map((cat, index) => {
         const catId = cat._id || `cat-${index}`;
         const chosen = selectedOptions[catId];
@@ -472,12 +516,13 @@ export default function ProductDetailPage() {
         name: product.name,
         price: unitPrice,
         images: product.images,
-        selectedOptions: optionsList,
-        optionsKey: optionsKey(optionsList),
-        stock: product.stock,
+        selectedOptions: optionsListForCart,
+        optionsKey: optionsKey(optionsListForCart),
+        stock: resolveLineStock(product, optionsListForCart),
         allowBackorder: product.allowBackorder,
         isHamper: product.isHamper,
         comboItems: product.comboItems,
+        optionCategories: product.optionCategories,
       },
       qty,
       showPersonalization ? snapshot : null

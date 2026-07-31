@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
-import { isProductSoldOut, resolveProductStock } from './comboItems.js';
+import { isProductSoldOut, resolveLineStock } from './comboItems.js';
 import { normalizePersonalizationFields } from './personalization.js';
+import { productTracksOptionInventory } from './optionInventory.js';
 
 export function optionsKey(selectedOptions) {
   if (!selectedOptions?.length) return '';
@@ -42,6 +43,9 @@ export function canQuickAddProduct(product) {
   if (!product) return false;
   if (isProductSoldOut(product)) return false;
   if (product.variants?.length > 0) return false;
+  // Option inventory needs an explicit size/weight pick on the PDP
+  if (productTracksOptionInventory(product)) return false;
+  if (product.optionCategories?.some((c) => (c.options || []).length > 1)) return false;
   if (hasRequiredPersonalization(product.personalizationFields)) return false;
   return true;
 }
@@ -61,7 +65,7 @@ export function quickAddProductToCart(addItem, product) {
 
   const { selectedOptions, priceAdjustment, optionsKey: oKey } = buildDefaultSelectedOptions(product);
   const unitPrice = Number(product.price || 0) + priceAdjustment;
-  const stock = resolveProductStock(product);
+  const stock = resolveLineStock(product, selectedOptions);
 
   const result = addItem(
     {

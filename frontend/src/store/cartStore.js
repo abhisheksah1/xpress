@@ -32,11 +32,16 @@ const stockMetaFromProduct = (product) => {
 };
 
 /** How many more units of this product can be added (null = unlimited / unknown). */
-export function getRemainingStock(items, productId, stock, allowBackorder, excludeCartItemId = null) {
+export function getRemainingStock(items, productId, stock, allowBackorder, excludeCartItemId = null, optionsKey = null) {
   if (allowBackorder) return null;
   if (stock == null || !Number.isFinite(Number(stock))) return null;
   const used = (items || [])
-    .filter((i) => i.productId === productId && i.cartItemId !== excludeCartItemId)
+    .filter((i) => {
+      if (i.productId !== productId || i.cartItemId === excludeCartItemId) return false;
+      // Variation stock is scoped per optionsKey; simple products share one pool.
+      if (optionsKey) return (i.optionsKey || '') === optionsKey;
+      return !(i.optionsKey);
+    })
     .reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
   return Math.max(0, Number(stock) - used);
 }
@@ -50,7 +55,8 @@ export function getCartItemMaxQuantity(item, items = []) {
     item.productId,
     item.stock,
     false,
-    item.cartItemId
+    item.cartItemId,
+    item.optionsKey || null
   );
   if (remainingForOthers == null) return Math.max(1, Number(item.stock));
   return Math.max(1, remainingForOthers);
@@ -105,7 +111,8 @@ export const useCartStore = create(
           product._id,
           stock,
           allowBackorder,
-          existing?.cartItemId || null
+          existing?.cartItemId || null,
+          oKey || null
         );
 
         if (remaining === 0) {

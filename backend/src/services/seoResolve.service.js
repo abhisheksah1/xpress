@@ -367,9 +367,9 @@ export const resolveSeoForPath = async (rawPath = '/') => {
         const rawDesc =
           seo.metaDescription
           || product.metaDescription
+          || product.longDescription
           || product.shortDescription
           || product.description
-          || product.longDescription
           || '';
 
         return finalize({

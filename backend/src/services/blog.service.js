@@ -46,8 +46,26 @@ export const getBlogById = async (id) => {
 };
 
 export const updateBlog = async (id, data) => {
-  const blog = await Blog.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+  const blog = await Blog.findById(id);
   if (!blog) throw new ApiError(404, 'Blog not found');
+
+  const { seo, ...rest } = data || {};
+  Object.keys(rest).forEach((key) => {
+    if (rest[key] !== undefined) blog[key] = rest[key];
+  });
+  // Persist empty content clears / SEO merges reliably
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'content')) {
+    blog.content = data.content == null ? '' : data.content;
+  }
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'excerpt')) {
+    blog.excerpt = data.excerpt == null ? '' : data.excerpt;
+  }
+  if (seo && typeof seo === 'object') {
+    const currentSeo = blog.seo?.toObject?.() || blog.seo || {};
+    blog.set('seo', { ...currentSeo, ...seo });
+    blog.markModified('seo');
+  }
+  await blog.save();
   return blog;
 };
 

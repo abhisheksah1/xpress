@@ -4,6 +4,8 @@ const inventoryLogSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     variantId: { type: mongoose.Schema.Types.ObjectId },
+    optionCategory: { type: String, trim: true },
+    optionLabel: { type: String, trim: true },
     type: {
       type: String,
       enum: ['in', 'out', 'adjustment', 'return'],
