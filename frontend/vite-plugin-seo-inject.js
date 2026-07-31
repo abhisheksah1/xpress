@@ -1,7 +1,8 @@
 /**
  * Vite plugin: inject admin-managed SEO into the SPA index.html for each route.
- * Crawlers and "View Source" then see title / description / OG / JSON-LD without waiting for React.
+ * Crawlers and "View Source" then see title / description / OG / H1 / JSON-LD without waiting for React.
  */
+
 function escapeHtml(value = '') {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -11,8 +12,10 @@ function escapeHtml(value = '') {
     .replace(/'/g, '&#39;');
 }
 
-const BLOCK_START = '<!--seo-head-->';
-const BLOCK_END = '<!--/seo-head-->';
+const HEAD_START = '<!--seo-head-->';
+const HEAD_END = '<!--/seo-head-->';
+const BODY_START = '<!--seo-body-->';
+const BODY_END = '<!--/seo-body-->';
 
 function metaTag(attr, key, content) {
   if (content == null || content === '') return '';
@@ -29,6 +32,7 @@ function buildSeoHeadBlock(meta = {}) {
   if (meta.title) lines.push(`<title>${escapeHtml(meta.title)}</title>`);
   lines.push(metaTag('name', 'description', meta.description));
   lines.push(metaTag('name', 'keywords', meta.keywords));
+  if (meta.focusKeyword) lines.push(metaTag('name', 'news_keywords', meta.focusKeyword));
   lines.push(metaTag('name', 'robots', meta.robots));
   if (meta.googleSiteVerification) {
     lines.push(metaTag('name', 'google-site-verification', meta.googleSiteVerification));
@@ -65,21 +69,57 @@ function buildSeoHeadBlock(meta = {}) {
   return lines.filter(Boolean).join('\n');
 }
 
+function buildSeoBodyBlock(meta = {}) {
+  const h1 = String(meta.h1 || meta.title || '').trim();
+  const h2 = String(meta.h2 || meta.focusKeyword || '').trim();
+  const description = String(meta.description || '').trim();
+  if (!h1 && !description) return '';
+  const parts = ['<div id="seo-prerender">'];
+  if (h1) parts.push(`<h1>${escapeHtml(h1)}</h1>`);
+  if (h2 && h2.toLowerCase() !== h1.toLowerCase()) {
+    parts.push(`<h2>${escapeHtml(h2)}</h2>`);
+  }
+  if (description) parts.push(`<p>${escapeHtml(description)}</p>`);
+  parts.push('</div>');
+  return parts.join('\n');
+}
+
 function injectSeoIntoHtml(html, meta) {
   if (!html || typeof html !== 'string') return html;
-  const block = buildSeoHeadBlock(meta || {});
-  if (!block) return html;
-  const wrapped = `${BLOCK_START}\n${block}\n${BLOCK_END}`;
-  if (html.includes(BLOCK_START) && html.includes(BLOCK_END)) {
-    return html.replace(new RegExp(`${BLOCK_START}[\\s\\S]*?${BLOCK_END}`), wrapped);
+  const headBlock = buildSeoHeadBlock(meta || {});
+  const bodyBlock = buildSeoBodyBlock(meta || {});
+  if (!headBlock && !bodyBlock) return html;
+
+  let out = html;
+
+  if (headBlock) {
+    const wrappedHead = `${HEAD_START}\n${headBlock}\n${HEAD_END}`;
+    if (out.includes(HEAD_START) && out.includes(HEAD_END)) {
+      out = out.replace(new RegExp(`${HEAD_START}[\\s\\S]*?${HEAD_END}`), wrappedHead);
+    } else {
+      out = out
+        .replace(/<title>[\s\S]*?<\/title>/i, '')
+        .replace(/<meta\s+name=["']description["'][^>]*>/i, '');
+      if (/<\/head>/i.test(out)) {
+        out = out.replace(/<\/head>/i, `${wrappedHead}\n</head>`);
+      } else {
+        out = `${wrappedHead}\n${out}`;
+      }
+    }
   }
-  let out = html
-    .replace(/<title>[\s\S]*?<\/title>/i, '')
-    .replace(/<meta\s+name=["']description["'][^>]*>/i, '');
-  if (/<\/head>/i.test(out)) {
-    return out.replace(/<\/head>/i, `${wrapped}\n</head>`);
+
+  if (bodyBlock) {
+    const wrappedBody = `${BODY_START}\n${bodyBlock}\n${BODY_END}`;
+    if (out.includes(BODY_START) && out.includes(BODY_END)) {
+      out = out.replace(new RegExp(`${BODY_START}[\\s\\S]*?${BODY_END}`), wrappedBody);
+    } else if (/<div id=["']root["'][^>]*>/i.test(out)) {
+      out = out.replace(/<div id=["']root["'][^>]*>/i, `${wrappedBody}\n$&`);
+    } else if (/<body[^>]*>/i.test(out)) {
+      out = out.replace(/<body([^>]*)>/i, `<body$1>\n${wrappedBody}`);
+    }
   }
-  return `${wrapped}\n${out}`;
+
+  return out;
 }
 
 function pathnameFromUrl(url = '/') {

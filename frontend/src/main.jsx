@@ -7,6 +7,9 @@ import ScrollToTop from './components/ScrollToTop.jsx';
 import App from './App';
 import './index.css';
 
+// Server-injected H1/meta body is for crawlers only — remove before React mounts.
+document.getElementById('seo-prerender')?.remove();
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

@@ -7,8 +7,10 @@ export const escapeHtml = (value = '') =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-const BLOCK_START = '<!--seo-head-->';
-const BLOCK_END = '<!--/seo-head-->';
+const HEAD_START = '<!--seo-head-->';
+const HEAD_END = '<!--/seo-head-->';
+const BODY_START = '<!--seo-body-->';
+const BODY_END = '<!--/seo-body-->';
 
 const metaTag = (attr, key, content) => {
   if (content == null || content === '') return '';
@@ -30,6 +32,9 @@ export const buildSeoHeadBlock = (meta = {}) => {
 
   lines.push(metaTag('name', 'description', meta.description));
   lines.push(metaTag('name', 'keywords', meta.keywords));
+  if (meta.focusKeyword) {
+    lines.push(metaTag('name', 'news_keywords', meta.focusKeyword));
+  }
   lines.push(metaTag('name', 'robots', meta.robots));
 
   if (meta.googleSiteVerification) {
@@ -74,29 +79,63 @@ export const buildSeoHeadBlock = (meta = {}) => {
 };
 
 /**
+ * Crawler-visible body content (H1 / intro) so Google sees headings before React boots.
+ * Removed by the client on first paint so shoppers only see the React app.
+ */
+export const buildSeoBodyBlock = (meta = {}) => {
+  const h1 = String(meta.h1 || meta.title || '').trim();
+  const h2 = String(meta.h2 || meta.focusKeyword || '').trim();
+  const description = String(meta.description || '').trim();
+  if (!h1 && !description) return '';
+
+  const parts = ['<div id="seo-prerender">'];
+  if (h1) parts.push(`<h1>${escapeHtml(h1)}</h1>`);
+  if (h2 && h2.toLowerCase() !== h1.toLowerCase()) {
+    parts.push(`<h2>${escapeHtml(h2)}</h2>`);
+  }
+  if (description) parts.push(`<p>${escapeHtml(description)}</p>`);
+  parts.push('</div>');
+  return parts.join('\n');
+};
+
+/**
  * Inject or replace SEO tags inside an HTML document string.
- * Safe to call repeatedly — uses a marked block.
+ * Safe to call repeatedly — uses marked blocks for head + body.
  */
 export const injectSeoIntoHtml = (html, meta) => {
   if (!html || typeof html !== 'string') return html;
-  const block = buildSeoHeadBlock(meta || {});
-  if (!block) return html;
+  const headBlock = buildSeoHeadBlock(meta || {});
+  const bodyBlock = buildSeoBodyBlock(meta || {});
+  if (!headBlock && !bodyBlock) return html;
 
-  const wrapped = `${BLOCK_START}\n${block}\n${BLOCK_END}`;
+  let out = html;
 
-  if (html.includes(BLOCK_START) && html.includes(BLOCK_END)) {
-    return html.replace(
-      new RegExp(`${BLOCK_START}[\\s\\S]*?${BLOCK_END}`),
-      wrapped
-    );
+  if (headBlock) {
+    const wrappedHead = `${HEAD_START}\n${headBlock}\n${HEAD_END}`;
+    if (out.includes(HEAD_START) && out.includes(HEAD_END)) {
+      out = out.replace(new RegExp(`${HEAD_START}[\\s\\S]*?${HEAD_END}`), wrappedHead);
+    } else {
+      out = out
+        .replace(/<title>[\s\S]*?<\/title>/i, '')
+        .replace(/<meta\s+name=["']description["'][^>]*>/i, '');
+      if (/<\/head>/i.test(out)) {
+        out = out.replace(/<\/head>/i, `${wrappedHead}\n</head>`);
+      } else {
+        out = `${wrappedHead}\n${out}`;
+      }
+    }
   }
 
-  let out = html
-    .replace(/<title>[\s\S]*?<\/title>/i, '')
-    .replace(/<meta\s+name=["']description["'][^>]*>/i, '');
-
-  if (/<\/head>/i.test(out)) {
-    return out.replace(/<\/head>/i, `${wrapped}\n</head>`);
+  if (bodyBlock) {
+    const wrappedBody = `${BODY_START}\n${bodyBlock}\n${BODY_END}`;
+    if (out.includes(BODY_START) && out.includes(BODY_END)) {
+      out = out.replace(new RegExp(`${BODY_START}[\\s\\S]*?${BODY_END}`), wrappedBody);
+    } else if (/<div id=["']root["'][^>]*>/i.test(out)) {
+      out = out.replace(/<div id=["']root["'][^>]*>/i, `${wrappedBody}\n$&`);
+    } else if (/<body[^>]*>/i.test(out)) {
+      out = out.replace(/<body([^>]*)>/i, `<body$1>\n${wrappedBody}`);
+    }
   }
-  return `${wrapped}\n${out}`;
+
+  return out;
 };

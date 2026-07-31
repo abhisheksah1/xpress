@@ -59,13 +59,18 @@ export default function SeoHead({
     || (typeof window !== 'undefined' ? window.location.href : '');
   const ogImage = meta.ogImage?.url ? absoluteUrl(resolveMediaUrl(meta.ogImage.url), siteUrl) : '';
   const robots = `${meta.robotsIndex ? 'index' : 'noindex'}, ${meta.robotsFollow ? 'follow' : 'nofollow'}`;
-  const keywords = meta.metaKeywords?.join(', ') || '';
+  const keywordParts = [...(meta.metaKeywords || [])];
+  if (meta.focusKeyword && !keywordParts.some((k) => String(k).toLowerCase() === String(meta.focusKeyword).toLowerCase())) {
+    keywordParts.unshift(meta.focusKeyword);
+  }
+  const keywords = keywordParts.join(', ');
 
   useEffect(() => {
     if (meta.metaTitle) document.title = meta.metaTitle;
 
     upsertMeta('name', 'description', meta.metaDescription);
     upsertMeta('name', 'keywords', keywords);
+    upsertMeta('name', 'news_keywords', meta.focusKeyword || '');
     upsertMeta('name', 'robots', robots);
 
     if (siteSettings.google_site_verification) {
@@ -123,6 +128,7 @@ export default function SeoHead({
     meta.geo.latitude,
     meta.geo.longitude,
     meta.ogImage?.alt,
+    meta.focusKeyword,
     keywords,
     robots,
     canonical,

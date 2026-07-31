@@ -240,7 +240,7 @@ const DEFAULT_SETTINGS = [
   { key: 'login_attempts_max', value: 5, group: 'auth', label: 'Max Login Attempts' },
 
   // SEO & Social
-  { key: 'site_url', value: 'https://koselixpress.com', group: 'seo', label: 'Canonical Site URL' },
+  { key: 'site_url', value: 'https://koselixpress.com.np', group: 'seo', label: 'Canonical Site URL' },
   { key: 'meta_title', value: 'KoseliXpress - Gift Portal Nepal', group: 'seo', label: 'Default Meta Title' },
   { key: 'meta_description', value: 'Send gifts across Nepal with KoseliXpress', group: 'seo', label: 'Default Meta Description' },
   { key: 'meta_keywords', value: 'gifts, flowers, cakes, Nepal, Kathmandu, delivery', group: 'seo', label: 'Default Meta Keywords' },

@@ -166,11 +166,19 @@ const finalize = ({
   ).trim().slice(0, 320);
 
   const keywordsList = Array.isArray(seo.metaKeywords) && seo.metaKeywords.length
-    ? seo.metaKeywords
+    ? [...seo.metaKeywords]
     : String(settings.meta_keywords || '')
         .split(',')
         .map((k) => k.trim())
         .filter(Boolean);
+
+  const focusKeyword = String(seo.focusKeyword || '').trim();
+  if (
+    focusKeyword
+    && !keywordsList.some((k) => String(k).toLowerCase() === focusKeyword.toLowerCase())
+  ) {
+    keywordsList.unshift(focusKeyword);
+  }
 
   const geo = {
     ...emptyGeo(),
@@ -200,12 +208,20 @@ const finalize = ({
   };
 
   const canonical = absoluteUrl(seo.canonicalUrl || path, siteUrl);
+  // Semantic H1 for crawlers: page/product/blog name, not the longer meta title when possible
+  const h1 = String(jsonLdContext.title || fallbackTitle || title).trim();
+  const h2 = focusKeyword && focusKeyword.toLowerCase() !== h1.toLowerCase()
+    ? focusKeyword
+    : '';
 
   return {
     path,
     title,
     description,
     keywords: keywordsList.join(', '),
+    focusKeyword,
+    h1,
+    h2,
     robots: `${robotsIndex ? 'index' : 'noindex'}, ${robotsFollow ? 'follow' : 'nofollow'}`,
     canonical,
     ogType,
@@ -239,7 +255,10 @@ const cmsPathForPage = (page) => {
 export const resolveSeoForPath = async (rawPath = '/') => {
   const path = normalizePath(rawPath);
   const settings = await getPublicSettings();
-  const siteUrl = (settings.site_url || config.clientUrl || '').replace(/\/$/, '');
+  // Prefer explicit site_url; fall back to CLIENT_URL so canonicals match the live host.
+  const siteUrl = String(settings.site_url || config.clientUrl || '')
+    .trim()
+    .replace(/\/$/, '');
 
   const forceNoindex = NOINDEX_PREFIXES.some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`)

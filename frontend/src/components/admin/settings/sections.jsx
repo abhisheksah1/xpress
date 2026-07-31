@@ -1163,8 +1163,8 @@ export function SeoSection({ values, set }) {
       saving={saving}
     >
       <div className="grid md:grid-cols-2 gap-4">
-        <Field label="Canonical site URL" hint="Used for absolute canonical and OG URLs.">
-          <input className="input-field" value={values.site_url || ''} onChange={(e) => set('site_url', e.target.value)} placeholder="https://koselixpress.com" />
+        <Field label="Canonical site URL" hint="Must match the live domain Google indexes (used for canonical, OG, and sitemap URLs).">
+          <input className="input-field" value={values.site_url || ''} onChange={(e) => set('site_url', e.target.value)} placeholder="https://koselixpress.com.np" />
         </Field>
         <Field label="Business name (schema)">
           <input className="input-field" value={values.business_name || ''} onChange={(e) => set('business_name', e.target.value)} />
