@@ -1,10 +1,45 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import SeoHead from '../../components/store/SeoHead.jsx';
 import { categoryShopPath, mergeEntitySeo } from '../../utils/seoMeta.js';
+import Pagination from '../../components/Pagination.jsx';
+
+/** Keep 10 full rows per page across breakpoints (matches grid columns). */
+const GRID_ROWS = 10;
+const PAGE_SIZE_BY_BREAKPOINT = {
+  mobile: 2 * GRID_ROWS, // 2 cols × 10 rows
+  tablet: 3 * GRID_ROWS, // 3 cols × 10 rows
+  desktop: 4 * GRID_ROWS, // 4 cols × 10 rows
+};
+
+function getShopPageSize() {
+  if (typeof window === 'undefined') return PAGE_SIZE_BY_BREAKPOINT.desktop;
+  if (window.matchMedia('(min-width: 1024px)').matches) return PAGE_SIZE_BY_BREAKPOINT.desktop;
+  if (window.matchMedia('(min-width: 768px)').matches) return PAGE_SIZE_BY_BREAKPOINT.tablet;
+  return PAGE_SIZE_BY_BREAKPOINT.mobile;
+}
+
+function useShopPageSize() {
+  const [pageSize, setPageSize] = useState(getShopPageSize);
+
+  useEffect(() => {
+    const mqTablet = window.matchMedia('(min-width: 768px)');
+    const mqDesktop = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setPageSize(getShopPageSize());
+    sync();
+    mqTablet.addEventListener('change', sync);
+    mqDesktop.addEventListener('change', sync);
+    return () => {
+      mqTablet.removeEventListener('change', sync);
+      mqDesktop.removeEventListener('change', sync);
+    };
+  }, []);
+
+  return pageSize;
+}
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -58,10 +93,12 @@ export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, pages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const pageSize = useShopPageSize();
+  const prevPageSizeRef = useRef(pageSize);
 
   const legacyCategoryId = searchParams.get('category') || '';
   const page = Number(searchParams.get('page') || 1);
@@ -90,16 +127,45 @@ export default function ShopPage() {
     }
   }, [categorySlug, legacyCategoryId, categories, navigate, searchParams]);
 
+  // When viewport columns change, remap page so the user stays near the same products
+  useEffect(() => {
+    const prevLimit = prevPageSizeRef.current;
+    if (prevLimit === pageSize) return;
+    const currentPage = Number(searchParams.get('page') || 1);
+    const offset = (Math.max(1, currentPage) - 1) * prevLimit;
+    const nextPage = Math.floor(offset / pageSize) + 1;
+    prevPageSizeRef.current = pageSize;
+    if (nextPage === currentPage) return;
+    const next = new URLSearchParams(searchParams);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setSearchParams(next, { replace: true });
+    // Only remap when the responsive page size changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageSize]);
+
   useEffect(() => {
     setLoading(true);
-    const params = { page, limit: 20, sort };
+    let cancelled = false;
+    const params = { page, limit: pageSize, sort };
     if (resolvedCategoryId) params.category = resolvedCategoryId;
     if (search) params.search = search;
     storeApi.getProducts(params).then((res) => {
+      if (cancelled) return;
+      const meta = res.data.data.pagination || { page: 1, pages: 1, total: 0 };
       setProducts(res.data.data.products);
-      setPagination(res.data.data.pagination);
-    }).finally(() => setLoading(false));
-  }, [resolvedCategoryId, page, search, sort]);
+      setPagination(meta);
+      if (page > meta.pages && meta.pages >= 1) {
+        const next = new URLSearchParams(window.location.search);
+        if (meta.pages <= 1) next.delete('page');
+        else next.set('page', String(meta.pages));
+        setSearchParams(next, { replace: true });
+      }
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [resolvedCategoryId, page, search, sort, pageSize, setSearchParams]);
 
   useEffect(() => {
     setFiltersOpen(false);
@@ -255,24 +321,21 @@ export default function ShopPage() {
                   <ProductCard key={p._id} product={p} variant="catalog" />
                 ))}
               </div>
-              {pagination.pages > 1 && (
-                <div className="flex gap-2 mt-8 justify-center">
-                  {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => {
-                        const next = new URLSearchParams(searchParams);
-                        next.set('page', String(p));
-                        setSearchParams(next);
-                      }}
-                      className={`px-3 py-1 rounded text-sm ${p === page ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <Pagination
+                className="mt-8"
+                page={page}
+                pages={pagination.pages}
+                total={pagination.total}
+                limit={pageSize}
+                itemLabel="products"
+                onPageChange={(nextPage) => {
+                  const next = new URLSearchParams(searchParams);
+                  if (nextPage <= 1) next.delete('page');
+                  else next.set('page', String(nextPage));
+                  setSearchParams(next);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             </>
           )}
         </div>

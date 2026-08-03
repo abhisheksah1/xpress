@@ -6,6 +6,9 @@ import { CategoryDeliveryRulesEditor } from '../../components/admin/DeliveryGrou
 import CategoryEditModal from '../../components/admin/CategoryEditModal.jsx';
 import StockAdjustModal from '../../components/admin/StockAdjustModal.jsx';
 import ProductVariablesTab from '../../components/admin/ProductVariablesTab.jsx';
+import Pagination from '../../components/Pagination.jsx';
+
+const PRODUCTS_PER_PAGE = 10;
 
 const formatPrice = (n) => `Rs. ${Number(n).toLocaleString('en-NP')}`;
 
@@ -290,7 +293,7 @@ export default function ProductsPage() {
   const loadProducts = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = { page, limit: 20 };
+      const params = { page, limit: PRODUCTS_PER_PAGE };
       if (filters.search) params.search = filters.search;
       if (filters.category) params.category = filters.category;
       if (filters.stockStatus) params.stockStatus = filters.stockStatus;
@@ -687,30 +690,15 @@ export default function ProductsPage() {
               </table>
             </div>
 
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <p className="text-sm text-gray-500">{pagination.total} products total</p>
-                <div className="flex gap-2">
-                  <button
-                    disabled={pagination.page <= 1}
-                    onClick={() => loadProducts(pagination.page - 1)}
-                    className="btn-secondary text-sm disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-3 py-2 text-sm text-gray-600">
-                    Page {pagination.page} of {pagination.pages}
-                  </span>
-                  <button
-                    disabled={pagination.page >= pagination.pages}
-                    onClick={() => loadProducts(pagination.page + 1)}
-                    className="btn-secondary text-sm disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              className="px-3 sm:px-4 py-3 border-t border-gray-100"
+              page={pagination.page}
+              pages={pagination.pages}
+              total={pagination.total}
+              limit={PRODUCTS_PER_PAGE}
+              itemLabel="products"
+              onPageChange={loadProducts}
+            />
           </div>
         </>
       )}

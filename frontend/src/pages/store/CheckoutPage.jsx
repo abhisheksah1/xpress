@@ -46,7 +46,7 @@ function FormField({ id, label, required, optional, hint, children }) {
 
 function SummaryMoney({ amount, className = '' }) {
   return (
-    <span className={`shrink-0 max-w-[48%] text-right tabular-nums leading-snug break-words sm:max-w-none sm:whitespace-nowrap ${className}`}>
+    <span className={`shrink-0 text-right tabular-nums leading-snug whitespace-nowrap ${className}`}>
       {amount}
     </span>
   );
@@ -973,6 +973,22 @@ export default function CheckoutPage() {
               {quote?.coupon?.appliesTo === 'payment_gateway' && (
                 <p className="text-xs text-amber-600 px-1">This coupon requires an eligible payment method.</p>
               )}
+
+              {/* Mobile: place order directly under payment methods */}
+              <div className="md:hidden space-y-2 pt-1">
+                <div className="flex items-center justify-between gap-3 px-0.5">
+                  <span className="text-sm font-semibold text-slate-700">Total</span>
+                  <span className="text-base font-extrabold text-slate-900 tabular-nums">{fmt(totalsNpr.total)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={placeOrder}
+                  disabled={placing || !gateways.length}
+                  className="w-full min-h-[48px] rounded-lg bg-[#16a34a] hover:bg-[#15803d] text-white text-base font-bold disabled:opacity-50 transition-colors inline-flex items-center justify-center"
+                >
+                  {placing ? 'Processing...' : 'Place Order'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -988,7 +1004,7 @@ export default function CheckoutPage() {
 
           {/* Summary — sticky under header on tablet/desktop, collapsible bottom sheet on mobile */}
           <aside
-            className={`md:col-span-5 min-w-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[55] max-md:flex max-md:flex-col max-md:max-h-[min(85dvh,40rem)] max-md:border-t max-md:border-slate-200 max-md:bg-[#FCF9F9] max-md:shadow-[0_-8px_24px_rgba(15,23,42,0.12)] max-md:transition-transform max-md:duration-300 max-md:ease-in-out md:sticky md:self-start md:overflow-y-auto md:top-[calc(var(--store-header-h,9.5rem)+0.75rem)] md:max-h-[calc(100dvh-var(--store-header-h,9.5rem)-1.5rem)] md:translate-y-0 md:z-auto ${
+            className={`md:col-span-5 min-w-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[55] max-md:flex max-md:flex-col max-md:max-h-[min(85dvh,40rem)] max-md:border-t max-md:border-slate-200 max-md:bg-[#FCF9F9] max-md:shadow-[0_-8px_24px_rgba(15,23,42,0.12)] max-md:transition-transform max-md:duration-300 max-md:ease-in-out md:sticky md:self-start md:flex md:flex-col md:overflow-hidden md:top-[calc(var(--store-header-h,9.5rem)+0.75rem)] md:max-h-[calc(100dvh-var(--store-header-h,9.5rem)-1.5rem)] md:translate-y-0 md:z-auto ${
               mobileSummaryCollapsed
                 ? 'max-md:translate-y-[calc(100%-5.25rem)] max-md:overflow-hidden'
                 : 'max-md:translate-y-0 max-md:overflow-hidden'
@@ -1023,9 +1039,9 @@ export default function CheckoutPage() {
               </button>
             </div>
 
-            <div className="max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-contain max-md:px-3 max-md:pt-3 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] md:contents">
-            <div className="card space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="max-md:min-h-0 max-md:flex-1 max-md:overflow-y-auto max-md:overscroll-contain max-md:px-3 max-md:pt-3 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] md:min-h-0 md:flex-1 md:flex md:flex-col md:overflow-hidden">
+            <div className="card space-y-4 md:min-h-0 md:flex-1 md:flex md:flex-col md:overflow-hidden !px-4 sm:!px-5 md:!px-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
                 <h2 className="text-sm font-black uppercase tracking-widest text-slate-800 max-md:sr-only">
                   Payment summary
                 </h2>
@@ -1036,44 +1052,50 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              <div className="space-y-3 max-h-48 overflow-y-auto">
-                {items.map((i) => (
-                  <div key={i.cartItemId} className="flex gap-2 sm:gap-3">
-                    {i.image ? (
-                      <img
-                        src={resolveMediaUrl(i.image)}
-                        alt=""
-                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-100 shrink-0"
-                        referrerPolicy="no-referrer"
+              {/* Cap product list height so totals + Place Order stay on screen; list scrolls when long */}
+              <div className="min-h-0 md:max-h-[min(32vh,15rem)] md:overflow-y-auto md:overscroll-contain [scrollbar-gutter:stable] space-y-4 pr-1 pb-1">
+                <div className="space-y-3">
+                  {items.map((i) => (
+                    <div key={i.cartItemId} className="flex items-start gap-2 sm:gap-3">
+                      {i.image ? (
+                        <img
+                          src={resolveMediaUrl(i.image)}
+                          alt=""
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-100 shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs sm:text-sm font-semibold text-slate-900 line-clamp-2">{i.name}</p>
+                        <p className="text-[11px] sm:text-xs text-slate-500">Qty: {i.quantity}</p>
+                      </div>
+                      <SummaryMoney
+                        amount={fmt(i.price * i.quantity)}
+                        className="text-xs sm:text-sm font-bold text-slate-900 shrink-0 whitespace-nowrap pl-1"
                       />
-                    ) : (
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs sm:text-sm font-semibold text-slate-900 line-clamp-2">{i.name}</p>
-                      <p className="text-[11px] sm:text-xs text-slate-500">Qty: {i.quantity}</p>
                     </div>
-                    <SummaryMoney amount={fmt(i.price * i.quantity)} className="text-xs sm:text-sm font-bold text-slate-900" />
+                  ))}
+                </div>
+
+                {selectedAddonIds.length > 0 && (
+                  <div className="pt-2 border-t border-gray-100 space-y-1">
+                    {selectedAddonIds.map((id) => {
+                      const addon = serviceAddons.find((a) => a.id === id);
+                      if (!addon) return null;
+                      return (
+                        <div key={id} className="flex justify-between items-start gap-3 text-xs sm:text-sm">
+                          <span className="text-slate-500 min-w-0 truncate pr-2">{addon.name}</span>
+                          <SummaryMoney amount={fmt(addon.price)} className="font-semibold shrink-0 whitespace-nowrap" />
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
               </div>
 
-              {selectedAddonIds.length > 0 && (
-                <div className="pt-2 border-t border-gray-100 space-y-1">
-                  {selectedAddonIds.map((id) => {
-                    const addon = serviceAddons.find((a) => a.id === id);
-                    if (!addon) return null;
-                    return (
-                      <div key={id} className="flex justify-between items-start gap-3 text-xs sm:text-sm">
-                        <span className="text-slate-500 min-w-0 truncate">{addon.name}</span>
-                        <SummaryMoney amount={fmt(addon.price)} className="font-semibold" />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <form onSubmit={applyCoupon} className="pt-3 border-t border-gray-100 space-y-2">
+              <form onSubmit={applyCoupon} className="pt-3 border-t border-gray-100 space-y-2 shrink-0">
                 <FormField id="coupon-code" label="Coupon code">
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
@@ -1096,70 +1118,73 @@ export default function CheckoutPage() {
                 )}
               </form>
 
-              <div className="pt-3 border-t border-gray-100 space-y-1.5">
-                {quoteLoading && <p className="text-xs text-slate-400">Updating totals...</p>}
-                <SummaryRow label="Subtotal" amount={fmt(totalsNpr.subtotal)} />
-                <SummaryRow
-                  label="Base delivery"
-                  amount={deliveryLocationId ? fmt(totalsNpr.baseDeliveryFee) : '—'}
-                />
-                {deliveryLocationId && totalsNpr.timeSlot?.id && (
-                  <div className="flex justify-between items-start gap-3 text-[11px] sm:text-xs text-slate-500">
-                    <span className="min-w-0 max-w-[65%] sm:max-w-[70%] leading-snug">
-                      Time slot — {formatTimeSlotSummary(
-                        timeSlots.find((s) => s.id === totalsNpr.timeSlot.id) || totalsNpr.timeSlot,
-                        (npr) => fmt(npr)
-                      )}
-                    </span>
+              {/* Pinned totals + CTA — always visible on desktop */}
+              <div className="shrink-0 space-y-3 pt-3 border-t border-gray-100 bg-white">
+                <div className="space-y-1.5">
+                  {quoteLoading && <p className="text-xs text-slate-400">Updating totals...</p>}
+                  <SummaryRow label="Subtotal" amount={fmt(totalsNpr.subtotal)} />
+                  <SummaryRow
+                    label="Base delivery"
+                    amount={deliveryLocationId ? fmt(totalsNpr.baseDeliveryFee) : '—'}
+                  />
+                  {deliveryLocationId && totalsNpr.timeSlot?.id && (
+                    <div className="flex justify-between items-start gap-3 text-[11px] sm:text-xs text-slate-500">
+                      <span className="min-w-0 max-w-[65%] sm:max-w-[70%] leading-snug">
+                        Time slot — {formatTimeSlotSummary(
+                          timeSlots.find((s) => s.id === totalsNpr.timeSlot.id) || totalsNpr.timeSlot,
+                          (npr) => fmt(npr)
+                        )}
+                      </span>
+                      <SummaryMoney
+                        amount={Number(totalsNpr.slotFee || 0) > 0 ? fmt(totalsNpr.slotFee) : 'No extra fee'}
+                        className="font-semibold shrink-0 whitespace-nowrap"
+                      />
+                    </div>
+                  )}
+                  <SummaryRow
+                    label="Total delivery"
+                    amount={deliveryLocationId ? fmt(totalsNpr.shippingFee) : '—'}
+                  />
+                  {totalsNpr.discount > 0 && (
+                    <SummaryRow
+                      label="Discount"
+                      amount={`- ${fmt(totalsNpr.discount)}`}
+                      labelClassName="text-emerald-700"
+                      amountClassName="font-bold text-emerald-700"
+                    />
+                  )}
+                  <div className="flex justify-between items-baseline gap-3 pt-2 border-t border-gray-100">
+                    <span className="text-base sm:text-lg font-extrabold text-slate-900">Total</span>
                     <SummaryMoney
-                      amount={Number(totalsNpr.slotFee || 0) > 0 ? fmt(totalsNpr.slotFee) : 'No extra fee'}
-                      className="font-semibold"
+                      amount={fmt(totalsNpr.total)}
+                      className="text-base sm:text-xl font-extrabold text-slate-900 shrink-0 whitespace-nowrap"
                     />
                   </div>
-                )}
-                <SummaryRow
-                  label="Total delivery"
-                  amount={deliveryLocationId ? fmt(totalsNpr.shippingFee) : '—'}
-                />
-                {totalsNpr.discount > 0 && (
-                  <SummaryRow
-                    label="Discount"
-                    amount={`- ${fmt(totalsNpr.discount)}`}
-                    labelClassName="text-emerald-700"
-                    amountClassName="font-bold text-emerald-700"
-                  />
-                )}
-                <div className="flex justify-between items-baseline gap-3 pt-2 border-t border-gray-100">
-                  <span className="text-base sm:text-lg font-extrabold text-slate-900">Total</span>
-                  <SummaryMoney
-                    amount={fmt(totalsNpr.total)}
-                    className="text-base sm:text-xl font-extrabold text-slate-900"
-                  />
+                  {showNprDisclaimer && (
+                    <p className="text-[11px] sm:text-xs text-slate-500 pt-1 leading-relaxed">
+                      NPR equivalent: Rs. {Number(totalsNpr.total).toLocaleString('en-NP')}
+                    </p>
+                  )}
                 </div>
+
                 {showNprDisclaimer && (
-                  <p className="text-[11px] sm:text-xs text-slate-500 pt-1 leading-relaxed">
-                    NPR equivalent: Rs. {Number(totalsNpr.total).toLocaleString('en-NP')}
-                  </p>
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-900 leading-relaxed">
+                    Our final settlement will be in NPR and may slightly vary at your end due to currency conversion by your bank and the bank in Nepal.
+                  </div>
                 )}
+
+                <button
+                  type="button"
+                  onClick={placeOrder}
+                  disabled={placing || !gateways.length}
+                  className="hidden md:inline-flex w-full min-h-[48px] rounded-lg bg-[#16a34a] hover:bg-[#15803d] text-white text-base font-bold disabled:opacity-50 transition-colors items-center justify-center"
+                >
+                  {placing ? 'Processing...' : 'Place Order'}
+                </button>
+                <p className="text-xs text-slate-400 text-center hidden md:block">
+                  By placing your order you agree to our terms and delivery policy.
+                </p>
               </div>
-
-              {showNprDisclaimer && (
-                <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-900 leading-relaxed">
-                  Our final settlement will be in NPR and may slightly vary at your end due to currency conversion by your bank and the bank in Nepal.
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={placeOrder}
-                disabled={placing || !gateways.length}
-                className="w-full min-h-[48px] rounded-lg bg-[#16a34a] hover:bg-[#15803d] text-white text-base font-bold disabled:opacity-50 transition-colors inline-flex items-center justify-center"
-              >
-                {placing ? 'Processing...' : 'Place Order'}
-              </button>
-              <p className="text-xs text-slate-400 text-center">
-                By placing your order you agree to our terms and delivery policy.
-              </p>
             </div>
             </div>
           </aside>
