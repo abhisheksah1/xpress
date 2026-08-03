@@ -80,17 +80,35 @@ export const getAllStaff = async ({ page = 1, limit = 20, search, requesterRole 
   };
 };
 
-export const updateStaff = async (id, data, requesterRole) => {
+export const updateStaff = async (id, data, requesterRole, requesterId) => {
   const staff = await User.findById(id);
   if (!staff) throw new ApiError(404, 'Staff not found');
+
+  const onlyNotificationFlag =
+    data
+    && Object.keys(data).every((k) => k === 'receiveOrderNotifications')
+    && data.receiveOrderNotifications !== undefined;
+
   if (staff.role === ROLES.SUPER_ADMIN) {
-    throw new ApiError(403, 'Cannot modify super admin');
-  }
-  if (requesterRole !== ROLES.SUPER_ADMIN && staff.role === ROLES.ADMIN) {
-    throw new ApiError(403, 'Only super admin can modify admin users');
+    if (!onlyNotificationFlag) {
+      throw new ApiError(403, 'Cannot modify super admin');
+    }
+    const isSelf = String(requesterId || '') === String(staff._id);
+    if (requesterRole !== ROLES.SUPER_ADMIN && !isSelf) {
+      throw new ApiError(403, 'Only super admin can change this setting');
+    }
+    staff.receiveOrderNotifications = !!data.receiveOrderNotifications;
+    await staff.save();
+    return staff.toSafeObject();
   }
 
-  const allowed = ['name', 'phone', 'permissions', 'isActive'];
+  if (requesterRole !== ROLES.SUPER_ADMIN && staff.role === ROLES.ADMIN) {
+    if (!onlyNotificationFlag) {
+      throw new ApiError(403, 'Only super admin can modify admin users');
+    }
+  }
+
+  const allowed = ['name', 'phone', 'permissions', 'isActive', 'receiveOrderNotifications'];
   if (data.password) allowed.push('password');
 
   if (requesterRole === ROLES.SUPER_ADMIN && data.role) {
@@ -118,6 +136,30 @@ export const updateStaff = async (id, data, requesterRole) => {
 
   await staff.save();
   return staff.toSafeObject();
+};
+
+/** Admin / staff / super-admin accounts that can be assigned order notification emails */
+export const listNotificationAssignees = async () => {
+  const users = await User.find({
+    role: { $in: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.STAFF] },
+  })
+    .select('name email role isActive receiveOrderNotifications')
+    .sort({ role: 1, name: 1 });
+
+  return users.map((u) => u.toSafeObject());
+};
+
+export const listActiveOrderNotificationEmails = async () => {
+  const users = await User.find({
+    role: { $in: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.STAFF] },
+    isActive: true,
+    receiveOrderNotifications: true,
+    email: { $exists: true, $ne: '' },
+  }).select('email name');
+
+  return users
+    .map((u) => ({ email: String(u.email || '').trim().toLowerCase(), name: u.name }))
+    .filter((u) => u.email.includes('@'));
 };
 
 export const deleteStaff = async (id, requesterRole) => {

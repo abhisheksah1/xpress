@@ -51,6 +51,86 @@ function NavItemLink({ item, className, onNavigate }) {
   );
 }
 
+function ChevronIcon({ direction = 'right', className = 'w-4 h-4' }) {
+  if (direction === 'down') {
+    return (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+/** Mobile accordion row — matches koselixpress.com drawer: bold parents, indented children + vertical rule */
+function MobileNavAccordion({ item, onNavigate }) {
+  const children = (item.children || []).filter((c) => c.label);
+  const hasChildren = item.type === 'dropdown' || children.length > 0;
+  const [open, setOpen] = useState(false);
+
+  if (!hasChildren) {
+    return (
+      <NavItemLink
+        item={item}
+        className="flex items-center justify-between w-full py-3.5 text-[15px] font-semibold text-slate-800"
+        onNavigate={onNavigate}
+      />
+    );
+  }
+
+  const parentLink = String(item.link || '').trim();
+  const showParentLink =
+    parentLink &&
+    parentLink !== '#' &&
+    !children.some(
+      (c) =>
+        String(c.link || '').trim() === parentLink &&
+        String(c.label || '').trim().toLowerCase() === String(item.label || '').trim().toLowerCase()
+    );
+
+  return (
+    <div>
+      <button
+        type="button"
+        className="flex items-center justify-between w-full gap-3 py-3.5 text-left touch-manipulation"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="text-[15px] font-semibold text-slate-800 leading-snug">{item.label}</span>
+        <ChevronIcon
+          direction={open ? 'down' : 'right'}
+          className="w-4 h-4 text-slate-500 shrink-0"
+        />
+      </button>
+      {open && (
+        <div className="pb-2 pl-0.5">
+          <div className="ml-2 border-l border-slate-200 pl-4 space-y-0.5">
+            {showParentLink && (
+              <NavItemLink
+                item={item}
+                className="block py-2.5 text-[14px] font-normal text-slate-600 hover:text-primary-600"
+                onNavigate={onNavigate}
+              />
+            )}
+            {children.map((child, idx) => (
+              <NavItemLink
+                key={child._id || `${child.label}-${idx}`}
+                item={child}
+                className="block py-2.5 text-[14px] font-normal text-slate-600 hover:text-primary-600"
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MenuDropdown({ item, onNavigate }) {
   const children = (item.children || []).filter((c) => c.label);
   const [open, setOpen] = useState(false);
@@ -270,6 +350,15 @@ export default function StoreHeader() {
   }, [location.pathname]);
 
   useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
+  useEffect(() => {
     if (searchOpen && searchRef.current) searchRef.current.focus();
   }, [searchOpen]);
 
@@ -440,80 +529,91 @@ export default function StoreHeader() {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-[60] md:hidden">
-          <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setMobileOpen(false)} />
-          <div className="absolute right-0 top-0 h-full w-[min(100%,320px)] bg-white shadow-xl flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <div className="flex items-center gap-2 min-w-0">
-                {headerOptions.showLogo !== false && (
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close menu"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="absolute right-0 top-0 h-full w-[min(100%,20rem)] bg-white shadow-xl flex flex-col">
+            {/* Centered logo header — same layout as koselixpress.com */}
+            <div className="relative shrink-0 flex items-center justify-center px-4 pt-5 pb-4 border-b border-slate-100">
+              {headerOptions.showLogo !== false ? (
+                <a href="/" onClick={goToHome} className="inline-flex items-center justify-center" aria-label={`${storeName} — home`}>
                   <LogoMark logoUrl={logoUrl} storeName={storeName} alt={logoAlt} />
-                )}
-                <span className="font-semibold text-gray-900">Menu</span>
-              </div>
-              <button type="button" className="p-2 text-gray-500" onClick={() => setMobileOpen(false)} aria-label="Close">✕</button>
-            </div>
-            <div className="p-4 border-b border-gray-100">
-              {headerOptions.showSearch && (
-                <form onSubmit={submitSearch}>
-                  <input
-                    className="input-field text-sm"
-                    placeholder={headerOptions.searchPlaceholder}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </form>
+                </a>
+              ) : (
+                <span className="text-lg font-bold text-slate-900">{storeName}</span>
               )}
-              {headerOptions.showCurrency && (
-                <div className="mt-3">
-                  <NavbarCurrencySelect />
-                </div>
-              )}
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 text-slate-500 hover:text-slate-800"
+                onClick={() => setMobileOpen(false)}
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-              {headerItems.map((item) => {
-                const children = (item.children || []).filter((c) => c.label);
-                return (
-                  <div key={item._id || item.label} className="border-b border-gray-50 pb-2 mb-2">
-                    <NavItemLink
-                      item={item}
-                      className="block py-2 font-medium text-gray-900"
-                      onNavigate={() => setMobileOpen(false)}
-                    />
-                    {children.map((child, idx) => (
-                      <NavItemLink
-                        key={child._id || idx}
-                        item={child}
-                        className="block py-1.5 pl-3 text-sm text-gray-600"
-                        onNavigate={() => setMobileOpen(false)}
-                      />
-                    ))}
-                  </div>
-                );
-              })}
-              <Link to="/reminders" className="block py-2 text-gray-700" onClick={() => setMobileOpen(false)}>Reminders</Link>
-              {headerOptions.showLogin !== false && (
-                user ? (
-                  <div className="pt-2 border-t border-gray-100 mt-2">
-                    <p className="text-xs text-gray-400 mb-1">Signed in as</p>
-                    <p className="text-sm font-semibold text-gray-900 mb-2">{user.name || user.email}</p>
-                    <Link to="/orders" className="block py-2 text-gray-700" onClick={() => setMobileOpen(false)}>My orders</Link>
-                    <button
-                      type="button"
-                      className="block w-full text-left py-2 text-red-600 font-medium"
-                      onClick={handleMobileLogout}
+
+            <nav className="flex-1 overflow-y-auto overscroll-contain px-5 py-1">
+              {headerItems.map((item) => (
+                <MobileNavAccordion
+                  key={item._id || item.label}
+                  item={item}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+
+              {(headerOptions.showReminders !== false || headerOptions.showCurrency || headerOptions.showLogin !== false) && (
+                <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                  {headerOptions.showReminders !== false && (
+                    <Link
+                      to="/reminders"
+                      className="flex items-center justify-between w-full py-3.5 text-[15px] font-bold text-slate-800"
+                      onClick={() => setMobileOpen(false)}
                     >
-                      Log out
-                    </button>
-                  </div>
-                ) : (
-                  <Link
-                    to="/login"
-                    className="inline-flex items-center gap-2 mt-1 px-3 py-2 rounded-lg text-sm font-semibold text-primary-600 border border-primary-200 bg-primary-50"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    <UserIcon />
-                    Login
-                  </Link>
-                )
+                      Reminders
+                    </Link>
+                  )}
+                  {headerOptions.showCurrency && (
+                    <div className="py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Currency</p>
+                      <NavbarCurrencySelect />
+                    </div>
+                  )}
+                  {headerOptions.showLogin !== false && (
+                    user ? (
+                      <div className="pt-1 pb-4">
+                        <p className="text-xs text-slate-400 mb-1">Signed in as</p>
+                        <p className="text-sm font-semibold text-slate-900 mb-2">{user.name || user.email}</p>
+                        <Link
+                          to="/orders"
+                          className="block py-2.5 text-sm text-slate-600"
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          My orders
+                        </Link>
+                        <button
+                          type="button"
+                          className="block w-full text-left py-2.5 text-sm text-red-600 font-medium"
+                          onClick={handleMobileLogout}
+                        >
+                          Log out
+                        </button>
+                      </div>
+                    ) : (
+                      <Link
+                        to="/login"
+                        className="flex items-center justify-between w-full py-3.5 text-[15px] font-bold text-slate-800"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        Login
+                      </Link>
+                    )
+                  )}
+                </div>
               )}
             </nav>
           </div>

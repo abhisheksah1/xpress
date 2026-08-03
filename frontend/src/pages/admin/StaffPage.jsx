@@ -281,6 +281,17 @@ export default function StaffPage() {
     }
   };
 
+  const handleToggleOrderNotify = async (member) => {
+    try {
+      const next = !member.receiveOrderNotifications;
+      await adminApi.updateStaff(member._id, { receiveOrderNotifications: next });
+      toast.success(next ? 'Will receive order emails' : 'Order emails disabled');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Update failed');
+    }
+  };
+
   const handleDelete = async (member) => {
     if (!window.confirm(`Remove ${member.name} from the team?`)) return;
     try {
@@ -324,15 +335,16 @@ export default function StaffPage() {
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Role</th>
               <th className="px-4 py-3 font-medium">Privileges</th>
+              <th className="px-4 py-3 font-medium">Order email</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No team members found</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No team members found</td></tr>
             ) : rows.map((member) => (
               <tr key={member._id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium">{member.name}</td>
@@ -346,6 +358,20 @@ export default function StaffPage() {
                   {member.role === 'admin'
                     ? 'Full access'
                     : (member.permissions || []).join(', ') || '—'}
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleOrderNotify(member)}
+                    className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                      member.receiveOrderNotifications
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                    title="Toggle new-order notification email"
+                  >
+                    {member.receiveOrderNotifications ? 'On' : 'Off'}
+                  </button>
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs font-semibold px-2 py-1 rounded-full ${member.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>

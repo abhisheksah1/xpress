@@ -17,8 +17,13 @@ export const getStaff = asyncHandler(async (req, res) => {
 });
 
 export const updateStaff = asyncHandler(async (req, res) => {
-  const staff = await staffService.updateStaff(req.params.id, req.body, req.user.role);
+  const staff = await staffService.updateStaff(req.params.id, req.body, req.user.role, req.user._id);
   res.json(new ApiResponse(200, staff, 'Team member updated'));
+});
+
+export const listNotificationAssignees = asyncHandler(async (req, res) => {
+  const users = await staffService.listNotificationAssignees();
+  res.json(new ApiResponse(200, { users }));
 });
 
 export const deleteStaff = asyncHandler(async (req, res) => {

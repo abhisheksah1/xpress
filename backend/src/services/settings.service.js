@@ -227,7 +227,23 @@ const DEFAULT_SETTINGS = [
         body:
           'Hi {{customer_name}},\n\nThis is a reminder for {{title}} ({{relation}}) on {{occasion_date}}.\nDelivery location note: {{delivery_location}}\n\nYou can place your order anytime from our store.\n\n{{custom_message}}',
       },
+      staff_order_notification: {
+        subject: 'New order {{order_number}} – {{total}}',
+        body: 'New order received.\n\nOrder number: {{order_number}}\nCustomer: {{customer_name}}\nTotal: {{total}}\nPayment: {{payment_method}}\nDelivery location: {{delivery_location}}\nPreferred date: {{preferred_delivery_date}}\n\nItems:\n{{order_items}}\n\nAdmin: {{admin_order_url}}\nTrack: {{tracking_url}}',
+      },
     },
+  },
+  {
+    key: 'staff_order_notifications_enabled',
+    value: true,
+    group: 'email',
+    label: 'Enable staff order notifications',
+  },
+  {
+    key: 'staff_order_notification_recipients',
+    value: [],
+    group: 'email',
+    label: 'Legacy staff notification emails (optional extras)',
   },
 
   // Customer Authentication

@@ -957,29 +957,56 @@ export function SmtpSection({ values, set }) {
 
 function StaffOrderNotificationsSection({ values, set }) {
   const [saving, setSaving] = useState(false);
-  const recipients = values.staff_order_notification_recipients || [];
+  const [assignees, setAssignees] = useState([]);
+  const [loadingAssignees, setLoadingAssignees] = useState(true);
+  const [togglingId, setTogglingId] = useState(null);
 
-  const update = (i, field, val) => {
-    const next = [...recipients];
-    next[i] = { ...next[i], [field]: val };
-    set('staff_order_notification_recipients', next);
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingAssignees(true);
+    adminApi
+      .getOrderNotificationAssignees()
+      .then((res) => {
+        if (!cancelled) setAssignees(res.data.data?.users || []);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Failed to load team members for notifications');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAssignees(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleAssignee = async (user) => {
+    setTogglingId(user._id);
+    try {
+      const next = !user.receiveOrderNotifications;
+      await adminApi.updateStaff(user._id, { receiveOrderNotifications: next });
+      setAssignees((list) =>
+        list.map((u) => (u._id === user._id ? { ...u, receiveOrderNotifications: next } : u))
+      );
+      toast.success(next ? `Order emails enabled for ${user.name}` : `Order emails disabled for ${user.name}`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update assignment');
+    } finally {
+      setTogglingId(null);
+    }
   };
 
-  const add = () => set('staff_order_notification_recipients', [
-    ...recipients,
-    { id: `staff_${Date.now()}`, name: '', email: '', enabled: true },
-  ]);
-  const remove = (i) => set('staff_order_notification_recipients', recipients.filter((_, j) => j !== i));
+  const roleLabel = (role) => {
+    if (role === 'super_admin') return 'Super admin';
+    if (role === 'admin') return 'Admin';
+    return 'Staff';
+  };
+
+  const assignedCount = assignees.filter((u) => u.receiveOrderNotifications && u.isActive !== false).length;
 
   return (
     <SectionCard
       title="Order Notification Settings"
-      description="Internal staff emails sent when a new order is placed. Separate from the customer order confirmation."
-      onSave={() => saveSection(
-        ['staff_order_notifications_enabled', 'staff_order_notification_recipients'],
-        values,
-        setSaving
-      )}
+      description="New-order emails go only to assigned admin/staff users (not all team members). Customer confirmation emails are separate."
+      onSave={() => saveSection(['staff_order_notifications_enabled'], values, setSaving)}
       saving={saving}
     >
       <Toggle
@@ -987,21 +1014,49 @@ function StaffOrderNotificationsSection({ values, set }) {
         checked={values.staff_order_notifications_enabled !== false}
         onChange={(v) => set('staff_order_notifications_enabled', v)}
       />
-      <div className="space-y-3 pt-2">
-        {recipients.map((r, i) => (
-          <div key={r.id || i} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border border-gray-100 rounded-lg">
-            <Field label="Name">
-              <input className="input-field text-sm" value={r.name || ''} onChange={(e) => update(i, 'name', e.target.value)} placeholder="Ops team" />
-            </Field>
-            <Field label="Email">
-              <input type="email" className="input-field text-sm" value={r.email || ''} onChange={(e) => update(i, 'email', e.target.value)} placeholder="orders@example.com" required />
-            </Field>
-            <Toggle label="Enabled" checked={r.enabled !== false} onChange={(v) => update(i, 'enabled', v)} />
-            <button type="button" onClick={() => remove(i)} className="text-red-500 text-sm self-end">Remove</button>
+      <div className="pt-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-gray-800">Assign recipients</p>
+          <p className="text-xs text-gray-500">{assignedCount} assigned</p>
+        </div>
+        <p className="text-xs text-gray-500">
+          Tick the admin or staff accounts that should receive an email when a customer places an order.
+        </p>
+        {loadingAssignees ? (
+          <p className="text-sm text-gray-400 py-4">Loading team...</p>
+        ) : assignees.length === 0 ? (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            No admin/staff users found. Add team members under Team &amp; roles, then assign them here.
+          </p>
+        ) : (
+          <div className="border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-80 overflow-y-auto">
+            {assignees.map((user) => (
+              <label
+                key={user._id}
+                className={`flex items-start sm:items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${
+                  user.isActive === false ? 'opacity-50' : ''
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 sm:mt-0 rounded border-gray-300"
+                  checked={!!user.receiveOrderNotifications}
+                  disabled={togglingId === user._id || user.isActive === false}
+                  onChange={() => toggleAssignee(user)}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">
+                  {roleLabel(user.role)}
+                  {user.isActive === false ? ' · inactive' : ''}
+                </span>
+              </label>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-      <button type="button" onClick={add} className="btn-secondary text-sm">+ Add staff email</button>
     </SectionCard>
   );
 }

@@ -372,10 +372,19 @@ export const createOrder = async (data) => {
   }
 
   try {
-    const { sendOrderConfirmationEmail } = await import('./orderEmail.service.js');
-    await sendOrderConfirmationEmail(order);
+    const { sendOrderConfirmationEmail, sendStaffOrderNotificationEmails } = await import('./orderEmail.service.js');
+    try {
+      await sendOrderConfirmationEmail(order);
+    } catch (err) {
+      console.error(`[orderEmail] Customer confirmation failed for ${order.orderNumber}:`, err.message);
+    }
+    try {
+      await sendStaffOrderNotificationEmails(order);
+    } catch (err) {
+      console.error(`[orderEmail] Staff notification failed for ${order.orderNumber}:`, err.message);
+    }
   } catch (err) {
-    console.error(`[orderEmail] Confirmation email failed for ${order.orderNumber}:`, err.message);
+    console.error(`[orderEmail] Email module failed for ${order.orderNumber}:`, err.message);
   }
 
   return order;

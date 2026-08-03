@@ -8,6 +8,44 @@ import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { useStore } from '../../context/StoreContext.jsx';
 import { allowsBackorder, resolveProductStock } from '../../utils/comboItems.js';
 
+function QuantityStepper({ value, min = 1, max, onChange, ariaLabel }) {
+  const decDisabled = value <= min;
+  const incDisabled = max != null && value >= max;
+
+  return (
+    <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white overflow-hidden shrink-0">
+      <button
+        type="button"
+        aria-label="Decrease quantity"
+        disabled={decDisabled}
+        onClick={() => onChange(value - 1)}
+        className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center text-lg font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none touch-manipulation"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value}
+        aria-label={ariaLabel || 'Quantity'}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-11 h-10 sm:h-9 text-center text-sm font-semibold tabular-nums border-x border-slate-200 outline-none focus:bg-slate-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        aria-label="Increase quantity"
+        disabled={incDisabled}
+        onClick={() => onChange(value + 1)}
+        className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center text-lg font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none touch-manipulation"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 export default function CartPage() {
   const { formatPriceNpr } = useStore();
   const { items, updateQuantity, removeItem, total, coupon, setCoupon, clearCoupon, grandTotal, syncItemStock } = useCartStore();
@@ -102,82 +140,104 @@ export default function CartPage() {
   const discount = coupon?.subtotalDiscount ?? coupon?.discount ?? 0;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Shopping Cart</h1>
-      <div className="space-y-4">
+    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
+      <h1 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Shopping Cart</h1>
+      <div className="space-y-3 sm:space-y-4">
         {items.map((item) => {
           const resolvedPersonalization = resolveCartItemPersonalization(item, useCartStore.getState().productUploads);
           const maxQty = getCartItemMaxQuantity(item, items);
           const showStockLimit = !item.allowBackorder && item.stock != null;
+          const lineTotal = item.price * item.quantity;
+          const itemKey = item.cartItemId || item.productId;
+
           return (
-          <div key={item.cartItemId || item.productId} className="card flex items-start gap-4">
-            {item.image && (
-              <img
-                src={resolveMediaUrl(item.image)}
-                alt={item.name}
-                className="w-20 h-20 object-cover rounded-lg shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              <h3 className="font-medium">{item.name}</h3>
-              <p className="text-primary-600 font-semibold">{formatPriceNpr(item.price)}</p>
-              {item.selectedOptions?.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {item.selectedOptions.map((o) => `${o.category}: ${o.label}`).join(' · ')}
-                </p>
-              )}
-              {showStockLimit && (
-                <p className="text-xs text-gray-400 mt-1">
-                  {item.stock <= 0 ? 'Out of stock' : `${item.stock} available`}
-                </p>
-              )}
-              <PersonalizationSummary personalization={resolvedPersonalization} className="mt-2" />
-              {resolvedPersonalization?.printImageUrl && (
-                <img
-                  src={resolveMediaUrl(resolvedPersonalization.printImageUrl)}
-                  alt="Custom design"
-                  className="mt-2 h-16 w-auto object-contain border rounded"
+            <div key={itemKey} className="card !p-3 sm:!p-4">
+              <div className="flex gap-3 sm:gap-4">
+                {item.image ? (
+                  <img
+                    src={resolveMediaUrl(item.image)}
+                    alt={item.name}
+                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg shrink-0 border border-slate-100"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-slate-100 shrink-0" />
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-2">
+                    <h3 className="flex-1 min-w-0 text-sm sm:text-base font-semibold text-slate-900 leading-snug line-clamp-2">
+                      {item.name}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(itemKey)}
+                      className="shrink-0 text-xs sm:text-sm font-medium text-red-500 hover:text-red-600 hover:underline py-0.5"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <p className="mt-1 text-sm font-semibold text-primary-600 whitespace-nowrap tabular-nums">
+                    {formatPriceNpr(item.price)}
+                    <span className="text-slate-400 font-normal"> each</span>
+                  </p>
+
+                  {item.selectedOptions?.length > 0 && (
+                    <p className="text-xs text-slate-500 mt-1 leading-snug">
+                      {item.selectedOptions.map((o) => `${o.category}: ${o.label}`).join(' · ')}
+                    </p>
+                  )}
+                  {showStockLimit && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {item.stock <= 0 ? 'Out of stock' : `${item.stock} available`}
+                    </p>
+                  )}
+                  <PersonalizationSummary personalization={resolvedPersonalization} className="mt-2" />
+                  {resolvedPersonalization?.printImageUrl && (
+                    <img
+                      src={resolveMediaUrl(resolvedPersonalization.printImageUrl)}
+                      alt="Custom design"
+                      className="mt-2 h-14 w-auto object-contain border rounded"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <QuantityStepper
+                  value={item.quantity}
+                  max={maxQty}
+                  ariaLabel={`Quantity for ${item.name}`}
+                  onChange={(next) => handleQuantityChange(item, next)}
                 />
-              )}
+                <p className="text-sm sm:text-base font-bold text-slate-900 whitespace-nowrap tabular-nums text-right">
+                  {formatPriceNpr(lineTotal)}
+                </p>
+              </div>
             </div>
-            <input
-              type="number"
-              min="1"
-              max={maxQty}
-              value={item.quantity}
-              onChange={(e) => handleQuantityChange(item, e.target.value)}
-              className="input-field w-20"
-            />
-            <button
-              onClick={() => removeItem(item.cartItemId || item.productId)}
-              className="text-red-500 text-sm hover:underline shrink-0"
-            >
-              Remove
-            </button>
-          </div>
           );
         })}
       </div>
 
-      <div className="card mt-6 space-y-4">
-        <form onSubmit={applyCoupon} className="flex gap-2">
+      <div className="card mt-5 sm:mt-6 space-y-4 !p-3 sm:!p-5">
+        <form onSubmit={applyCoupon} className="flex flex-col sm:flex-row gap-2">
           <input
-            className="input-field flex-1 uppercase"
+            className="input-field flex-1 uppercase min-w-0"
             placeholder="Coupon code"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
           />
-          <button type="submit" disabled={applying} className="btn-secondary shrink-0">
+          <button type="submit" disabled={applying} className="btn-secondary shrink-0 w-full sm:w-auto">
             {applying ? '...' : 'Apply'}
           </button>
         </form>
         {coupon && (
-          <div className="flex items-center justify-between text-sm bg-green-50 border border-green-100 rounded-lg px-3 py-2">
-            <span className="text-green-700">
+          <div className="flex items-start sm:items-center justify-between gap-3 text-sm bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+            <span className="text-green-700 min-w-0">
               <span className="font-mono font-bold">{coupon.coupon?.code}</span> — {coupon.message}
             </span>
-            <button type="button" onClick={removeCoupon} className="text-red-500 text-xs">Remove</button>
+            <button type="button" onClick={removeCoupon} className="text-red-500 text-xs shrink-0">Remove</button>
           </div>
         )}
         {coupon?.appliesTo === 'shipping' && (
@@ -187,24 +247,26 @@ export default function CartPage() {
           <p className="text-xs text-amber-600">Select an eligible payment method at checkout to use this coupon.</p>
         )}
 
-        <div className="border-t border-gray-100 pt-4 space-y-1 text-sm">
-          <div className="flex justify-between">
+        <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
             <span className="text-gray-500">Subtotal</span>
-            <span>{formatPriceNpr(subtotal)}</span>
+            <span className="whitespace-nowrap tabular-nums">{formatPriceNpr(subtotal)}</span>
           </div>
           {discount > 0 && (
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between gap-3 text-green-600">
               <span>Discount</span>
-              <span>- {formatPriceNpr(discount)}</span>
+              <span className="whitespace-nowrap tabular-nums">- {formatPriceNpr(discount)}</span>
             </div>
           )}
-          <div className="flex justify-between text-lg font-semibold pt-2">
+          <div className="flex justify-between gap-3 text-base sm:text-lg font-semibold pt-2">
             <span>Estimated total</span>
-            <span>{formatPriceNpr(grandTotal())}</span>
+            <span className="whitespace-nowrap tabular-nums">{formatPriceNpr(grandTotal())}</span>
           </div>
         </div>
 
-        <a href="/checkout" className="btn-primary w-full text-center block">Proceed to Checkout</a>
+        <a href="/checkout" className="btn-primary w-full text-center block min-h-[48px] flex items-center justify-center">
+          Proceed to Checkout
+        </a>
       </div>
     </div>
   );

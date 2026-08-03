@@ -44,6 +44,8 @@ const userSchema = new mongoose.Schema(
     addresses: [addressSchema],
     isActive: { type: Boolean, default: true },
     isEmailVerified: { type: Boolean, default: false },
+    /** When true, this admin/staff receives new-order notification emails */
+    receiveOrderNotifications: { type: Boolean, default: false },
     refreshToken: { type: String, select: false },
     lastLogin: { type: Date },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

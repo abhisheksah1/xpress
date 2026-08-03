@@ -97,6 +97,7 @@ export const adminApi = {
 
   getStaffMeta: () => api.get('/admin/staff/meta'),
   getStaff: (params) => api.get('/admin/staff', { params }),
+  getOrderNotificationAssignees: () => api.get('/admin/staff/notification-assignees'),
   createStaff: (data) => api.post('/admin/staff', data),
   updateStaff: (id, data) => api.patch(`/admin/staff/${id}`, data),
   deleteStaff: (id) => api.delete(`/admin/staff/${id}`),

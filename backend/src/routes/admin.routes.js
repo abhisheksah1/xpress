@@ -160,6 +160,7 @@ router.delete('/users/:id', isAdmin, userController.deleteUser);
 
 // Staff / team roles
 router.get('/staff/meta', isAdmin, staffController.getStaffMeta);
+router.get('/staff/notification-assignees', isAdmin, staffController.listNotificationAssignees);
 router.get('/staff', isAdmin, staffController.getStaff);
 router.post('/staff', isAdmin, validate(createStaffSchema), staffController.createStaff);
 router.patch('/staff/:id', isAdmin, staffController.updateStaff);
