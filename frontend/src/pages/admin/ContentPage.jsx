@@ -14,6 +14,7 @@ import VideoBlockEditor from '../../components/admin/VideoBlockEditor.jsx';
 import ProductGridBlockEditor from '../../components/admin/ProductGridBlockEditor.jsx';
 import TextBlockEditor from '../../components/admin/TextBlockEditor.jsx';
 import HtmlEmbedBlockEditor from '../../components/admin/HtmlEmbedBlockEditor.jsx';
+import HomepageSeoGuide from '../../components/admin/HomepageSeoGuide.jsx';
 
 const BLOCK_TYPES = [
   'hero',
@@ -435,6 +436,8 @@ export default function ContentPage() {
                 </div>
               )}
 
+              {selected.pageType === 'home' && <HomepageSeoGuide />}
+
               <div className="card flex flex-wrap justify-between items-center gap-3">
                 <div>
                   <h2 className="font-bold">{selected.title}</h2>
@@ -471,8 +474,20 @@ export default function ContentPage() {
                 <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Page settings</h3>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Title</label>
-                    <input className="input-field" value={selected.title || ''} onChange={(e) => setSelected((p) => ({ ...p, title: e.target.value }))} />
+                    <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">
+                      Title {selected.pageType === 'home' && <span className="normal-case text-sky-700">(used as H1 topic)</span>}
+                    </label>
+                    <input
+                      className="input-field"
+                      value={selected.title || ''}
+                      onChange={(e) => setSelected((p) => ({ ...p, title: e.target.value }))}
+                      placeholder={selected.pageType === 'home' ? 'e.g. Send Gifts to Nepal' : ''}
+                    />
+                    {selected.pageType === 'home' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Avoid “Homepage”. Use your main keyword phrase — this becomes the storefront H1 when Hero has no title.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Slug</label>

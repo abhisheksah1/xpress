@@ -8,14 +8,15 @@ import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 import { getDeliveryCountdownState, getDeliveryCountdownCopy } from '../../utils/deliveryCountdown.js';
 import { resolveVideoEmbed, getVideoUrlFromBlock } from '../../utils/videoEmbed.js';
 import { resolveImageContentButtons } from '../../utils/imageContentLayout.js';
-import { getTextBlockHtml, sanitizeCmsHtml } from '../../utils/cmsHtml.js';
+import { getTextBlockHtml, sanitizeCmsHtml, demoteCmsH1ToH2 } from '../../utils/cmsHtml.js';
 import { isHtmlContent } from '../../utils/productHtml.js';
+import { categoryShopPath } from '../../utils/seoMeta.js';
 
-function HeroBlock({ block }) {
+function HeroBlock({ block, as: HeadingTag = 'h1' }) {
   return (
     <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white py-12 sm:py-16 md:py-20 lg:py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 leading-tight">{block.title}</h1>
+        <HeadingTag className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 leading-tight">{block.title}</HeadingTag>
         {block.content && (
           <p className="text-base sm:text-lg md:text-xl text-primary-100 mb-6 sm:mb-8 max-w-2xl mx-auto whitespace-pre-line px-2">
             {block.content}
@@ -138,11 +139,13 @@ function SliderBlock({ block }) {
 
 function CategoriesGridBlock({ block }) {
   const [categories, setCategories] = useState([]);
+  const hideEmpty = block.settings?.hideEmpty === true;
+
   useEffect(() => {
-    storeApi.getCategories({ withProductCount: true })
+    storeApi.getCategories(hideEmpty ? { withProductCount: true } : undefined)
       .then((res) => setCategories(res.data.data || []))
       .catch(() => setCategories([]));
-  }, []);
+  }, [hideEmpty]);
 
   const { items, cols } = useMemo(
     () => applyCategoriesGridRules(categories, block.settings),
@@ -177,7 +180,7 @@ function CategoriesGridBlock({ block }) {
           return (
             <Link
               key={cat._id}
-              to={`/shop?category=${cat._id}`}
+              to={categoryShopPath(cat)}
               className="group overflow-hidden rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col"
             >
               <div className="aspect-square bg-gradient-to-b from-rose-50 to-white overflow-hidden flex items-center justify-center p-3 sm:p-4">
@@ -238,7 +241,15 @@ function ProductGridBlock({ block }) {
       </div>
       {block.content && <p className="cms-body text-gray-600 mb-4 sm:mb-6 max-w-3xl whitespace-pre-line">{block.content}</p>}
       {loading ? (
-        <p className="text-gray-400 text-sm">Loading...</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 animate-pulse" aria-busy="true">
+          {Array.from({ length: Math.min(8, Number(block.settings?.limit) || 8) }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="aspect-square rounded-lg bg-gray-100" />
+              <div className="h-3 w-3/4 rounded bg-gray-100" />
+              <div className="h-3 w-1/3 rounded bg-gray-100" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {products.map((p) => (
@@ -772,12 +783,13 @@ function TextRunnerBlock({ block }) {
   );
 }
 
-function TextBlock({ block }) {
+function TextBlock({ block, demoteH1 = false }) {
   const cfg = block.settings || {};
   const textAlign = cfg.textAlign || 'left';
   const backgroundColor = cfg.backgroundColor || undefined;
   const html = getTextBlockHtml(block);
-  const safeHtml = html && isHtmlContent(html) ? sanitizeCmsHtml(html) : '';
+  let safeHtml = html && isHtmlContent(html) ? sanitizeCmsHtml(html) : '';
+  if (demoteH1 && safeHtml) safeHtml = demoteCmsH1ToH2(safeHtml);
 
   const alignClass = {
     left: 'text-left',
@@ -960,23 +972,32 @@ function TestimonialBlock({ block }) {
   );
 }
 
-export default function CmsBlockRenderer({ blocks = [] }) {
+export default function CmsBlockRenderer({ blocks = [], hasPageH1 = false }) {
   const sorted = [...blocks]
     .filter((b) => b.isActive !== false)
     .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || String(a._id).localeCompare(String(b._id)));
+
+  const heroIsPrimaryH1 = !hasPageH1 && sorted.some((b) => b.type === 'hero' && String(b.title || '').trim());
 
   return (
     <div className="cms-page">
       {sorted.map((block) => {
         switch (block.type) {
-          case 'hero': return <HeroBlock key={block._id} block={block} />;
+          case 'hero':
+            return (
+              <HeroBlock
+                key={block._id}
+                block={block}
+                as={heroIsPrimaryH1 ? 'h1' : 'h2'}
+              />
+            );
           case 'banner': return <BannerBlock key={block._id} block={block} />;
           case 'slider': return <SliderBlock key={block._id} block={block} />;
           case 'categories_grid': return <CategoriesGridBlock key={block._id} block={block} />;
           case 'product_grid': return <ProductGridBlock key={block._id} block={block} />;
           case 'image_content': return <ImageContentBlock key={block._id} block={block} />;
           case 'video': return <VideoBlock key={block._id} block={block} />;
-          case 'text': return <TextBlock key={block._id} block={block} />;
+          case 'text': return <TextBlock key={block._id} block={block} demoteH1={hasPageH1 || heroIsPrimaryH1} />;
           case 'text_runner': return <TextRunnerBlock key={block._id} block={block} />;
           case 'cta': return <CtaBlock key={block._id} block={block} />;
           case 'faq': return <FaqBlock key={block._id} block={block} />;
@@ -985,7 +1006,7 @@ export default function CmsBlockRenderer({ blocks = [] }) {
           case 'delivery_countdown': return <DeliveryCountdownBlock key={block._id} block={block} />;
           case 'image': return <ImageBlock key={block._id} block={block} />;
           case 'testimonial': return <TestimonialBlock key={block._id} block={block} />;
-          default: return block.content ? <TextBlock key={block._id} block={block} /> : null;
+          default: return block.content ? <TextBlock key={block._id} block={block} demoteH1={hasPageH1 || heroIsPrimaryH1} /> : null;
         }
       })}
     </div>

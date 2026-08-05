@@ -119,10 +119,15 @@ const validateExternalUrl = (url) => {
   }
 };
 
+const uniquePublicId = () =>
+  `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+
 export const addImageToEntity = async ({ file, url, alt }) => {
   if (file) {
+    // Unique public_id — originalname.split('.')[0] collides on names like
+    // "WhatsApp Image … at 12.34.56.jpg" and overwrites prior uploads on Cloudinary.
     const uploaded = await uploadFromBuffer(file.buffer, {
-      public_id: file.originalname?.split('.')[0],
+      public_id: uniquePublicId(),
       filename: file.originalname,
     });
     return {

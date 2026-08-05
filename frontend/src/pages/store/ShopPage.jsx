@@ -201,9 +201,12 @@ export default function ShopPage() {
         seo={categorySeo || undefined}
         siteSettings={settings}
         fallbacks={{
-          title: activeCategory ? `${activeCategory.name} | Shop Gifts` : 'Shop Gifts | KoseliXpress',
+          title: activeCategory
+            ? `${activeCategory.name} | Shop Gifts | KoseliXpress`.slice(0, 60)
+            : 'Shop Gifts | KoseliXpress',
           description: pageDescription,
           image: activeCategory?.image?.url,
+          imageAlt: activeCategory?.image?.alt || pageTitle,
           path: categoryPath,
           schemaType: 'CollectionPage',
         }}
@@ -211,9 +214,29 @@ export default function ShopPage() {
         jsonLdId="shop-json-ld"
       />
 
+      <nav className="text-xs text-gray-500 mb-4 flex flex-wrap items-center gap-1.5 px-2 md:px-0" aria-label="Breadcrumb">
+        <Link to="/" className="hover:text-primary-600">Home</Link>
+        <span>/</span>
+        <Link to="/shop" className="hover:text-primary-600">Shop</Link>
+        {activeCategory && (
+          <>
+            <span>/</span>
+            <span className="text-gray-800 font-medium">{activeCategory.name}</span>
+          </>
+        )}
+      </nav>
+
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold text-center md:text-left text-slate-900 px-2 md:px-0">
+          {pageTitle}
+        </h1>
+        <p className="text-sm text-gray-600 mt-2 max-w-3xl text-center md:text-left px-2 md:px-0">
+          {pageDescription}
+        </p>
+      </div>
+
       <div className="md:hidden mb-4">
-        <h1 className="text-xl font-bold text-center text-slate-900 px-2">{pageTitle}</h1>
-        <div className="flex items-center justify-between gap-3 mt-4">
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => setFiltersOpen(true)}
@@ -238,13 +261,6 @@ export default function ShopPage() {
             </select>
           </div>
         </div>
-      </div>
-
-      <div className="hidden md:block mb-6">
-        <h1 className="text-2xl font-bold">{pageTitle}</h1>
-        {activeCategory?.description && (
-          <p className="text-sm text-gray-600 mt-2 max-w-3xl">{activeCategory.description}</p>
-        )}
       </div>
 
       {filtersOpen && (
@@ -316,6 +332,9 @@ export default function ShopPage() {
             <p className="text-gray-400 py-8 text-center md:text-left">No products found.</p>
           ) : (
             <>
+              <h2 className="text-base md:text-lg font-semibold text-slate-900 mb-3 md:mb-4 px-1 md:px-0">
+                {activeCategory ? `${activeCategory.name} products` : 'All products'}
+              </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
                 {products.map((p) => (
                   <ProductCard key={p._id} product={p} variant="catalog" />

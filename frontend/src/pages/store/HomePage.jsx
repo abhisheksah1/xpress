@@ -38,7 +38,31 @@ export default function HomePage() {
   }, [loadHome]);
 
   if (loading) {
-    return <div className="py-20 text-center text-gray-400">Loading...</div>;
+    return (
+      <div className="cms-page animate-pulse" aria-busy="true" aria-label="Loading homepage">
+        <div className="w-full aspect-[21/9] max-h-[420px] bg-gray-100" />
+        <div className="cms-section space-y-4">
+          <div className="mx-auto h-7 w-48 rounded bg-gray-100" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="aspect-square rounded-lg bg-gray-100" />
+            ))}
+          </div>
+        </div>
+        <div className="cms-section space-y-4">
+          <div className="mx-auto h-7 w-40 rounded bg-gray-100" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="aspect-square rounded-lg bg-gray-100" />
+                <div className="h-3 w-3/4 rounded bg-gray-100" />
+                <div className="h-3 w-1/3 rounded bg-gray-100" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!homePage?.blocks?.length) {
@@ -84,6 +108,10 @@ export default function HomePage() {
 
   const seo = mergeEntitySeo(homePage);
   const path = storeUrlForPage(homePage);
+  const pageH1 = String(homePage.title || settings.store_name || 'KoseliXpress').trim();
+  const hasHeroTitle = (homePage.blocks || []).some(
+    (b) => b.isActive !== false && b.type === 'hero' && String(b.title || '').trim()
+  );
 
   return (
     <>
@@ -96,10 +124,20 @@ export default function HomePage() {
           path,
           schemaType: 'WebPage',
         }}
-        jsonLdContext={{ title: homePage.title, path }}
+        jsonLdContext={{ title: pageH1, path }}
         jsonLdId="home-json-ld"
       />
-      <CmsBlockRenderer blocks={homePage.blocks} />
+      {/* Always expose one storefront H1 for Rank Math / crawlers (hero may own it). */}
+      {!hasHeroTitle && (
+        <div className="bg-gray-50 border-b border-gray-100">
+          <div className="cms-section !py-6 sm:!py-8">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight text-slate-900">
+              {pageH1}
+            </h1>
+          </div>
+        </div>
+      )}
+      <CmsBlockRenderer blocks={homePage.blocks} hasPageH1={!hasHeroTitle} />
       <LandingPopup />
     </>
   );

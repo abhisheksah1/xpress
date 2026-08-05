@@ -108,7 +108,13 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     refresh();
-    const onFocus = () => refresh();
+    let lastRefreshAt = Date.now();
+    const onFocus = () => {
+      // Avoid refetching settings/nav on every tab focus — was spamming the API.
+      if (Date.now() - lastRefreshAt < 60_000) return;
+      lastRefreshAt = Date.now();
+      refresh();
+    };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, []);

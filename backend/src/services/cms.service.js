@@ -3,6 +3,20 @@ import { syncLegacySeoFields } from '../models/schemas/seoMeta.schema.js';
 import { ApiError } from '../utils/ApiError.js';
 import { CMS_PAGE_TYPES } from '../config/constants.js';
 import { DEFAULT_HOME_PAGE } from '../config/defaultHomePage.js';
+import { cacheDel, cacheGet, cacheSet } from '../utils/ttlCache.js';
+
+const CMS_PAGE_CACHE_TTL_MS = 30_000;
+const cmsTypeCacheKey = (pageType) => `cms:type:${pageType}`;
+const cmsSlugCacheKey = (slug) => `cms:slug:${slug}`;
+
+const invalidateCmsCache = (page) => {
+  if (!page) {
+    cacheDel('cms:');
+    return;
+  }
+  if (page.pageType) cacheDel(cmsTypeCacheKey(page.pageType));
+  if (page.slug) cacheDel(cmsSlugCacheKey(page.slug));
+};
 
 const RESERVED_SLUGS = new Set(['home', 'shop', 'cart', 'checkout', 'login', 'register', 'admin', 'blog', 'orders', 'track', 'reminders']);
 
@@ -44,13 +58,15 @@ export const createPage = async (data, userId) => {
   await assertUniqueSlug(slug, null, data.pageType);
   await assertUniquePageType(data.pageType);
 
-  return CMSPage.create({
+  const page = await CMSPage.create({
     ...data,
     slug,
     blocks: data.blocks || [],
     isPublished: data.isPublished !== false,
     updatedBy: userId,
   });
+  invalidateCmsCache(page);
+  return page;
 };
 
 const SINGLETON_PAGE_TYPES = [
@@ -118,15 +134,23 @@ export const getPages = async ({ pageType, isPublished }) => {
 };
 
 export const getPageBySlug = async (slug) => {
-  const page = await CMSPage.findOne({ slug, isPublished: true });
+  const cacheKey = cmsSlugCacheKey(slug);
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+
+  const page = await CMSPage.findOne({ slug, isPublished: true }).lean();
   if (!page) throw new ApiError(404, 'Page not found');
-  return page;
+  return cacheSet(cacheKey, page, CMS_PAGE_CACHE_TTL_MS);
 };
 
 export const getPageByType = async (pageType) => {
-  const page = await CMSPage.findOne({ pageType, isPublished: true }).sort({ updatedAt: -1 });
+  const cacheKey = cmsTypeCacheKey(pageType);
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+
+  const page = await CMSPage.findOne({ pageType, isPublished: true }).sort({ updatedAt: -1 }).lean();
   if (!page) throw new ApiError(404, 'Page not found');
-  return page;
+  return cacheSet(cacheKey, page, CMS_PAGE_CACHE_TTL_MS);
 };
 
 export const getPageById = async (id) => {
@@ -166,12 +190,14 @@ export const updatePage = async (id, data, userId) => {
 
   page.updatedBy = userId;
   await page.save();
+  invalidateCmsCache(page);
   return page;
 };
 
 export const deletePage = async (id) => {
   const page = await CMSPage.findByIdAndDelete(id);
   if (!page) throw new ApiError(404, 'Page not found');
+  invalidateCmsCache(page);
 };
 
 export const updatePageBlocks = async (id, blocks, userId) => {
@@ -181,6 +207,7 @@ export const updatePageBlocks = async (id, blocks, userId) => {
   page.isPublished = true;
   page.updatedBy = userId;
   await page.save();
+  invalidateCmsCache(page);
   return page;
 };
 
@@ -193,6 +220,7 @@ export const ensureDefaultHomePage = async (userId) => {
       page.isPublished = true;
       page.updatedBy = userId;
       await page.save();
+      invalidateCmsCache(page);
       return { page, created: false, restored: true };
     }
     return { page, created: false, restored: false };
@@ -202,5 +230,6 @@ export const ensureDefaultHomePage = async (userId) => {
     ...DEFAULT_HOME_PAGE,
     updatedBy: userId,
   });
+  invalidateCmsCache(page);
   return { page, created: true, restored: false };
 };

@@ -81,6 +81,14 @@ export function sanitizeCmsHtml(html) {
   return doc.body.innerHTML.trim();
 }
 
+/** When the page already has a primary H1, demote rich-text H1s so Rank Math sees a single H1. */
+export function demoteCmsH1ToH2(html) {
+  if (!html || typeof html !== 'string') return html;
+  return html
+    .replace(/<\s*h1(\s[^>]*)?>/gi, '<h2$1>')
+    .replace(/<\s*\/\s*h1\s*>/gi, '</h2>');
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')

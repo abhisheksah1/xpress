@@ -39,7 +39,7 @@ export default function SeoAuditorPanel({ seo = {}, context = {}, className = ''
         <div>
           <h3 className="text-sm font-bold text-emerald-900 uppercase tracking-wide">Real-Time SEO Auditor</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Updates as you edit meta fields and content · {audit.wordCount} words analysed
+            Mirrors storefront HTML (H1/H2 Rank Math can see) · {audit.wordCount} words analysed
           </p>
         </div>
         <SeoGauge score={audit.score} rating={audit.rating} />

@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin.js';
 import AdminImageDropzone from './AdminImageDropzone.jsx';
 import SeoMetaEditor, { emptySeoMeta } from './SeoMetaEditor.jsx';
+import CategoryFocusProductsPicker from './CategoryFocusProductsPicker.jsx';
 import { mergeEntitySeo } from '../../utils/seoMeta.js';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
 
@@ -20,6 +21,7 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
     description: '',
     isActive: true,
     image: { url: '', alt: '' },
+    focusProductIds: [],
     seo: emptySeoMeta({ schemaType: 'CollectionPage' }),
   });
   const [saving, setSaving] = useState(false);
@@ -33,6 +35,7 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
       description: category.description || '',
       isActive: category.isActive !== false,
       image: category.image || { url: '', alt: '' },
+      focusProductIds: (category.focusProductIds || []).map((id) => String(id?._id || id)),
       seo: mergeEntitySeo({
         ...category,
         seo: { ...mergeEntitySeo(category), schemaType: category.seo?.schemaType || 'CollectionPage' },
@@ -81,6 +84,7 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
         description: form.description.trim() || undefined,
         isActive: form.isActive,
         image: form.image?.url ? form.image : undefined,
+        focusProductIds: (form.focusProductIds || []).map(String).slice(0, 10),
         metaTitle: form.seo?.metaTitle,
         metaDescription: form.seo?.metaDescription,
         seo: form.seo,
@@ -158,6 +162,12 @@ export default function CategoryEditModal({ category, onClose, onSaved }) {
           <input type="checkbox" checked={form.isActive} onChange={(e) => setField('isActive', e.target.checked)} />
           Active (visible on storefront)
         </label>
+
+        <CategoryFocusProductsPicker
+          categoryId={category._id}
+          value={form.focusProductIds}
+          onChange={(ids) => setField('focusProductIds', ids)}
+        />
 
         <SeoMetaEditor
           value={form.seo}

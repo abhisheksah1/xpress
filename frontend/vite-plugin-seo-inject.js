@@ -72,14 +72,13 @@ function buildSeoHeadBlock(meta = {}) {
 function buildSeoBodyBlock(meta = {}) {
   const h1 = String(meta.h1 || meta.title || '').trim();
   const h2 = String(meta.h2 || meta.focusKeyword || '').trim();
-  const description = String(meta.description || '').trim();
-  if (!h1 && !description) return '';
-  const parts = ['<div id="seo-prerender">'];
+  if (!h1 && !h2) return '';
+  // Visible crawlable H1 — Rank Math ignores clipped/aria-hidden headings.
+  const parts = ['<div id="seo-prerender" class="seo-prerender">'];
   if (h1) parts.push(`<h1>${escapeHtml(h1)}</h1>`);
   if (h2 && h2.toLowerCase() !== h1.toLowerCase()) {
     parts.push(`<h2>${escapeHtml(h2)}</h2>`);
   }
-  if (description) parts.push(`<p>${escapeHtml(description)}</p>`);
   parts.push('</div>');
   return parts.join('\n');
 }

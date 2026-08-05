@@ -172,9 +172,14 @@ export const getProducts = async ({
   forComboPicker,
   ids,
   sort = 'newest',
+  fields,
 }) => {
   const sortBy = resolveProductSort(sort);
   const isComboPicker = forComboPicker === 'true' || forComboPicker === true;
+  const cardFields = fields === 'card' || fields === true;
+  /** Lean fields for storefront product cards / grids — skip heavy CMS/SEO blobs. */
+  const STOREFRONT_CARD_SELECT =
+    'name slug sku price compareAtPrice stock images isHamper isFeatured isActive allowBackorder optionCategories variants personalizationFields shortDescription tags';
   const filter = {};
   const idList = Array.isArray(ids)
     ? ids.map(String).filter(Boolean)
@@ -242,11 +247,44 @@ export const getProducts = async ({
 
   const skip = (page - 1) * limit;
   const preserveIdOrder = idList.length > 0;
+  const pageNum = Math.max(1, Number(page) || 1);
+  const limitNum = Math.max(1, Number(limit) || 20);
+
+  /** Category focus products — pinned first on PLP, no customer-facing badge. */
+  let focusIds = [];
+  if (category && !preserveIdOrder && !deliveryGroup) {
+    const catDoc = await Category.findById(category).select('focusProductIds').lean();
+    focusIds = [...new Set((catDoc?.focusProductIds || []).map(String).filter(Boolean))].slice(0, 10);
+  }
+
+  const listSelect = isComboPicker
+    ? 'name slug sku price stock images isHamper isActive shortDescription description'
+    : cardFields
+      ? STOREFRONT_CARD_SELECT
+      : undefined;
+
+  const categoryPopulate = cardFields
+    ? { path: 'category', select: 'name slug' }
+    : { path: 'category', select: 'name slug deliveryScope deliveryGroupRules' };
+
+  const buildListQuery = (queryFilter, { applySort = true, applySkip = 0, applyLimit = limitNum } = {}) => {
+    let q = Product.find(queryFilter)
+      .populate(categoryPopulate)
+      .populate('categories', 'name slug')
+      .select(listSelect);
+    if (cardFields) q = q.lean();
+    if (applySort) q = q.sort(sortBy);
+    if (applySkip > 0) q = q.skip(applySkip);
+    if (applyLimit != null) q = q.limit(applyLimit);
+    return q;
+  };
 
   if (deliveryGroup) {
     let query = Product.find(filter)
-      .populate('category', 'name slug deliveryScope deliveryGroupRules')
+      .populate(categoryPopulate)
       .populate('categories', 'name slug');
+    if (listSelect) query = query.select(listSelect);
+    if (cardFields) query = query.lean();
     if (!preserveIdOrder) query = query.sort(sortBy);
     let products = await query;
     products = await deliveryService.filterProductsByGroup(products, deliveryGroup);
@@ -256,13 +294,54 @@ export const getProducts = async ({
     }
     const total = products.length;
     const paged = products.slice(skip, skip + limit);
-    return { products: paged, pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } };
+    const synced = await comboService.refreshHamperStocksInList(paged);
+    return {
+      products: synced.map((p) => enrichProductMedia(p)),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
+    };
+  }
+
+  if (focusIds.length) {
+    const focusFilter = { $and: [filter, { _id: { $in: focusIds } }] };
+    const focusDocs = await buildListQuery(focusFilter, { applySort: false, applySkip: 0, applyLimit: focusIds.length });
+    const byId = new Map(focusDocs.map((p) => [String(p._id), p]));
+    const focusOrdered = focusIds.map((id) => byId.get(id)).filter(Boolean);
+    const focusIdSet = new Set(focusOrdered.map((p) => String(p._id)));
+    const restFilter = { $and: [filter, { _id: { $nin: [...focusIdSet] } }] };
+    const F = focusOrdered.length;
+
+    const [restTotal, pageSlice] = await Promise.all([
+      Product.countDocuments(filter),
+      (async () => {
+        if (pageNum === 1) {
+          const restLimit = Math.max(0, limitNum - F);
+          const rest = restLimit
+            ? await buildListQuery(restFilter, { applySkip: 0, applyLimit: restLimit })
+            : [];
+          return [...focusOrdered, ...rest];
+        }
+        const restSkip = Math.max(0, (pageNum - 1) * limitNum - F);
+        return buildListQuery(restFilter, { applySkip: restSkip, applyLimit: limitNum });
+      })(),
+    ]);
+
+    const syncedProducts = await comboService.refreshHamperStocksInList(pageSlice);
+    return {
+      products: syncedProducts.map((p) => enrichProductMedia(p)),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: restTotal,
+        pages: Math.ceil(restTotal / limitNum) || 1,
+      },
+    };
   }
 
   let listQuery = Product.find(filter)
-    .populate('category', 'name slug deliveryScope deliveryGroupRules')
+    .populate(categoryPopulate)
     .populate('categories', 'name slug')
-    .select(isComboPicker ? 'name slug sku price stock images isHamper isActive shortDescription description' : undefined);
+    .select(listSelect);
+  if (cardFields) listQuery = listQuery.lean();
   if (!preserveIdOrder) {
     listQuery = listQuery.sort(sortBy).skip(skip).limit(limit);
   } else {
@@ -378,10 +457,15 @@ export const getCategories = async (isActive, options = {}) => {
   const filter = {};
   if (isActive !== undefined) filter.isActive = isActive;
 
-  const categories = await Category.find(filter)
-    .populate('deliveryGroupRules.group', 'name province')
-    .sort({ sortOrder: 1, name: 1 })
-    .lean();
+  const cardFields = options.fields === 'card';
+  let categoryQuery = Category.find(filter).sort({ sortOrder: 1, name: 1 }).lean();
+  if (cardFields) {
+    categoryQuery = categoryQuery.select('name slug image sortOrder isActive createdAt parent');
+  } else {
+    categoryQuery = categoryQuery.populate('deliveryGroupRules.group', 'name province');
+  }
+
+  const categories = await categoryQuery;
 
   if (!options.withProductCount) return categories;
 
@@ -415,10 +499,17 @@ export const updateCategory = async (id, data) => {
   const category = await Category.findById(id);
   if (!category) throw new ApiError(404, 'Category not found');
 
-  const { seo, ...rest } = data || {};
+  const { seo, focusProductIds, ...rest } = data || {};
   Object.keys(rest).forEach((key) => {
     if (rest[key] !== undefined) category[key] = rest[key];
   });
+  if (focusProductIds !== undefined) {
+    const ids = (Array.isArray(focusProductIds) ? focusProductIds : [])
+      .map(String)
+      .filter(Boolean)
+      .slice(0, 10);
+    category.focusProductIds = ids;
+  }
   if (seo && typeof seo === 'object') {
     const currentSeo = category.seo?.toObject?.() || category.seo || {};
     category.set('seo', { ...currentSeo, ...seo });

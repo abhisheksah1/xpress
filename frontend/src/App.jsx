@@ -1,6 +1,6 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import StoreLayout from './layouts/StoreLayout';
-import AdminLayout from './layouts/AdminLayout';
 import AdminGuard from './components/admin/AdminGuard';
 import HomePage from './pages/store/HomePage';
 import ShopPage from './pages/store/ShopPage';
@@ -16,32 +16,42 @@ import OrderHistoryPage from './pages/store/OrderHistoryPage';
 import TrackOrderPage from './pages/store/TrackOrderPage';
 import BlogPage from './pages/store/BlogPage';
 import BlogPostPage from './pages/store/BlogPostPage';
-import AdminDashboard from './pages/admin/DashboardPage';
-import AdminProducts from './pages/admin/ProductsPage';
-import ProductFormPage from './pages/admin/ProductFormPage';
-import ContentPage from './pages/admin/ContentPage';
-import MediaLibraryPage from './pages/admin/MediaLibraryPage';
-import NavbarPage from './pages/admin/NavbarPage';
-import BlogAdminPage from './pages/admin/BlogAdminPage';
-import AdminOrders from './pages/admin/OrdersPage';
-import LeadOrdersPage from './pages/admin/LeadOrdersPage';
-import AdminSettings from './pages/admin/SettingsPage';
-import DeliveryGroupsPage from './pages/admin/DeliveryGroupsPage';
-import CouponsPage from './pages/admin/CouponsPage';
-import AdminRemindersPage from './pages/admin/RemindersPage';
-import CustomersPage from './pages/admin/CustomersPage';
 import RemindersPage from './pages/store/RemindersPage';
-import ApiPartnersPage from './pages/admin/ApiPartnersPage';
-import PartnerReportsPage from './pages/admin/PartnerReportsPage';
-import FinanceLayout from './layouts/FinanceLayout';
-import FinancePnlPage from './pages/admin/finance/FinancePnlPage';
-import FinanceSalesPage from './pages/admin/finance/FinanceSalesPage';
-import FinancePurchasesPage from './pages/admin/finance/FinancePurchasesPage';
-import FinanceExpensesPage from './pages/admin/finance/FinanceExpensesPage';
-import FinanceVendorsPage from './pages/admin/finance/FinanceVendorsPage';
-import FinanceStockPage from './pages/admin/finance/FinanceStockPage';
-import FinanceTreasuryPage from './pages/admin/finance/FinanceTreasuryPage';
-import StaffPage from './pages/admin/StaffPage';
+
+const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
+const AdminDashboard = lazy(() => import('./pages/admin/DashboardPage'));
+const AdminProducts = lazy(() => import('./pages/admin/ProductsPage'));
+const ProductFormPage = lazy(() => import('./pages/admin/ProductFormPage'));
+const ContentPage = lazy(() => import('./pages/admin/ContentPage'));
+const MediaLibraryPage = lazy(() => import('./pages/admin/MediaLibraryPage'));
+const NavbarPage = lazy(() => import('./pages/admin/NavbarPage'));
+const BlogAdminPage = lazy(() => import('./pages/admin/BlogAdminPage'));
+const AdminOrders = lazy(() => import('./pages/admin/OrdersPage'));
+const LeadOrdersPage = lazy(() => import('./pages/admin/LeadOrdersPage'));
+const AdminSettings = lazy(() => import('./pages/admin/SettingsPage'));
+const DeliveryGroupsPage = lazy(() => import('./pages/admin/DeliveryGroupsPage'));
+const CouponsPage = lazy(() => import('./pages/admin/CouponsPage'));
+const AdminRemindersPage = lazy(() => import('./pages/admin/RemindersPage'));
+const CustomersPage = lazy(() => import('./pages/admin/CustomersPage'));
+const ApiPartnersPage = lazy(() => import('./pages/admin/ApiPartnersPage'));
+const PartnerReportsPage = lazy(() => import('./pages/admin/PartnerReportsPage'));
+const FinanceLayout = lazy(() => import('./layouts/FinanceLayout'));
+const FinancePnlPage = lazy(() => import('./pages/admin/finance/FinancePnlPage'));
+const FinanceSalesPage = lazy(() => import('./pages/admin/finance/FinanceSalesPage'));
+const FinancePurchasesPage = lazy(() => import('./pages/admin/finance/FinancePurchasesPage'));
+const FinanceExpensesPage = lazy(() => import('./pages/admin/finance/FinanceExpensesPage'));
+const FinanceVendorsPage = lazy(() => import('./pages/admin/finance/FinanceVendorsPage'));
+const FinanceStockPage = lazy(() => import('./pages/admin/finance/FinanceStockPage'));
+const FinanceTreasuryPage = lazy(() => import('./pages/admin/finance/FinanceTreasuryPage'));
+const StaffPage = lazy(() => import('./pages/admin/StaffPage'));
+
+function AdminRouteFallback() {
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center text-sm text-gray-400">
+      Loading admin…
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -79,7 +89,9 @@ export default function App() {
         path="/admin"
         element={
           <AdminGuard>
-            <AdminLayout />
+            <Suspense fallback={<AdminRouteFallback />}>
+              <AdminLayout />
+            </Suspense>
           </AdminGuard>
         }
       >

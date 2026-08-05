@@ -98,10 +98,28 @@ export function mergeProductSeo(product = {}) {
     || product.shortDescription
     || product.description
     || '';
-  const description = fromSeo.metaDescription || product.metaDescription || stripHtmlText(rawDesc).slice(0, 160);
-  const title = fromSeo.metaTitle
+  const cleaned = stripHtmlText(rawDesc);
+  let description = fromSeo.metaDescription || product.metaDescription || '';
+  if (!description || description.length < 120) {
+    if (cleaned.length >= 120) {
+      description = cleaned.slice(0, 160);
+    } else {
+      const base = `Shop ${product.name || 'this gift'} online at KoseliXpress Nepal. Same-day gift delivery across Kathmandu and major cities.`;
+      description = cleaned
+        ? `${cleaned} Order ${product.name} with delivery across Nepal.`.replace(/\s+/g, ' ').trim().slice(0, 160)
+        : base.slice(0, 160);
+    }
+  }
+  const titleRaw = fromSeo.metaTitle
     || product.metaTitle
-    || `${product.name || 'Product'} | Buy Online in Nepal | KoseliXpress`.slice(0, 60);
+    || `${product.name || 'Product'} | Buy Online | KoseliXpress`;
+  const title = titleRaw.length <= 60
+    ? titleRaw
+    : (() => {
+        const sliced = titleRaw.slice(0, 60);
+        const lastSpace = sliced.lastIndexOf(' ');
+        return (lastSpace > 40 ? sliced.slice(0, lastSpace) : sliced).trim();
+      })();
 
   const keywords = Array.isArray(fromSeo.metaKeywords) && fromSeo.metaKeywords.length
     ? fromSeo.metaKeywords
@@ -112,7 +130,7 @@ export function mergeProductSeo(product = {}) {
   return normalizeSeoMeta(
     {
       ...fromSeo,
-      metaTitle: fromSeo.metaTitle || product.metaTitle,
+      metaTitle: fromSeo.metaTitle || product.metaTitle || title,
       metaDescription: fromSeo.metaDescription || product.metaDescription || description,
       focusKeyword: fromSeo.focusKeyword || product.focusKeyword,
       metaKeywords: keywords,

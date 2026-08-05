@@ -57,9 +57,9 @@ function optionsKey(selectedOptions) {
   return selectedOptions.map((o) => `${o.category}:${o.label}`).sort().join('|');
 }
 
-function ProductGallery({ product, gallery, comboComponents, activeImage, onSelectImage }) {
+function ProductGallery({ product, gallery, comboComponents, activeImage, onSelectImage, className = '' }) {
   return (
-    <div className="lg:col-span-7 w-full min-w-0 space-y-4">
+    <div className={`w-full min-w-0 space-y-4 ${className}`.trim()}>
       <div className="aspect-square rounded-2xl overflow-hidden shadow-sm border border-rose-100 bg-white relative">
         {gallery[activeImage] ? (
           <img
@@ -155,7 +155,7 @@ function BuyPanelExtended({
   if (!hasContent) return null;
 
   return (
-    <div className={`lg:col-span-12 w-full max-w-none min-w-0 space-y-4 sm:space-y-5 pt-2 lg:pt-4`}>
+    <div className="w-full max-w-none min-w-0 space-y-4 sm:space-y-5 pt-6 lg:pt-8">
       {hasDelivery && (
         <ProductDeliverySchedule
           className={blockClass}
@@ -211,11 +211,12 @@ function BuyPanel({
   qty,
   setQty,
   onAddToCart,
+  className = '',
 }) {
   const blockClass = 'w-full max-w-none min-w-0';
 
   return (
-    <div className={`lg:col-span-5 w-full max-w-none min-w-0 self-start space-y-4 sm:space-y-5`}>
+    <div className={`w-full max-w-none min-w-0 self-start space-y-4 sm:space-y-5 ${className}`.trim()}>
       <div className={blockClass}>
         {product.brand && (
           <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-1">{product.brand}</p>
@@ -573,7 +574,7 @@ export default function ProductDetailPage() {
         jsonLdId="product-json-ld"
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <nav className="text-xs text-gray-500 mb-6 flex flex-wrap items-center gap-1.5">
+        <nav className="text-xs text-gray-500 mb-6 flex flex-wrap items-center gap-1.5" aria-label="Breadcrumb">
           <Link to="/" className="hover:text-primary-600">Home</Link>
           <span>/</span>
           <Link to="/shop" className="hover:text-primary-600">Shop</Link>
@@ -593,13 +594,7 @@ export default function ProductDetailPage() {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-start w-full">
-          <ProductGallery
-            product={product}
-            gallery={gallery}
-            comboComponents={comboComponents}
-            activeImage={activeImage}
-            onSelectImage={setActiveImage}
-          />
+          {/* Buy content first in DOM so it stays at the top on mobile; desktop places gallery left via order */}
           <BuyPanel
             product={product}
             isHamper={isHamper}
@@ -626,17 +621,27 @@ export default function ProductDetailPage() {
             qty={qty}
             setQty={setQty}
             onAddToCart={handleAddToCart}
+            className="order-1 lg:order-2 lg:col-span-5"
           />
-          <BuyPanelExtended
+          <ProductGallery
             product={product}
-            isHamper={isHamper}
-            shortTerms={settings.product_page_short_terms}
-            storeSettings={settings}
-            deliverySchedules={deliverySchedules}
-            deliveryDisclaimer={settings.product_delivery_schedule_disclaimer}
-            deliveryTierLabel={settings.product_delivery_location_tier_label}
+            gallery={gallery}
+            comboComponents={comboComponents}
+            activeImage={activeImage}
+            onSelectImage={setActiveImage}
+            className="order-2 lg:order-1 lg:col-span-7"
           />
         </div>
+
+        <BuyPanelExtended
+          product={product}
+          isHamper={isHamper}
+          shortTerms={settings.product_page_short_terms}
+          storeSettings={settings}
+          deliverySchedules={deliverySchedules}
+          deliveryDisclaimer={settings.product_delivery_schedule_disclaimer}
+          deliveryTierLabel={settings.product_delivery_location_tier_label}
+        />
 
         {isHamper ? (
           <HamperProductInfoSections

@@ -51,19 +51,23 @@ export const syncHamperStockRecord = async (hamperProduct) => {
   return stock;
 };
 
+/**
+ * Resolve live hamper stock for list responses without writing to the DB.
+ * Persist via syncHamperStockRecord / product detail / order flows instead —
+ * sequential saves on every storefront list GET made the homepage very slow.
+ */
 export const refreshHamperStocksInList = async (products) => {
   const hampers = products.filter((p) => p.isHamper);
   if (!hampers.length) return products;
 
-  const populated = await Product.find({ _id: { $in: hampers.map((p) => p._id) } }).populate(
-    'comboItems.product',
-    'stock'
-  );
+  const populated = await Product.find({ _id: { $in: hampers.map((p) => p._id) } })
+    .select('comboItems stock')
+    .populate('comboItems.product', 'stock')
+    .lean();
 
   const stockById = new Map();
   for (const hamper of populated) {
-    const stock = await syncHamperStockRecord(hamper);
-    stockById.set(String(hamper._id), stock);
+    stockById.set(String(hamper._id), resolveEffectiveStock(hamper));
   }
 
   return products.map((p) => {

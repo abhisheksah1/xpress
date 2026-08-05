@@ -168,7 +168,7 @@ function CategoriesTab({ categories, onRefresh }) {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right space-x-2">
-                  <button onClick={() => setSeoCategory(cat)} className="text-primary-600 text-xs font-medium">SEO</button>
+                  <button onClick={() => setSeoCategory(cat)} className="text-primary-600 text-xs font-medium">Edit / Focus</button>
                   <button onClick={() => setDeliveryCategory(cat)} className="text-primary-600 text-xs font-medium">Delivery</button>
                   {editing === cat._id ? (
                     <>

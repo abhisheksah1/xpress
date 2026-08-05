@@ -16,6 +16,8 @@ const categorySchema = new mongoose.Schema(
     parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
+    /** Up to 10 products pinned at the top of this category listing (order = display order). */
+    focusProductIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     deliveryScope: {
       type: String,
       enum: ['all', 'selected'],

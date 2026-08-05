@@ -29,6 +29,20 @@ cd "$ROOT/frontend"
 npm install
 npm run build
 
+echo "==> stamp live deploy time for admin dashboard"
+cd "$ROOT"
+DEPLOYED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "")"
+mkdir -p "$ROOT/backend"
+cat > "$ROOT/backend/deploy-info.json" <<EOF
+{
+  "deployedAt": "${DEPLOYED_AT}",
+  "gitSha": "${GIT_SHA}",
+  "source": "deploy.sh"
+}
+EOF
+echo "Wrote backend/deploy-info.json (${DEPLOYED_AT} / ${GIT_SHA})"
+
 echo "==> restart API (PM2 if present, else systemd hint)"
 cd "$ROOT"
 restart_pm2() {

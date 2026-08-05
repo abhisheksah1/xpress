@@ -1,6 +1,7 @@
 import { Order } from '../../models/index.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+import { getDeployInfo } from '../../utils/deployInfo.js';
 
 export const getDashboard = asyncHandler(async (req, res) => {
   const [totalOrders, pendingOrders, totalProducts, lowStockCount, recentOrders] = await Promise.all([
@@ -19,6 +20,8 @@ export const getDashboard = asyncHandler(async (req, res) => {
     { $group: { _id: null, total: { $sum: '$total' } } },
   ]);
 
+  const deploy = getDeployInfo();
+
   res.json(
     new ApiResponse(200, {
       stats: {
@@ -29,6 +32,13 @@ export const getDashboard = asyncHandler(async (req, res) => {
         totalRevenue: revenue[0]?.total || 0,
       },
       recentOrders,
+      system: {
+        liveUpdatedAt: deploy.deployedAt,
+        serverStartedAt: deploy.serverStartedAt,
+        gitSha: deploy.gitSha,
+        updateSource: deploy.source,
+        hasDeployStamp: deploy.hasDeployStamp,
+      },
     })
   );
 });

@@ -20,6 +20,41 @@ const stripHtml = (html = '') =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** Truncate on word boundary for meta titles (avoid "KoseliXpr"). */
+const truncateTitle = (value = '', max = 60) => {
+  const text = String(value || '').trim();
+  if (text.length <= max) return text;
+  const sliced = text.slice(0, max);
+  const lastSpace = sliced.lastIndexOf(' ');
+  return (lastSpace > 40 ? sliced.slice(0, lastSpace) : sliced).trim();
+};
+
+const productMetaTitle = (name) =>
+  truncateTitle(`${name || 'Product'} | Buy Online | KoseliXpress`, 60);
+
+const productMetaDescription = (name, rawDesc = '') => {
+  const cleaned = stripHtml(rawDesc);
+  if (cleaned.length >= 120 && cleaned.length <= 160) return cleaned;
+  if (cleaned.length > 160) return cleaned.slice(0, 160);
+  const base = `Shop ${name} online at KoseliXpress Nepal. Same-day gift delivery across Kathmandu and major cities.`;
+  if (!cleaned || cleaned.length < 40) return base.slice(0, 160);
+  // Avoid echoing a short name-only blurb twice
+  if (/^shop\s+/i.test(cleaned) && cleaned.length < 100) return base.slice(0, 160);
+  return `${cleaned} Delivery across Nepal with KoseliXpress.`.replace(/\s+/g, ' ').trim().slice(0, 160);
+};
+
+const categoryMetaDescription = (name, rawDesc = '', siteFallback = '') => {
+  const cleaned = stripHtml(rawDesc);
+  if (cleaned.length >= 120) return cleaned.slice(0, 160);
+  const generated = `Browse ${name} gifts and products at KoseliXpress Nepal. Flowers, cakes, and hampers with delivery across Nepal.`;
+  if (cleaned.length >= 40) return `${cleaned} Shop ${name} at KoseliXpress.`.replace(/\s+/g, ' ').trim().slice(0, 160);
+  if (siteFallback && siteFallback.length >= 120 && !cleaned) {
+    // Prefer category-specific copy over generic site blurb for Rank Math uniqueness
+    return generated.slice(0, 160);
+  }
+  return generated.slice(0, 160);
+};
+
 const absoluteUrl = (pathOrUrl, siteUrl) => {
   if (!pathOrUrl) return '';
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
@@ -71,7 +106,7 @@ const buildJsonLd = (meta, context = {}) => {
   if (type === 'Product') {
     const product = context.product || {};
     const inStock = (product.stock ?? 0) > 0;
-    return {
+    const productLd = {
       ...base,
       '@type': 'Product',
       name: context.title || product.name || meta.title,
@@ -86,6 +121,49 @@ const buildJsonLd = (meta, context = {}) => {
         price: String(product.price ?? 0),
         availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       },
+    };
+    if (context.breadcrumbs?.length) {
+      return {
+        '@context': 'https://schema.org',
+        '@graph': [
+          productLd,
+          {
+            '@type': 'BreadcrumbList',
+            itemListElement: context.breadcrumbs.map((crumb, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              name: crumb.name,
+              item: absoluteUrl(crumb.path, siteUrl),
+            })),
+          },
+        ],
+      };
+    }
+    return productLd;
+  }
+
+  if (type === 'CollectionPage' && context.breadcrumbs?.length) {
+    return {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          ...base,
+          '@type': 'CollectionPage',
+          name: context.title || meta.title,
+          description: meta.description,
+          url: pageUrl,
+          image,
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: context.breadcrumbs.map((crumb, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: crumb.name,
+            item: absoluteUrl(crumb.path, siteUrl),
+          })),
+        },
+      ],
     };
   }
 
@@ -208,11 +286,12 @@ const finalize = ({
   };
 
   const canonical = absoluteUrl(seo.canonicalUrl || path, siteUrl);
-  // Semantic H1 for crawlers: page/product/blog name, not the longer meta title when possible
-  const h1 = String(jsonLdContext.title || fallbackTitle || title).trim();
-  const h2 = focusKeyword && focusKeyword.toLowerCase() !== h1.toLowerCase()
-    ? focusKeyword
-    : '';
+  // H1 = short entity name only (never full meta title / focus keyword noise)
+  const h1 = String(jsonLdContext.title || '').trim()
+    || String(fallbackTitle || '').trim()
+    || String(title || '').trim();
+  // Do not emit focus keyword as H2 — Rank Math treats that as low-quality stuffing
+  const h2 = '';
 
   return {
     path,
@@ -225,10 +304,10 @@ const finalize = ({
     robots: `${robotsIndex ? 'index' : 'noindex'}, ${robotsFollow ? 'follow' : 'nofollow'}`,
     canonical,
     ogType,
-    ogTitle: String(seo.ogTitle || title).trim(),
+    ogTitle: String(seo.ogTitle || jsonLdContext.title || title).trim(),
     ogDescription: stripHtml(String(seo.ogDescription || description).trim()).slice(0, 320),
     ogImage,
-    ogImageAlt: String(seo.ogImage?.alt || fallbackImageAlt || title).trim(),
+    ogImageAlt: String(seo.ogImage?.alt || fallbackImageAlt || jsonLdContext.title || title).trim(),
     twitterCard: seo.twitterCard || 'summary_large_image',
     geo,
     googleSiteVerification: settings.google_site_verification || '',
@@ -341,9 +420,16 @@ export const resolveSeoForPath = async (rawPath = '/') => {
       settings,
       siteUrl,
       path: '/shop',
-      fallbackTitle: `Shop | ${settings.store_name || 'KoseliXpress'}`,
+      fallbackTitle: `Shop Gifts | ${settings.store_name || 'KoseliXpress'}`,
       fallbackDescription: settings.meta_description || 'Browse gifts, flowers, and cakes with delivery across Nepal.',
       schemaType: 'CollectionPage',
+      jsonLdContext: {
+        title: 'Shop Gifts',
+        breadcrumbs: [
+          { name: 'Home', path: '/' },
+          { name: 'Shop Gifts', path: '/shop' },
+        ],
+      },
     });
   }
 
@@ -352,17 +438,40 @@ export const resolveSeoForPath = async (rawPath = '/') => {
     if (slug) {
       const category = await Category.findOne({ slug, isActive: true }).lean();
       if (category) {
+        const seo = mergeEntity(category);
+        if (!seo.schemaType || seo.schemaType === 'WebPage') seo.schemaType = 'CollectionPage';
+        const storedDesc = String(seo.metaDescription || category.description || '').trim();
+        const desc = categoryMetaDescription(
+          category.name,
+          storedDesc,
+          settings.meta_description || ''
+        );
+        const storedTitle = String(seo.metaTitle || '').trim();
+        const autoTitle = (storedTitle.length >= 50 && storedTitle.length <= 60)
+          ? storedTitle
+          : truncateTitle(`${category.name} | Shop Gifts | KoseliXpress`, 60);
         return finalize({
           settings,
           siteUrl,
           path: `/shop/category/${category.slug}`,
-          seo: mergeEntity(category),
-          fallbackTitle: category.name,
-          fallbackDescription: category.description || settings.meta_description,
+          seo: {
+            ...seo,
+            metaTitle: autoTitle,
+            metaDescription: storedDesc.length >= 120 ? storedDesc.slice(0, 160) : desc,
+          },
+          fallbackTitle: autoTitle,
+          fallbackDescription: desc,
           fallbackImage: category.image?.url,
           fallbackImageAlt: category.image?.alt || category.name,
           schemaType: 'CollectionPage',
-          jsonLdContext: { title: category.name },
+          jsonLdContext: {
+            title: category.name,
+            breadcrumbs: [
+              { name: 'Home', path: '/' },
+              { name: 'Shop', path: '/shop' },
+              { name: category.name, path: `/shop/category/${category.slug}` },
+            ],
+          },
         });
       }
     }
@@ -372,7 +481,8 @@ export const resolveSeoForPath = async (rawPath = '/') => {
     const slug = path.slice('/shop/'.length);
     if (slug && !slug.includes('/')) {
       const product = await Product.findOne({ slug, isActive: true })
-        .select('name slug sku brand price stock images metaTitle metaDescription metaKeywords focusKeyword seo shortDescription description longDescription')
+        .select('name slug sku brand price stock images metaTitle metaDescription metaKeywords focusKeyword seo shortDescription description longDescription category')
+        .populate('category', 'name slug')
         .lean();
       if (product) {
         const seo = mergeEntity(product);
@@ -383,26 +493,57 @@ export const resolveSeoForPath = async (rawPath = '/') => {
         if (!seo.schemaType) seo.schemaType = 'Product';
 
         const primaryImage = product.images?.find((i) => i.isPrimary) || product.images?.[0];
-        const rawDesc =
-          seo.metaDescription
-          || product.metaDescription
-          || product.longDescription
-          || product.shortDescription
-          || product.description
-          || '';
+        const storedDesc = String(seo.metaDescription || product.metaDescription || '').trim();
+        const autoDesc = productMetaDescription(
+          product.name,
+          storedDesc
+            || product.longDescription
+            || product.shortDescription
+            || product.description
+            || ''
+        );
+        const storedTitle = String(seo.metaTitle || product.metaTitle || '').trim();
+        const titleLooksTruncated = /KoseliXpr$/i.test(storedTitle) || /\|$/.test(storedTitle);
+        const autoTitle = (
+          storedTitle.length >= 50
+          && storedTitle.length <= 60
+          && !titleLooksTruncated
+        )
+          ? storedTitle
+          : productMetaTitle(product.name);
+
+        const breadcrumbs = [
+          { name: 'Home', path: '/' },
+          { name: 'Shop', path: '/shop' },
+        ];
+        if (product.category?.slug && product.category?.name) {
+          breadcrumbs.push({
+            name: product.category.name,
+            path: `/shop/category/${product.category.slug}`,
+          });
+        }
+        breadcrumbs.push({ name: product.name, path: `/shop/${product.slug}` });
 
         return finalize({
           settings,
           siteUrl,
           path: `/shop/${product.slug}`,
-          seo,
-          fallbackTitle: `${product.name} | Buy Online in Nepal | KoseliXpress`.slice(0, 60),
-          fallbackDescription: stripHtml(rawDesc).slice(0, 160),
+          seo: {
+            ...seo,
+            metaTitle: autoTitle,
+            metaDescription: storedDesc.length >= 120 ? storedDesc.slice(0, 160) : autoDesc,
+          },
+          fallbackTitle: autoTitle,
+          fallbackDescription: autoDesc,
           fallbackImage: primaryImage?.url,
           fallbackImageAlt: primaryImage?.alt || product.name,
           schemaType: 'Product',
           ogType: 'product',
-          jsonLdContext: { title: product.name, product },
+          jsonLdContext: {
+            title: product.name,
+            product,
+            breadcrumbs,
+          },
         });
       }
     }

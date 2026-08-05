@@ -63,7 +63,7 @@ export default function CmsPageView({ pageType }) {
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight">{page.title}</h1>
         </div>
       </div>
-      <CmsBlockRenderer blocks={page.blocks} />
+      <CmsBlockRenderer blocks={page.blocks} hasPageH1 />
     </div>
   );
 }

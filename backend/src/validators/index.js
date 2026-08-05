@@ -431,6 +431,7 @@ const categoryBodySchema = z.object({
   parent: z.string().optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().optional(),
+  focusProductIds: z.array(z.string()).max(10).optional(),
   metaTitle: z.string().max(160).optional(),
   metaDescription: z.string().max(320).optional(),
   seo: seoMetaZod,

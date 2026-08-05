@@ -4,6 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      /* Crawlable H1 for SEO tools before React mounts — matches storefront title styling */
+      .seo-prerender {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 1.25rem 1rem 0;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .seo-prerender h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1.25;
+        color: #0f172a;
+      }
+      .seo-prerender h2 {
+        margin: 0.5rem 0 0;
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #334155;
+      }
+    </style>
     <!--seo-head-->
     <meta name="description" content="Send gifts across Nepal with KoseliXpress — flowers, cakes, hampers and more." />
     <title>KoseliXpress - Gifts Across Nepal</title>

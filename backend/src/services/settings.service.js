@@ -3,6 +3,10 @@ import { ApiError } from '../utils/ApiError.js';
 import { syncLegacyPaymentFlags } from './paymentGateway.service.js';
 import { getDefaultPaymentGateways } from '../config/paymentGatewayDefaults.js';
 import { DEFAULT_BRAND_LOGO_URL } from '../config/brandLogo.js';
+import { cacheDel, cacheGet, cacheSet } from '../utils/ttlCache.js';
+
+const PUBLIC_SETTINGS_CACHE_KEY = 'settings:public';
+const PUBLIC_SETTINGS_TTL_MS = 30_000;
 
 const DEFAULT_SETTINGS = [
   // Store Registry Identities
@@ -297,6 +301,9 @@ export const getSettingByKey = async (key) => {
 };
 
 export const getPublicSettings = async () => {
+  const cached = cacheGet(PUBLIC_SETTINGS_CACHE_KEY);
+  if (cached) return cached;
+
   const publicGroups = [
     'general', 'store', 'appearance', 'branding', 'social', 'seo', 'payment',
     'currency', 'addons', 'shipping', 'timeslots', 'compliance', 'auth', 'plugins', 'registry',
@@ -330,7 +337,7 @@ export const getPublicSettings = async () => {
   if (result.primary_color) {
     result.primary_color = result.primary_color || result.primary_color_legacy;
   }
-  return result || {};
+  return cacheSet(PUBLIC_SETTINGS_CACHE_KEY, result || {}, PUBLIC_SETTINGS_TTL_MS);
 };
 
 const syncBrandingLogoToNavbars = async (logoUrl, userId) => {
@@ -356,6 +363,7 @@ export const updateSetting = async (key, value, userId) => {
   if (key === 'logo_url' && value) {
     await syncBrandingLogoToNavbars(value, userId);
   }
+  cacheDel(PUBLIC_SETTINGS_CACHE_KEY);
   return setting;
 };
 
@@ -381,12 +389,14 @@ export const bulkUpdateSettings = async (settings, userId) => {
       await syncBrandingLogoToNavbars(value, userId);
     }
   }
+  cacheDel(PUBLIC_SETTINGS_CACHE_KEY);
   return results;
 };
 
 export const createSetting = async (data, userId) => {
   const existing = await Settings.findOne({ key: data.key });
   if (existing) throw new ApiError(409, 'Setting key already exists');
+  cacheDel(PUBLIC_SETTINGS_CACHE_KEY);
   return Settings.create({ ...data, updatedBy: userId });
 };
 

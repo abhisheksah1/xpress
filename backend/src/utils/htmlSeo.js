@@ -79,21 +79,19 @@ export const buildSeoHeadBlock = (meta = {}) => {
 };
 
 /**
- * Crawler-visible body content (H1 / intro) so Google sees headings before React boots.
- * Removed by the client on first paint so shoppers only see the React app.
+ * Crawler-visible body H1 so Rank Math / View Source see a real heading before React boots.
+ * Not visually hidden (tools ignore clipped/aria-hidden H1s). Removed once #root has its own H1.
  */
 export const buildSeoBodyBlock = (meta = {}) => {
   const h1 = String(meta.h1 || meta.title || '').trim();
   const h2 = String(meta.h2 || meta.focusKeyword || '').trim();
-  const description = String(meta.description || '').trim();
-  if (!h1 && !description) return '';
+  if (!h1 && !h2) return '';
 
-  const parts = ['<div id="seo-prerender">'];
+  const parts = ['<div id="seo-prerender" class="seo-prerender">'];
   if (h1) parts.push(`<h1>${escapeHtml(h1)}</h1>`);
   if (h2 && h2.toLowerCase() !== h1.toLowerCase()) {
     parts.push(`<h2>${escapeHtml(h2)}</h2>`);
   }
-  if (description) parts.push(`<p>${escapeHtml(description)}</p>`);
   parts.push('</div>');
   return parts.join('\n');
 };
