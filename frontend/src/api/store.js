@@ -30,4 +30,5 @@ export const storeApi = {
     form.append('image', file);
     return api.post('/store/upload/personalization', form);
   },
+  recordPageView: (data) => api.post('/store/analytics/pageview', data),
 };

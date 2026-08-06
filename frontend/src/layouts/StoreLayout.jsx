@@ -1,4 +1,5 @@
-import { Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import StoreHeader from '../components/store/StoreHeader.jsx';
 import StoreFooter from '../components/store/StoreFooter.jsx';
@@ -6,12 +7,18 @@ import CookieConsent from '../components/store/CookieConsent.jsx';
 import WhatsAppFloatingButton from '../components/store/WhatsAppFloatingButton.jsx';
 import MaintenancePage from '../components/store/MaintenancePage.jsx';
 import { buildWhatsAppChatUrl, isWhatsAppChatEnabled, resolveWhatsAppNumber } from '../utils/whatsapp.js';
+import { trackPageView } from '../utils/visitTracker.js';
 
 const URGENT_MESSAGE =
   'Hi KoseliXpress CSR, I need urgent order / support help while the website is under maintenance.';
 
 export default function StoreLayout() {
   const { settings = {} } = useStore();
+  const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(location.pathname + (location.search || ''));
+  }, [location.pathname, location.search]);
 
   const whatsappNumber = resolveWhatsAppNumber(settings);
   const maintenanceEnabled = settings?.maintenance_enabled === true || settings?.maintenance_enabled === 'true';

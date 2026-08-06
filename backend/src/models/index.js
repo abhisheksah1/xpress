@@ -23,3 +23,4 @@ export { default as Media } from './Media.model.js';
 export { default as AdminTrustedDevice } from './AdminTrustedDevice.model.js';
 export { default as AdminLoginChallenge } from './AdminLoginChallenge.model.js';
 export { default as ProductVariableTemplate } from './ProductVariableTemplate.model.js';
+export { VisitStat, VisitVisitorDay } from './VisitStat.model.js';

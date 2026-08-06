@@ -127,15 +127,15 @@ export default function HomePage() {
         jsonLdContext={{ title: pageH1, path }}
         jsonLdId="home-json-ld"
       />
-      {/* Always expose one storefront H1 for Rank Math / crawlers (hero may own it). */}
+      {/* Page H1 band — compact, responsive; hero owns H1 when present */}
       {!hasHeroTitle && (
-        <div className="bg-gray-50 border-b border-gray-100">
-          <div className="cms-section !py-6 sm:!py-8">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight text-slate-900">
+        <header className="border-b border-slate-200/80 bg-slate-50">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 md:py-5">
+            <h1 className="text-center md:text-left text-base sm:text-xl md:text-2xl font-bold tracking-tight text-slate-900 leading-snug text-balance max-w-4xl md:max-w-none mx-auto md:mx-0">
               {pageH1}
             </h1>
           </div>
-        </div>
+        </header>
       )}
       <CmsBlockRenderer blocks={homePage.blocks} hasPageH1={!hasHeroTitle} />
       <LandingPopup />

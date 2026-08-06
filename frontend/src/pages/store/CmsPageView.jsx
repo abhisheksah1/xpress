@@ -58,11 +58,13 @@ export default function CmsPageView({ pageType }) {
         }}
         jsonLdContext={{ title: page.title, path }}
       />
-      <div className="bg-gray-50 border-b border-gray-100">
-        <div className="cms-section !py-6 sm:!py-8 md:!py-10">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight">{page.title}</h1>
+      <header className="border-b border-slate-200/80 bg-slate-50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 md:py-5">
+          <h1 className="text-center md:text-left text-base sm:text-xl md:text-2xl font-bold tracking-tight text-slate-900 leading-snug text-balance max-w-4xl md:max-w-none mx-auto md:mx-0">
+            {page.title}
+          </h1>
         </div>
-      </div>
+      </header>
       <CmsBlockRenderer blocks={page.blocks} hasPageH1 />
     </div>
   );

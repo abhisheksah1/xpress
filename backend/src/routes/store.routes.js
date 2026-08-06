@@ -8,6 +8,7 @@ import * as settingsController from '../controllers/store/settings.controller.js
 import * as storeUploadController from '../controllers/store/upload.controller.js';
 import * as reminderController from '../controllers/store/reminder.controller.js';
 import * as seoController from '../controllers/seo.controller.js';
+import * as analyticsController from '../controllers/store/analytics.controller.js';
 import { authenticate, optionalAuth } from '../middlewares/auth.middleware.js';
 import { authorize } from '../middlewares/role.middleware.js';
 import { ROLES } from '../config/constants.js';
@@ -17,6 +18,9 @@ import { maintenanceGate } from '../middlewares/maintenance.middleware.js';
 import { uploadSingle } from '../middlewares/upload.middleware.js';
 
 const router = Router();
+
+// Analytics before maintenance gate so beacons still work during maintenance
+router.post('/analytics/pageview', analyticsController.pageviewLimiter, analyticsController.recordPageView);
 
 // Maintenance mode: allow browsing, block checkout/actions
 router.use(

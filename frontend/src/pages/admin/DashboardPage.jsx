@@ -14,13 +14,29 @@ function formatDateTime(iso) {
   }
 }
 
+function formatDayLabel(dateKey) {
+  if (!dateKey) return '—';
+  try {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return dateKey;
+  }
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
+  const [visits, setVisits] = useState(null);
   const [system, setSystem] = useState(null);
 
   useEffect(() => {
     adminApi.getDashboard().then((res) => {
       setStats(res.data.data.stats);
+      setVisits(res.data.data.visits || null);
       setSystem(res.data.data.system || null);
     });
   }, []);
@@ -32,6 +48,29 @@ export default function DashboardPage() {
     { label: 'Revenue (NPR)', value: stats?.totalRevenue != null ? Number(stats.totalRevenue).toLocaleString() : '—' },
   ];
 
+  const visitCards = [
+    {
+      label: 'Visitors today',
+      value: stats?.visitorsToday != null ? Number(stats.visitorsToday).toLocaleString() : '—',
+      hint: visits?.yesterday ? `Yesterday: ${Number(visits.yesterday.uniqueVisitors || 0).toLocaleString()}` : null,
+    },
+    {
+      label: 'Page views today',
+      value: stats?.pageViewsToday != null ? Number(stats.pageViewsToday).toLocaleString() : '—',
+      hint: visits?.yesterday ? `Yesterday: ${Number(visits.yesterday.pageViews || 0).toLocaleString()}` : null,
+    },
+    {
+      label: 'Visitors (7 days)',
+      value: stats?.visitorsLast7Days != null ? Number(stats.visitorsLast7Days).toLocaleString() : '—',
+      hint: 'Unique per day, summed',
+    },
+    {
+      label: 'Page views (7 days)',
+      value: stats?.pageViewsLast7Days != null ? Number(stats.pageViewsLast7Days).toLocaleString() : '—',
+      hint: visits?.timezone ? `Timezone: ${visits.timezone}` : null,
+    },
+  ];
+
   const quickLinks = [
     { to: '/admin/products/new', label: 'Add Product' },
     { to: '/admin/reminders', label: 'Customer Reminders' },
@@ -40,6 +79,8 @@ export default function DashboardPage() {
     { to: '/admin/settings', label: 'Store Settings' },
     { to: '/admin/blog', label: 'Manage Blog' },
   ];
+
+  const last7 = Array.isArray(visits?.last7Days) ? [...visits.last7Days].reverse() : [];
 
   return (
     <div>
@@ -74,6 +115,46 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      <div className="mb-8">
+        <h2 className="font-semibold mb-3">Store traffic</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
+          {visitCards.map((s) => (
+            <div key={s.label} className="card">
+              <p className="text-sm text-gray-500">{s.label}</p>
+              <p className="text-3xl font-bold mt-1 tabular-nums">{s.value}</p>
+              {s.hint ? <p className="text-xs text-gray-400 mt-1">{s.hint}</p> : null}
+            </div>
+          ))}
+        </div>
+        {last7.length > 0 && (
+          <div className="card overflow-x-auto">
+            <h3 className="font-semibold mb-3 text-sm text-gray-700">Last 7 days</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b border-gray-100">
+                  <th className="pb-2 font-medium">Day</th>
+                  <th className="pb-2 font-medium text-right">Visitors</th>
+                  <th className="pb-2 font-medium text-right">Page views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {last7.map((row) => (
+                  <tr key={row.date} className="border-b border-gray-50 last:border-0">
+                    <td className="py-2">{formatDayLabel(row.date)}</td>
+                    <td className="py-2 text-right tabular-nums">{Number(row.uniqueVisitors || 0).toLocaleString()}</td>
+                    <td className="py-2 text-right tabular-nums">{Number(row.pageViews || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-xs text-gray-400 mt-3">
+              Visitors are unique browsers per day (anonymous id in the shopper&apos;s browser). Counts start after this update is live.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="card">
         <h2 className="font-semibold mb-4">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">

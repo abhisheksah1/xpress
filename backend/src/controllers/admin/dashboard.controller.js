@@ -2,9 +2,10 @@ import { Order } from '../../models/index.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { getDeployInfo } from '../../utils/deployInfo.js';
+import { getVisitStatsForDashboard } from '../../services/visit.service.js';
 
 export const getDashboard = asyncHandler(async (req, res) => {
-  const [totalOrders, pendingOrders, totalProducts, lowStockCount, recentOrders] = await Promise.all([
+  const [totalOrders, pendingOrders, totalProducts, lowStockCount, recentOrders, visits] = await Promise.all([
     Order.countDocuments(),
     Order.countDocuments({ status: 'pending' }),
     import('../../models/index.js').then((m) => m.Product.countDocuments({ isActive: true })),
@@ -13,6 +14,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
       .populate('user', 'name email')
       .sort({ createdAt: -1 })
       .limit(10),
+    getVisitStatsForDashboard(),
   ]);
 
   const revenue = await Order.aggregate([
@@ -30,7 +32,12 @@ export const getDashboard = asyncHandler(async (req, res) => {
         totalProducts,
         lowStockCount: lowStockCount.length,
         totalRevenue: revenue[0]?.total || 0,
+        visitorsToday: visits.today.uniqueVisitors,
+        pageViewsToday: visits.today.pageViews,
+        visitorsLast7Days: visits.last7Totals.uniqueVisitors,
+        pageViewsLast7Days: visits.last7Totals.pageViews,
       },
+      visits,
       recentOrders,
       system: {
         liveUpdatedAt: deploy.deployedAt,
