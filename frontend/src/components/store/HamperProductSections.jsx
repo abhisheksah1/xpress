@@ -28,8 +28,6 @@ export function HamperComboIncludes({ comboItems }) {
         {comboItems.map((item, index) => {
           const p = item.product;
           const desc = p?.shortDescription || p?.description || '';
-          const component = item.product;
-          const outOfStock = !component || (component.stock ?? 0) <= 0;
           const qty = getComboItemQuantity(item);
           const qtyLabel = qty > 1 ? ` ×${qty}` : '';
 
@@ -42,9 +40,6 @@ export function HamperComboIncludes({ comboItems }) {
                 <p className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
                   {p?.name || 'Product'}
                   {qtyLabel}
-                  {outOfStock && (
-                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-rose-600">Out of stock</span>
-                  )}
                 </p>
                 {desc && (
                   <div className="text-xs sm:text-sm mt-1.5">
@@ -172,12 +167,6 @@ export function HamperProductInfoSections({
   return (
     <div className="mt-10 space-y-6 w-full min-w-0">
       <HamperComboIncludes comboItems={comboItems} />
-      {product.shortDescriptionEnabled && (product.shortDescription || product.description) && (
-        <section className="rounded-xl border border-rose-100 bg-white p-4 sm:p-5">
-          <SectionHeading>About this combo</SectionHeading>
-          <ProductRichText content={product.shortDescription || product.description} />
-        </section>
-      )}
       {longDescription && (
         <section className="rounded-xl border border-rose-100 bg-white p-4 sm:p-5">
           <SectionHeading>Product details</SectionHeading>

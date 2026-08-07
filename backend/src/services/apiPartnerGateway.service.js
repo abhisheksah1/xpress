@@ -3,7 +3,7 @@ import * as deliveryService from './delivery.service.js';
 import * as couponService from './coupon.service.js';
 import * as orderService from './order.service.js';
 import * as comboService from './combo.service.js';
-import { allowsBackorder } from '../utils/productStock.js';
+import { allowsBackorder, effectiveAllowsBackorder } from '../utils/productStock.js';
 import * as paymentGatewayService from './paymentGateway.service.js';
 import { getSettings } from './settings.service.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -79,7 +79,7 @@ export const validatePartnerPayloadFields = (partner, payload) => {
 
 const isProductEligible = async (partner, product, locationId, deliveryDate) => {
   if (!product?.isActive) return false;
-  if (!allowsBackorder(product)) {
+  if (!effectiveAllowsBackorder(product)) {
     if (product.isHamper) {
       const available = await comboService.getComboAvailableStock(product);
       if (available <= 0) return false;

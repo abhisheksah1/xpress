@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { storeApi } from '../../api/store.js';
 import { useStore } from '../../context/StoreContext.jsx';
@@ -7,39 +7,8 @@ import SeoHead from '../../components/store/SeoHead.jsx';
 import { categoryShopPath, mergeEntitySeo } from '../../utils/seoMeta.js';
 import Pagination from '../../components/Pagination.jsx';
 
-/** Keep 10 full rows per page across breakpoints (matches grid columns). */
-const GRID_ROWS = 10;
-const PAGE_SIZE_BY_BREAKPOINT = {
-  mobile: 2 * GRID_ROWS, // 2 cols × 10 rows
-  tablet: 3 * GRID_ROWS, // 3 cols × 10 rows
-  desktop: 4 * GRID_ROWS, // 4 cols × 10 rows
-};
-
-function getShopPageSize() {
-  if (typeof window === 'undefined') return PAGE_SIZE_BY_BREAKPOINT.desktop;
-  if (window.matchMedia('(min-width: 1024px)').matches) return PAGE_SIZE_BY_BREAKPOINT.desktop;
-  if (window.matchMedia('(min-width: 768px)').matches) return PAGE_SIZE_BY_BREAKPOINT.tablet;
-  return PAGE_SIZE_BY_BREAKPOINT.mobile;
-}
-
-function useShopPageSize() {
-  const [pageSize, setPageSize] = useState(getShopPageSize);
-
-  useEffect(() => {
-    const mqTablet = window.matchMedia('(min-width: 768px)');
-    const mqDesktop = window.matchMedia('(min-width: 1024px)');
-    const sync = () => setPageSize(getShopPageSize());
-    sync();
-    mqTablet.addEventListener('change', sync);
-    mqDesktop.addEventListener('change', sync);
-    return () => {
-      mqTablet.removeEventListener('change', sync);
-      mqDesktop.removeEventListener('change', sync);
-    };
-  }, []);
-
-  return pageSize;
-}
+/** Products per page on shop / category listings. */
+const SHOP_PAGE_SIZE = 60;
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -97,8 +66,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const pageSize = useShopPageSize();
-  const prevPageSizeRef = useRef(pageSize);
+  const pageSize = SHOP_PAGE_SIZE;
 
   const legacyCategoryId = searchParams.get('category') || '';
   const page = Number(searchParams.get('page') || 1);
@@ -126,23 +94,6 @@ export default function ShopPage() {
       navigate(`/shop/category/${cat.slug}${suffix}`, { replace: true });
     }
   }, [categorySlug, legacyCategoryId, categories, navigate, searchParams]);
-
-  // When viewport columns change, remap page so the user stays near the same products
-  useEffect(() => {
-    const prevLimit = prevPageSizeRef.current;
-    if (prevLimit === pageSize) return;
-    const currentPage = Number(searchParams.get('page') || 1);
-    const offset = (Math.max(1, currentPage) - 1) * prevLimit;
-    const nextPage = Math.floor(offset / pageSize) + 1;
-    prevPageSizeRef.current = pageSize;
-    if (nextPage === currentPage) return;
-    const next = new URLSearchParams(searchParams);
-    if (nextPage <= 1) next.delete('page');
-    else next.set('page', String(nextPage));
-    setSearchParams(next, { replace: true });
-    // Only remap when the responsive page size changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageSize]);
 
   useEffect(() => {
     setLoading(true);
@@ -191,7 +142,8 @@ export default function ShopPage() {
 
   const categorySeo = activeCategory ? mergeEntitySeo(activeCategory) : null;
   const pageTitle = activeCategory ? activeCategory.name : 'Shop Gifts';
-  const pageDescription = activeCategory?.description
+  // Meta-only fallback — not shown on the page for customers
+  const metaDescription = activeCategory?.description
     || (activeCategory ? `Browse ${activeCategory.name} gifts and products at KoseliXpress Nepal.` : 'Browse gifts and products at KoseliXpress Nepal.');
   const categoryPath = activeCategory ? categoryShopPath(activeCategory) : '/shop';
 
@@ -204,7 +156,7 @@ export default function ShopPage() {
           title: activeCategory
             ? `${activeCategory.name} | Shop Gifts | KoseliXpress`.slice(0, 60)
             : 'Shop Gifts | KoseliXpress',
-          description: pageDescription,
+          description: metaDescription,
           image: activeCategory?.image?.url,
           imageAlt: activeCategory?.image?.alt || pageTitle,
           path: categoryPath,
@@ -230,9 +182,6 @@ export default function ShopPage() {
         <h1 className="text-xl md:text-2xl font-bold text-center md:text-left text-slate-900 px-2 md:px-0">
           {pageTitle}
         </h1>
-        <p className="text-sm text-gray-600 mt-2 max-w-3xl text-center md:text-left px-2 md:px-0">
-          {pageDescription}
-        </p>
       </div>
 
       <div className="md:hidden mb-4">
@@ -327,7 +276,20 @@ export default function ShopPage() {
           </div>
 
           {loading ? (
-            <p className="text-gray-400 py-8 text-center md:text-left">Loading products...</p>
+            <div
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6 animate-pulse"
+              aria-busy="true"
+              aria-label="Loading products"
+            >
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="aspect-square rounded-xl bg-gray-100" />
+                  <div className="h-3 w-4/5 rounded bg-gray-100" />
+                  <div className="h-3 w-1/3 rounded bg-gray-100" />
+                  <div className="h-9 rounded-lg bg-gray-100" />
+                </div>
+              ))}
+            </div>
           ) : products.length === 0 ? (
             <p className="text-gray-400 py-8 text-center md:text-left">No products found.</p>
           ) : (

@@ -89,6 +89,7 @@ const productSchema = new mongoose.Schema(
       imagePrint: {
         enabled: { type: Boolean, default: false },
         required: { type: Boolean, default: false },
+        maxImages: { type: Number, default: 1, min: 1, max: 6 },
       },
     },
     allowBackorder: { type: Boolean, default: false },

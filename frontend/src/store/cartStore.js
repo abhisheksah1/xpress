@@ -20,6 +20,7 @@ const resolvePersonalization = (productId, personalization, productUploads) => {
 const printFieldsFromPersonalization = (personalization) => ({
   printImageUrl: personalization?.printImageUrl,
   printImageName: personalization?.printImageName,
+  printImages: personalization?.printImages,
 });
 
 const stockMetaFromProduct = (product) => {

@@ -286,6 +286,7 @@ export default function CheckoutPage() {
           categoryId: o.categoryId || undefined,
           label: String(o.label),
           priceAdjustment: Number(o.priceAdjustment) || 0,
+          componentId: o.componentId || undefined,
         })),
     })),
     paymentMethod: paymentMethod || undefined,
@@ -504,7 +505,11 @@ export default function CheckoutPage() {
 
     for (const item of items) {
       const p = resolveCartItemPersonalization(item, useCartStore.getState().productUploads);
-      if (p?.printImageName && !p?.printImageUrl) {
+      if (
+        p?.printImageName
+        && !p?.printImageUrl
+        && !(Array.isArray(p?.printImages) && p.printImages.some((img) => img?.url))
+      ) {
         return toast.error(`Custom image for "${item.name}" did not save correctly. Remove the item and add it again from the product page.`);
       }
     }
@@ -524,6 +529,7 @@ export default function CheckoutPage() {
               categoryId: o.categoryId || undefined,
               label: String(o.label),
               priceAdjustment: Number(o.priceAdjustment) || 0,
+              componentId: o.componentId || undefined,
             })),
           personalization: resolveCartItemPersonalization(i, productUploads),
         })),

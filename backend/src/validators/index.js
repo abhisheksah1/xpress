@@ -109,7 +109,11 @@ export const createProductSchema = z.object({
       ]).optional(),
       imagePrint: z.union([
         z.boolean(),
-        z.object({ enabled: z.boolean().optional(), required: z.boolean().optional() }),
+        z.object({
+          enabled: z.boolean().optional(),
+          required: z.boolean().optional(),
+          maxImages: z.coerce.number().int().min(1).max(6).optional(),
+        }),
       ]).optional(),
     }).optional(),
     allowBackorder: z.boolean().optional(),
@@ -118,6 +122,11 @@ export const createProductSchema = z.object({
       product: z.preprocess(toProductId, z.string()),
       quantity: z.number().min(1).optional(),
       sortOrder: z.number().optional(),
+      selectedOptions: z.array(z.object({
+        category: z.string().min(1),
+        label: z.string().min(1),
+        priceAdjustment: z.coerce.number().optional(),
+      })).optional(),
     })).optional(),
     barcode: z.string().optional(),
     productGroup: z.string().optional(),
@@ -182,6 +191,7 @@ const selectedOptionSchema = z.object({
   categoryId: z.string().optional(),
   label: z.string().min(1),
   priceAdjustment: z.coerce.number().optional(),
+  componentId: z.string().optional(),
 });
 
 export const createOrderSchema = z.object({
@@ -200,6 +210,10 @@ export const createOrderSchema = z.object({
             giftMessage: z.string().optional(),
             printImageUrl: z.string().optional(),
             printImageName: z.string().optional(),
+            printImages: z.array(z.object({
+              url: z.string().min(1),
+              name: z.string().optional(),
+            })).optional(),
           }).optional(),
         })
       )

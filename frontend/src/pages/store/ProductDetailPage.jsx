@@ -29,7 +29,14 @@ import {
 } from '../../components/store/HamperProductSections.jsx';
 import ProductAssociatedCategories from '../../components/store/ProductAssociatedCategories.jsx';
 import ProductRichText from '../../components/store/ProductRichText.jsx';
+import ProductPageSkeleton from '../../components/store/ProductPageSkeleton.jsx';
 import { resolveMediaUrl } from '../../utils/mediaUrl.js';
+import {
+  fetchProduct,
+  getCachedProduct,
+  resolveLoadingProductTitle,
+  setCachedProduct,
+} from '../../utils/productCache.js';
 
 function buildGallery(product, comboComponents) {
   const base = product?.images?.length
@@ -261,9 +268,11 @@ function BuyPanel({
             <div className="flex flex-wrap gap-2">
               {(cat.options || []).map((opt) => {
                 const active = chosen?.label === opt.label;
+                const optionBackorder =
+                  allowsBackorder(product) || cat.sourceAllowBackorder === true;
                 const optionOut =
                   cat.tracksInventory &&
-                  !allowsBackorder(product) &&
+                  !optionBackorder &&
                   (Number(opt.stock) || 0) <= 0;
                 return (
                   <button
@@ -383,7 +392,7 @@ export default function ProductDetailPage() {
   const addItem = useCartStore((s) => s.addItem);
   const setProductUpload = useCartStore((s) => s.setProductUpload);
   const uploadedPrintRef = useRef(null);
-  const [product, setProduct] = useState(null);
+  const [product, setProduct] = useState(() => getCachedProduct(slug));
   const [related, setRelated] = useState([]);
   const [qty, setQty] = useState(1);
   const [personalization, setPersonalization] = useState({});
@@ -397,35 +406,62 @@ export default function ProductDetailPage() {
   const isHamper = Boolean(product?.isHamper);
 
   useEffect(() => {
-    storeApi
-      .getProduct(slug)
-      .then((res) => {
-        const p = res.data.data;
-        setProduct(p);
+    let cancelled = false;
+    const cached = getCachedProduct(slug);
+
+    const applyProduct = (p, { soft = false } = {}) => {
+      if (!p) return;
+      setProduct(p);
+      if (!soft) {
         setPersonalization(emptyPersonalization(p.personalizationFields || {}));
         uploadedPrintRef.current = null;
         setActiveImage(0);
         setQty(1);
+      }
+      const initial = {};
+      (p.optionCategories || []).forEach((cat, index) => {
+        const catId = cat._id || `cat-${index}`;
+        if (cat.options?.[0]) initial[catId] = cat.options[0];
+      });
+      setSelectedOptions(initial);
+    };
 
-        const initial = {};
-        (p.optionCategories || []).forEach((cat, index) => {
-          const catId = cat._id || `cat-${index}`;
-          if (cat.options?.[0]) initial[catId] = cat.options[0];
-        });
-        setSelectedOptions(initial);
+    if (cached) {
+      applyProduct(cached, { soft: true });
+    } else {
+      setProduct(null);
+    }
+
+    fetchProduct(slug)
+      .then((p) => {
+        if (cancelled || !p) return;
+        setCachedProduct(slug, p);
+        applyProduct(p);
 
         const catId = p.category?._id || p.category;
         if (catId) {
           storeApi
             .getProducts({ category: catId, limit: 8 })
             .then((r) => {
+              if (cancelled) return;
               const list = (r.data.data?.products || []).filter((item) => item.slug !== p.slug);
               setRelated(list.slice(0, 4));
             })
-            .catch(() => setRelated([]));
+            .catch(() => {
+              if (!cancelled) setRelated([]);
+            });
         }
       })
-      .catch(() => toast.error('Product not found'));
+      .catch(() => {
+        if (!cancelled) {
+          setProduct(null);
+          toast.error('Product not found');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
   const showPersonalization = useMemo(
@@ -457,6 +493,7 @@ export default function ProductDetailPage() {
             categoryId: cat._id ? String(cat._id) : undefined,
             label: chosen.label,
             priceAdjustment: Number(chosen.priceAdjustment) || 0,
+            componentId: cat.sourceProductId ? String(cat.sourceProductId) : undefined,
           };
         })
         .filter(Boolean),
@@ -491,7 +528,11 @@ export default function ProductDetailPage() {
       }
 
       const imageEnabled = normalizePersonalizationFields(fields).imagePrint?.enabled;
-      if (imageEnabled && mergedPersonalization.printImageName && !snapshot?.printImageUrl) {
+      const hasAnyImage = Boolean(
+        snapshot?.printImageUrl
+        || (Array.isArray(snapshot?.printImages) && snapshot.printImages.some((img) => img?.url))
+      );
+      if (imageEnabled && mergedPersonalization.printImageName && !hasAnyImage) {
         toast.error('Image upload incomplete. Please upload the design image again.');
         return;
       }
@@ -507,6 +548,7 @@ export default function ProductDetailPage() {
           categoryId: cat._id ? String(cat._id) : undefined,
           label: chosen.label,
           priceAdjustment: Number(chosen.priceAdjustment) || 0,
+          componentId: cat.sourceProductId ? String(cat.sourceProductId) : undefined,
         };
       })
       .filter(Boolean);
@@ -520,7 +562,7 @@ export default function ProductDetailPage() {
         selectedOptions: optionsListForCart,
         optionsKey: optionsKey(optionsListForCart),
         stock: resolveLineStock(product, optionsListForCart),
-        allowBackorder: product.allowBackorder,
+        allowBackorder: allowsBackorder(product),
         isHamper: product.isHamper,
         comboItems: product.comboItems,
         optionCategories: product.optionCategories,
@@ -541,11 +583,7 @@ export default function ProductDetailPage() {
   };
 
   if (!product) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-[#FCF9F9]">
-        <p className="text-gray-400 text-sm">Loading product...</p>
-      </div>
-    );
+    return <ProductPageSkeleton title={resolveLoadingProductTitle(slug)} />;
   }
 
   const deliverySchedules = product.deliveryInfo || [];
@@ -594,7 +632,14 @@ export default function ProductDetailPage() {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-start w-full">
-          {/* Buy content first in DOM so it stays at the top on mobile; desktop places gallery left via order */}
+          <ProductGallery
+            product={product}
+            gallery={gallery}
+            comboComponents={comboComponents}
+            activeImage={activeImage}
+            onSelectImage={setActiveImage}
+            className="lg:col-span-7"
+          />
           <BuyPanel
             product={product}
             isHamper={isHamper}
@@ -621,15 +666,7 @@ export default function ProductDetailPage() {
             qty={qty}
             setQty={setQty}
             onAddToCart={handleAddToCart}
-            className="order-1 lg:order-2 lg:col-span-5"
-          />
-          <ProductGallery
-            product={product}
-            gallery={gallery}
-            comboComponents={comboComponents}
-            activeImage={activeImage}
-            onSelectImage={setActiveImage}
-            className="order-2 lg:order-1 lg:col-span-7"
+            className="lg:col-span-5"
           />
         </div>
 

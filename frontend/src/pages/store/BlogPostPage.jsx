@@ -25,8 +25,15 @@ export default function BlogPostPage() {
 
   if (!blog) {
     return (
-      <div className="cms-section text-center text-gray-400 py-16 sm:py-20">
-        Loading...
+      <div className="cms-section animate-pulse space-y-4 py-10" aria-busy="true" aria-label="Loading article">
+        <div className="h-8 w-3/4 max-w-xl rounded bg-gray-100" />
+        <div className="h-4 w-40 rounded bg-gray-100" />
+        <div className="aspect-[16/9] max-w-3xl rounded-xl bg-gray-100" />
+        <div className="space-y-2 max-w-3xl">
+          <div className="h-3 w-full rounded bg-gray-100" />
+          <div className="h-3 w-11/12 rounded bg-gray-100" />
+          <div className="h-3 w-4/5 rounded bg-gray-100" />
+        </div>
       </div>
     );
   }

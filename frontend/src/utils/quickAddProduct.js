@@ -1,5 +1,5 @@
 import toast from 'react-hot-toast';
-import { isProductSoldOut, resolveLineStock } from './comboItems.js';
+import { allowsBackorder, isProductSoldOut, resolveLineStock } from './comboItems.js';
 import { normalizePersonalizationFields } from './personalization.js';
 import { productTracksOptionInventory } from './optionInventory.js';
 
@@ -23,6 +23,7 @@ export function buildDefaultSelectedOptions(product) {
       categoryId: cat._id ? String(cat._id) : undefined,
       label: chosen.label,
       priceAdjustment: Number(chosen.priceAdjustment) || 0,
+      componentId: cat.sourceProductId ? String(cat.sourceProductId) : undefined,
     });
     priceAdjustment += Number(chosen.priceAdjustment) || 0;
   });
@@ -76,7 +77,7 @@ export function quickAddProductToCart(addItem, product) {
       selectedOptions,
       optionsKey: oKey,
       stock,
-      allowBackorder: product.allowBackorder,
+      allowBackorder: allowsBackorder(product),
       isHamper: product.isHamper,
       comboItems: product.comboItems,
     },

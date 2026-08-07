@@ -7,6 +7,9 @@ import ScrollToTop from './components/ScrollToTop.jsx';
 import App from './App';
 import './index.css';
 
+/** Mark JS boot so the SEO body block can leave the visual layout for shoppers. */
+document.documentElement.classList.add('app-booted');
+
 /**
  * Keep server H1 until React paints its own — Rank Math / non-JS crawlers need a real H1
  * in the first HTML. Removing it too early (or using a hidden H1) fails external audits.

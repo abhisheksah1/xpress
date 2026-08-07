@@ -258,7 +258,7 @@ export const getProducts = async ({
   }
 
   const listSelect = isComboPicker
-    ? 'name slug sku price stock images isHamper isActive shortDescription description'
+    ? 'name slug sku price compareAtPrice stock images isHamper isActive allowBackorder optionCategories shortDescription description'
     : cardFields
       ? STOREFRONT_CARD_SELECT
       : undefined;
@@ -372,7 +372,10 @@ export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
   const product = await Product.findOne({ slug, isActive: true })
     .populate('category', 'name slug deliveryScope deliveryGroupRules')
     .populate('categories', 'name slug')
-    .populate('comboItems.product', 'name slug price images stock shortDescription description');
+    .populate(
+      'comboItems.product',
+      'name slug price images stock allowBackorder optionCategories shortDescription description'
+    );
   if (!product) throw new ApiError(404, 'Product not found');
 
   const groups = await deliveryService.getDeliveryGroups();
@@ -386,6 +389,8 @@ export const getProductBySlug = async (slug, { deliveryGroup } = {}) => {
       await Product.updateOne({ _id: product._id }, { stock });
     }
     doc.stock = stock;
+    doc.optionCategories = comboService.mapComboOptionCategories(product);
+    doc.allowBackorder = comboService.effectiveAllowsBackorder(product) || product.allowBackorder;
   }
 
   doc.deliveryInfo = deliveryInfo;
@@ -404,7 +409,7 @@ export const getProductById = async (id) => {
   const product = await Product.findById(id)
     .populate('category', 'name slug deliveryScope deliveryGroupRules')
     .populate('categories', 'name slug deliveryScope deliveryGroupRules')
-    .populate('comboItems.product', 'name slug sku price stock images isHamper shortDescription description')
+    .populate('comboItems.product', 'name slug sku price stock images isHamper allowBackorder optionCategories shortDescription description')
     .populate('deliveryGroupRules.group', 'name code estimatedDays estimatedHours cutoffTime')
     .populate('deliveryZones', 'name code estimatedDeliveryLabel estimatedDays cutoffTime coverageLocations')
     .populate('deliveryGroups', 'name code estimatedDeliveryLabel estimatedDays cutoffTime');

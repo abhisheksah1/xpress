@@ -209,15 +209,33 @@ export default function TrackOrderPage() {
                       {(p.cakeMessage || p.giftMessage) && (
                         <p className="text-xs text-gray-600 mt-1">
                           {p.cakeMessage && <>Message: {p.cakeMessage}</>}
-                          {p.giftMessage && <>Gift note: {p.giftMessage}</>}
+                          {p.cakeMessage && p.giftMessage && ' · '}
+                          {p.giftMessage && <>Text on gift: {p.giftMessage}</>}
                         </p>
                       )}
-                      {p.printImageUrl && (
-                        <div className="mt-2">
-                          <p className="text-xs text-gray-500 mb-1">Custom print</p>
-                          <OrderImage src={p.printImageUrl} alt="Print" className="w-24 h-24 rounded-lg overflow-hidden" />
-                        </div>
-                      )}
+                      {(() => {
+                        const images = Array.isArray(p.printImages) && p.printImages.length
+                          ? p.printImages
+                          : p.printImageUrl
+                            ? [{ url: p.printImageUrl, name: p.printImageName }]
+                            : [];
+                        if (!images.length) return null;
+                        return (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-500 mb-1">Custom print{images.length > 1 ? 's' : ''}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {images.map((img, idx) => (
+                                <OrderImage
+                                  key={`${img.url}-${idx}`}
+                                  src={img.url}
+                                  alt={img.name || `Print ${idx + 1}`}
+                                  className="w-24 h-24 rounded-lg overflow-hidden"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </li>
                 );

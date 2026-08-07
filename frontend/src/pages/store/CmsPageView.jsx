@@ -25,7 +25,20 @@ export default function CmsPageView({ pageType }) {
   }, [pageType, routeSlug]);
 
   if (loading) {
-    return <div className="cms-section text-center text-gray-400 py-16 sm:py-20">Loading...</div>;
+    return (
+      <div className="cms-page animate-pulse" aria-busy="true" aria-label="Loading page">
+        <div className="cms-section space-y-4 py-8">
+          <div className="h-8 w-64 max-w-full rounded bg-gray-100" />
+          <div className="h-4 w-full max-w-xl rounded bg-gray-100" />
+          <div className="h-4 w-3/4 max-w-lg rounded bg-gray-100" />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="aspect-[4/3] rounded-xl bg-gray-100" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
   if (!page) {
     return (

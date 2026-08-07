@@ -151,6 +151,11 @@ export const cancelLead = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, withOrderMeta(order, req), 'Lead order cancelled'));
 });
 
+export const deleteOrder = asyncHandler(async (req, res) => {
+  const result = await orderService.deleteOrder(req.params.id);
+  res.json(new ApiResponse(200, result, 'Order deleted'));
+});
+
 export const updateStatus = asyncHandler(async (req, res) => {
   const order = await orderService.updateOrderStatus(req.params.id, req.validated.body, req.user._id);
   res.json(new ApiResponse(200, withOrderMeta(order, req), 'Order status updated'));

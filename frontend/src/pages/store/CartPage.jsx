@@ -96,6 +96,7 @@ export default function CartPage() {
               categoryId: o.categoryId || undefined,
               label: String(o.label),
               priceAdjustment: Number(o.priceAdjustment) || 0,
+              componentId: o.componentId || undefined,
             })),
         })),
       });
@@ -194,13 +195,24 @@ export default function CartPage() {
                     </p>
                   )}
                   <PersonalizationSummary personalization={resolvedPersonalization} className="mt-2" />
-                  {resolvedPersonalization?.printImageUrl && (
+                  {Array.isArray(resolvedPersonalization?.printImages) && resolvedPersonalization.printImages.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {resolvedPersonalization.printImages.map((img, idx) => (
+                        <img
+                          key={`${img.url}-${idx}`}
+                          src={resolveMediaUrl(img.url)}
+                          alt={img.name || `Custom design ${idx + 1}`}
+                          className="h-14 w-auto object-contain border rounded"
+                        />
+                      ))}
+                    </div>
+                  ) : resolvedPersonalization?.printImageUrl ? (
                     <img
                       src={resolveMediaUrl(resolvedPersonalization.printImageUrl)}
                       alt="Custom design"
                       className="mt-2 h-14 w-auto object-contain border rounded"
                     />
-                  )}
+                  ) : null}
                 </div>
               </div>
 

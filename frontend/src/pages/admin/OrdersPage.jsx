@@ -107,6 +107,7 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
   const [confirmingLead, setConfirmingLead] = useState(false);
   const [cancellingLead, setCancellingLead] = useState(false);
   const [syncingPayment, setSyncingPayment] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadOrder = () => {
     if (!orderId) return;
@@ -129,6 +130,28 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
   }, [open, orderId]);
 
   if (!open) return null;
+
+  const canDeleteOrder = order && order.payment?.status !== 'paid';
+
+  const deleteOrder = async () => {
+    if (!order || !canDeleteOrder) return;
+    const label = order.orderNumber || orderId;
+    const paymentLabel = order.payment?.status || 'unknown';
+    if (!confirm(`Delete order ${label}?\n\nPayment: ${paymentLabel}\nThis permanently removes the order and cannot be undone.`)) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await adminApi.deleteOrder(orderId);
+      toast.success(`Order ${label} deleted`);
+      onUpdated?.(true);
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete order');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const saveStatus = async () => {
     setSavingStatus(true);
@@ -444,19 +467,35 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                           {(p.cakeMessage || p.giftMessage) && (
                             <div className="mt-2 text-xs text-gray-700 space-y-0.5">
                               {p.cakeMessage && <p><span className="text-gray-500">Cake message:</span> {p.cakeMessage}</p>}
-                              {p.giftMessage && <p><span className="text-gray-500">Personalization:</span> {p.giftMessage}</p>}
+                              {p.giftMessage && <p><span className="text-gray-500">Text on gift:</span> {p.giftMessage}</p>}
                             </div>
                           )}
-                          {(printImageUrl || printImageName) && (
-                            <div className="mt-2">
-                              <p className="text-xs text-gray-500 mb-1">Customer print image</p>
-                              {printImageUrl ? (
-                                <OrderImage src={printImageUrl} alt={printImageName || 'Print'} size="md" />
-                              ) : (
-                                <p className="text-xs text-amber-700">Image name: {printImageName} (file URL missing)</p>
-                              )}
-                            </div>
-                          )}
+                          {(() => {
+                            const images = Array.isArray(p.printImages) && p.printImages.length
+                              ? p.printImages
+                              : (printImageUrl || printImageName)
+                                ? [{ url: printImageUrl, name: printImageName }]
+                                : [];
+                            if (!images.length) return null;
+                            return (
+                              <div className="mt-2">
+                                <p className="text-xs text-gray-500 mb-1">
+                                  Customer print image{images.length > 1 ? 's' : ''}
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {images.map((img, idx) => (
+                                    img.url ? (
+                                      <OrderImage key={`${img.url}-${idx}`} src={img.url} alt={img.name || `Print ${idx + 1}`} size="md" />
+                                    ) : (
+                                      <p key={`missing-${idx}`} className="text-xs text-amber-700">
+                                        Image name: {img.name} (file URL missing)
+                                      </p>
+                                    )
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </li>
                     );
@@ -552,6 +591,24 @@ function OrderDetailModal({ orderId, open, onClose, onUpdated }) {
                   </p>
                 )}
               </div>
+
+              {canDeleteOrder && (
+                <div className="rounded-lg border border-red-200 bg-red-50/50 p-3 space-y-2">
+                  <p className="text-xs font-bold uppercase text-red-800">Delete order</p>
+                  <p className="text-xs text-red-700">
+                    Use this for failed payments, cancelled leads, or junk checkout attempts.
+                    Paid orders cannot be deleted.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={deleteOrder}
+                    disabled={deleting || confirmingLead || cancellingLead || syncingPayment}
+                    className="btn-secondary text-red-700 border-red-300 hover:bg-red-100"
+                  >
+                    {deleting ? 'Deleting...' : 'Delete order permanently'}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -800,10 +857,32 @@ export default function OrdersPage({ mode = 'orders' }) {
                       <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                         {order.createdAt ? new Date(order.createdAt).toLocaleString() : '—'}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
                         <button type="button" onClick={() => setDetailId(order._id)} className="text-primary-600 text-xs font-medium hover:underline">
                           View
                         </button>
+                        {order.payment?.status !== 'paid' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const label = order.orderNumber || order._id;
+                              if (!confirm(`Delete order ${label}?\n\nPayment: ${order.payment?.status || 'unknown'}\nThis cannot be undone.`)) {
+                                return;
+                              }
+                              try {
+                                await adminApi.deleteOrder(order._id);
+                                toast.success(`Order ${label} deleted`);
+                                if (detailId === order._id) setDetailId(null);
+                                load();
+                              } catch (err) {
+                                toast.error(err.response?.data?.message || 'Failed to delete order');
+                              }
+                            }}
+                            className="text-red-600 text-xs font-medium hover:underline ml-3"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

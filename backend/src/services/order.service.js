@@ -152,7 +152,10 @@ export const createOrder = async (data) => {
     }
 
     if (product.isHamper && product.comboItems?.length) {
-      product = await Product.findById(item.productId).populate('comboItems.product', 'stock');
+      product = await Product.findById(item.productId).populate(
+        'comboItems.product',
+        'name slug stock allowBackorder optionCategories'
+      );
     }
 
     let price = resolveProductUnitPrice(product, item);
@@ -164,6 +167,7 @@ export const createOrder = async (data) => {
             category: String(opt.category || '').trim(),
             label: String(opt.label || '').trim(),
             priceAdjustment: Number(opt.priceAdjustment) || 0,
+            ...(opt.componentId ? { componentId: String(opt.componentId) } : {}),
           }))
           .filter((opt) => opt.category && opt.label)
       : undefined;
@@ -174,7 +178,7 @@ export const createOrder = async (data) => {
       if (variant.image?.url) image = variant.image.url;
     }
 
-    if (productTracksOptionInventory(product) && !item.variantId) {
+    if (productTracksOptionInventory(product) && !item.variantId && !product.isHamper) {
       const resolved = resolveInventoryOption(product, selectedOptions);
       if (!resolved) {
         throw new ApiError(400, `Select a stock variation for ${product.name}`);
@@ -188,7 +192,7 @@ export const createOrder = async (data) => {
 
     if (!allowsBackorder(product)) {
       if (product.isHamper && product.comboItems?.length) {
-        await comboService.assertComboStock(product, item.quantity);
+        await comboService.assertComboStock(product, item.quantity, selectedOptions || []);
       } else if (stock < item.quantity) {
         const variation = formatSelectedOptionsLabel(selectedOptions);
         throw new ApiError(
@@ -202,7 +206,8 @@ export const createOrder = async (data) => {
     if (personalizationError) throw new ApiError(400, personalizationError);
 
     const normalizedPersonalization = normalizeItemPersonalization(item.personalization);
-    if (item.personalization?.printImageName && !normalizedPersonalization?.printImageUrl) {
+    if (item.personalization?.printImageName && !normalizedPersonalization?.printImageUrl
+      && !(normalizedPersonalization?.printImages || []).length) {
       throw new ApiError(
         400,
         `Custom print image for ${product.name} did not upload correctly. Please re-upload the image and try again.`
@@ -729,6 +734,32 @@ export const cancelLeadOrder = async (id, { note }, userId) => {
   return getOrderById(id);
 };
 
+/**
+ * Permanently remove an order. Paid orders cannot be deleted (use cancel/refund instead).
+ * Intended for failed payments, cancelled leads, and junk checkout attempts.
+ */
+export const deleteOrder = async (id) => {
+  const order = await Order.findById(id);
+  if (!order) throw new ApiError(404, 'Order not found');
+
+  if (order.payment?.status === PAYMENT_STATUS.PAID) {
+    throw new ApiError(
+      400,
+      'Paid orders cannot be deleted. Cancel or refund the order instead.'
+    );
+  }
+
+  const snapshot = {
+    _id: order._id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    paymentStatus: order.payment?.status,
+  };
+
+  await Order.deleteOne({ _id: order._id });
+  return snapshot;
+};
+
 export const markPaymentPaid = async (orderId, transactionId, gatewayResponse) => {
   const order = await Order.findById(orderId);
   if (!order) throw new ApiError(404, 'Order not found');
@@ -773,8 +804,9 @@ export const markPaymentPaid = async (orderId, transactionId, gatewayResponse) =
         quantity: item.quantity,
         reference: order.orderNumber,
         userId: null,
+        selectedOptions: item.selectedOptions || [],
       });
-      product.stock = await comboService.getComboAvailableStock(product);
+      product.stock = await comboService.getComboAvailableStock(product, item.selectedOptions || []);
       await product.save();
       continue;
     }

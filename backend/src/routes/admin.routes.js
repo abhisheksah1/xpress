@@ -115,6 +115,7 @@ router.get('/orders/:id', hasPermission('orders:read'), orderController.getOrder
 router.post('/orders/:id/confirm', hasPermission('orders:write'), validate(confirmLeadOrderSchema), orderController.confirmLead);
 router.post('/orders/:id/sync-payment', hasPermission('orders:write'), orderController.syncPayment);
 router.post('/orders/:id/cancel-lead', hasPermission('orders:write'), validate(cancelLeadOrderSchema), orderController.cancelLead);
+router.delete('/orders/:id', hasPermission('orders:write'), orderController.deleteOrder);
 router.patch('/orders/:id/status', hasPermission('orders:write'), validate(updateOrderStatusSchema), orderController.updateStatus);
 router.patch('/orders/:id/payment', hasPermission('orders:write'), validate(updateOrderPaymentSchema), orderController.updatePayment);
 

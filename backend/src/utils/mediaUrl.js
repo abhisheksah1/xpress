@@ -69,25 +69,60 @@ export const normalizeItemPersonalization = (personalization) => {
 
   const cakeMessage = personalization.cakeMessage?.trim() || undefined;
   const giftMessage = personalization.giftMessage?.trim() || undefined;
-  const printImageName = personalization.printImageName?.trim() || undefined;
-  const rawPrintUrl = typeof personalization.printImageUrl === 'string'
-    ? personalization.printImageUrl.trim()
-    : '';
-  const printImageUrl = rawPrintUrl ? toStoredMediaUrl(rawPrintUrl) : undefined;
 
-  if (!cakeMessage && !giftMessage && !printImageUrl && !printImageName) return undefined;
+  const printImages = [];
+  if (Array.isArray(personalization.printImages)) {
+    for (const img of personalization.printImages) {
+      const rawUrl = typeof img?.url === 'string' ? img.url.trim() : (typeof img?.printImageUrl === 'string' ? img.printImageUrl.trim() : '');
+      if (!rawUrl) continue;
+      const url = toStoredMediaUrl(rawUrl);
+      if (!url) continue;
+      printImages.push({
+        url,
+        name: String(img?.name || img?.printImageName || '').trim() || undefined,
+      });
+    }
+  }
 
-  const safeName = printImageUrl ? printImageName : undefined;
-  return { cakeMessage, giftMessage, printImageUrl, printImageName: safeName };
+  if (!printImages.length) {
+    const rawPrintUrl = typeof personalization.printImageUrl === 'string'
+      ? personalization.printImageUrl.trim()
+      : '';
+    const printImageUrl = rawPrintUrl ? toStoredMediaUrl(rawPrintUrl) : undefined;
+    if (printImageUrl) {
+      printImages.push({
+        url: printImageUrl,
+        name: personalization.printImageName?.trim() || undefined,
+      });
+    }
+  }
+
+  const printImageUrl = printImages[0]?.url;
+  const printImageName = printImages[0]?.name;
+
+  if (!cakeMessage && !giftMessage && !printImages.length) return undefined;
+
+  return {
+    cakeMessage,
+    giftMessage,
+    printImages: printImages.length ? printImages : undefined,
+    printImageUrl,
+    printImageName: printImageUrl ? printImageName : undefined,
+  };
 };
 
 export const enrichPersonalizationForClient = (personalization, baseUrl = '') => {
   const normalized = normalizeItemPersonalization(personalization);
   if (!normalized) return normalized;
-  if (!normalized.printImageUrl) return normalized;
   return {
     ...normalized,
-    printImageUrl: forClientMediaUrl(normalized.printImageUrl, baseUrl),
+    printImageUrl: normalized.printImageUrl
+      ? forClientMediaUrl(normalized.printImageUrl, baseUrl)
+      : undefined,
+    printImages: (normalized.printImages || []).map((img) => ({
+      ...img,
+      url: forClientMediaUrl(img.url, baseUrl),
+    })),
   };
 };
 

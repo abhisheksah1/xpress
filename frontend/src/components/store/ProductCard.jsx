@@ -4,6 +4,7 @@ import { useCartStore } from '../../store/cartStore.js';
 import { canQuickAddProduct, quickAddProductToCart } from '../../utils/quickAddProduct.js';
 import { isProductSoldOut } from '../../utils/comboItems.js';
 import { resolveProductImageUrl } from '../../utils/mediaUrl.js';
+import { prefetchProduct } from '../../utils/productCache.js';
 
 function getListingPriceLabel(product, formatPriceNpr) {
   const base = product.price ?? 0;
@@ -67,7 +68,13 @@ export default function ProductCard({
           : 'card group hover:shadow-md transition-shadow p-0 overflow-hidden flex flex-col h-full'
       }
     >
-      <Link to={productUrl} className="block shrink-0">
+      <Link
+        to={productUrl}
+        className="block shrink-0"
+        onMouseEnter={() => prefetchProduct(product.slug)}
+        onFocus={() => prefetchProduct(product.slug)}
+        onTouchStart={() => prefetchProduct(product.slug)}
+      >
         <div
           className={
             isCatalog
@@ -113,7 +120,7 @@ export default function ProductCard({
         </p>
 
         {showQuickAdd && (
-          <div className={isCatalog ? 'mt-auto pt-1 hidden md:block' : 'mt-auto pt-1'}>
+          <div className="mt-auto pt-1">
             {soldOut ? (
               <button
                 type="button"

@@ -147,11 +147,19 @@ export default function ProductFormPage() {
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
   const setPersonalization = (key, patch) =>
     setForm((f) => {
-      const current = f.personalizationFields[key] || { enabled: false, required: false };
+      const current = f.personalizationFields[key] || {
+        enabled: false,
+        required: false,
+        ...(key === 'imagePrint' ? { maxImages: 1 } : {}),
+      };
       const next = typeof patch === 'boolean'
-        ? { enabled: patch, required: patch ? current.required : false }
+        ? { enabled: patch, required: patch ? current.required : false, ...(key === 'imagePrint' ? { maxImages: current.maxImages || 1 } : {}) }
         : { ...current, ...patch };
       if (!next.enabled) next.required = false;
+      if (key === 'imagePrint') {
+        const n = Number(next.maxImages);
+        next.maxImages = Number.isFinite(n) ? Math.min(6, Math.max(1, Math.floor(n))) : 1;
+      }
       return {
         ...f,
         personalizationFields: { ...f.personalizationFields, [key]: next },
@@ -266,6 +274,7 @@ export default function ProductFormPage() {
             productData: item.product?._id ? item.product : undefined,
             quantity: item.quantity || 1,
             sortOrder: item.sortOrder ?? index,
+            selectedOptions: item.selectedOptions?.length ? item.selectedOptions : undefined,
           }));
         const autoDescription = p.isHamper ? buildComboShortDescription(mappedComboItems) : '';
         setForm({
@@ -941,7 +950,7 @@ export default function ProductFormPage() {
               Show fields on the product page. Mark mandatory only when the customer must fill them before ordering.
             </p>
             {ADMIN_PERSONALIZATION_OPTIONS.map(({ key, label, description }) => {
-              const field = form.personalizationFields[key] || { enabled: false, required: false };
+              const field = form.personalizationFields[key] || { enabled: false, required: false, maxImages: 1 };
               return (
                 <div key={key} className="rounded-lg border border-gray-100 p-3 space-y-2">
                   <label className="flex items-start gap-2 text-sm cursor-pointer">
@@ -967,6 +976,20 @@ export default function ProductFormPage() {
                         Mandatory
                         <span className="text-gray-400"> — customer cannot add to basket without this</span>
                       </span>
+                    </label>
+                  )}
+                  {field.enabled && key === 'imagePrint' && (
+                    <label className="flex items-center gap-2 text-xs text-gray-600 ml-6">
+                      <span className="whitespace-nowrap">Max images</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={6}
+                        className="input-field w-16 py-1 text-sm"
+                        value={field.maxImages ?? 1}
+                        onChange={(e) => setPersonalization(key, { maxImages: e.target.value })}
+                      />
+                      <span className="text-gray-400">(1–6)</span>
                     </label>
                   )}
                 </div>

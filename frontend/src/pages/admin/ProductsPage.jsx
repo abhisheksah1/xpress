@@ -7,6 +7,7 @@ import CategoryEditModal from '../../components/admin/CategoryEditModal.jsx';
 import StockAdjustModal from '../../components/admin/StockAdjustModal.jsx';
 import ProductVariablesTab from '../../components/admin/ProductVariablesTab.jsx';
 import Pagination from '../../components/Pagination.jsx';
+import { resolveProductImageUrl } from '../../utils/mediaUrl.js';
 
 const PRODUCTS_PER_PAGE = 10;
 
@@ -602,7 +603,7 @@ export default function ProductsPage() {
                       <input type="checkbox" checked={selected.length === products.length && products.length > 0} onChange={toggleAll} />
                     </th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">SKU / Item</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Catalog Section</th>
+                    <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Image</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Standard Rate</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Remaining Stock</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase text-xs">Composition</th>
@@ -617,6 +618,7 @@ export default function ProductsPage() {
                     <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">No products found. Add your first product!</td></tr>
                   ) : products.map((product) => {
                     const composition = getComposition(product);
+                    const imageUrl = resolveProductImageUrl(product);
                     return (
                       <tr key={product._id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
@@ -632,12 +634,20 @@ export default function ProductsPage() {
                             {product.name}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {[...(product.categories || []), product.category]
-                            .filter(Boolean)
-                            .map((c) => c.name || c)
-                            .filter((name, i, arr) => arr.indexOf(name) === i)
-                            .join(', ') || '—'}
+                        <td className="px-4 py-3">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={product.name || ''}
+                              className="w-12 h-12 rounded-lg object-cover border border-gray-100 bg-gray-50"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gray-100 border border-gray-100 flex items-center justify-center text-[10px] text-gray-400">
+                              No img
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 font-medium">{formatPrice(product.price)}</td>
                         <td className="px-4 py-3">

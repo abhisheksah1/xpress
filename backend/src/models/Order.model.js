@@ -9,6 +9,13 @@ const orderItemPersonalizationSchema = new mongoose.Schema(
     giftMessage: { type: String },
     printImageUrl: { type: String },
     printImageName: { type: String },
+    printImages: [
+      {
+        url: { type: String },
+        name: { type: String },
+        _id: false,
+      },
+    ],
   },
   { _id: false, minimize: false }
 );
@@ -18,6 +25,7 @@ const orderSelectedOptionSchema = new mongoose.Schema(
     category: { type: String, required: true, trim: true },
     label: { type: String, required: true, trim: true },
     priceAdjustment: { type: Number, default: 0 },
+    componentId: { type: String, trim: true },
   },
   { _id: false }
 );

@@ -1,45 +1,76 @@
 import { Product, InventoryLog } from '../models/index.js';
 import { ApiError } from '../utils/ApiError.js';
-import { allowsBackorder } from '../utils/productStock.js';
+import {
+  allowsBackorder,
+  effectiveAllowsBackorder,
+  getComponentAvailableStock,
+  mapComboOptionCategories,
+  optionsForComboComponent,
+} from '../utils/productStock.js';
+import {
+  productTracksOptionInventory,
+  resolveInventoryOption,
+  syncProductStockFromOptions,
+} from '../utils/optionInventory.js';
 
-export const computeComboStock = (comboItems, components) => {
+export { mapComboOptionCategories, effectiveAllowsBackorder };
+
+const COMBO_COMPONENT_POPULATE =
+  'name slug sku price stock images allowBackorder optionCategories shortDescription description isHamper';
+
+export const computeComboStock = (comboItems, components, selectedOptions = []) => {
   if (!comboItems?.length) return 0;
   const byId = new Map(components.map((c) => [String(c._id), c]));
   let min = Infinity;
+  let hasHardLimit = false;
 
   for (const item of comboItems) {
     const component = byId.get(String(item.product?._id || item.product));
     if (!component) continue;
     const qty = Math.max(1, item.quantity || 1);
-    if ((component.stock ?? 0) <= 0) return 0;
-    const bundles = Math.floor((component.stock || 0) / qty);
+
+    // Component sell-after-OOS → does not limit the combo
+    if (allowsBackorder(component)) continue;
+
+    const itemOptions = item.selectedOptions?.length
+      ? item.selectedOptions
+      : selectedOptions;
+    const stock = getComponentAvailableStock(component, itemOptions);
+    const bundles = Math.floor(stock / qty);
     min = Math.min(min, bundles);
+    hasHardLimit = true;
   }
 
+  if (!hasHardLimit) return 99;
   return min === Infinity ? 0 : Math.max(0, min);
 };
 
-export const hasOutOfStockComboComponent = (product) => {
+export const hasOutOfStockComboComponent = (product, selectedOptions = []) => {
   if (!product?.isHamper || !product.comboItems?.length) return false;
 
   return product.comboItems.some((item) => {
     const component = item.product;
     if (!component || typeof component !== 'object') return true;
-    return (component.stock ?? 0) <= 0;
+    if (allowsBackorder(component)) return false;
+    const needed = Math.max(1, item.quantity || 1);
+    const itemOptions = item.selectedOptions?.length
+      ? item.selectedOptions
+      : selectedOptions;
+    return getComponentAvailableStock(component, itemOptions) < needed;
   });
 };
 
-export const resolveEffectiveStock = (product) => {
+export const resolveEffectiveStock = (product, selectedOptions = []) => {
   if (!product?.isHamper) return product?.stock ?? 0;
   if (!product.comboItems?.length) return 0;
-  if (hasOutOfStockComboComponent(product)) return 0;
+  if (hasOutOfStockComboComponent(product, selectedOptions)) return 0;
 
   const components = product.comboItems
     .map((i) => i.product)
     .filter((p) => p && typeof p === 'object');
   if (!components.length) return product.stock ?? 0;
 
-  return computeComboStock(product.comboItems, components);
+  return computeComboStock(product.comboItems, components, selectedOptions);
 };
 
 export const syncHamperStockRecord = async (hamperProduct) => {
@@ -61,8 +92,8 @@ export const refreshHamperStocksInList = async (products) => {
   if (!hampers.length) return products;
 
   const populated = await Product.find({ _id: { $in: hampers.map((p) => p._id) } })
-    .select('comboItems stock')
-    .populate('comboItems.product', 'stock')
+    .select('comboItems stock allowBackorder')
+    .populate('comboItems.product', 'stock allowBackorder optionCategories')
     .lean();
 
   const stockById = new Map();
@@ -74,12 +105,19 @@ export const refreshHamperStocksInList = async (products) => {
     if (!p.isHamper) return p;
     const stock = stockById.get(String(p._id));
     if (stock == null) return p;
+    const hamper = populated.find((h) => String(h._id) === String(p._id));
+    const allowBackorder = hamper ? effectiveAllowsBackorder(hamper) : false;
     if (typeof p.toObject === 'function') {
       const obj = p.toObject();
       obj.stock = stock;
+      if (allowBackorder) obj.allowBackorder = true;
       return obj;
     }
-    return { ...p, stock };
+    return {
+      ...p,
+      stock,
+      ...(allowBackorder ? { allowBackorder: true } : {}),
+    };
   });
 };
 
@@ -181,13 +219,46 @@ export const prepareComboProductData = async (data, productId = null) => {
     return { ...data, comboItems: [] };
   }
 
-  const comboItems = (data.comboItems || []).map((item, index) => ({
-    product: String(item.product?._id || item.product),
-    quantity: Math.max(1, Number(item.quantity) || 1),
-    sortOrder: item.sortOrder ?? index,
-  }));
+  const comboItems = (data.comboItems || []).map((item, index) => {
+    const selectedOptions = (item.selectedOptions || [])
+      .map((opt) => ({
+        category: String(opt.category || '').trim(),
+        label: String(opt.label || '').trim(),
+        priceAdjustment: Number(opt.priceAdjustment) || 0,
+      }))
+      .filter((opt) => opt.category && opt.label);
+
+    return {
+      product: String(item.product?._id || item.product),
+      quantity: Math.max(1, Number(item.quantity) || 1),
+      sortOrder: item.sortOrder ?? index,
+      ...(selectedOptions.length ? { selectedOptions } : {}),
+    };
+  });
 
   const components = await validateComboItems(comboItems, productId);
+
+  // Require variation picks for inventory-tracking variable components
+  const byId = new Map(components.map((c) => [String(c._id), c]));
+  for (const item of comboItems) {
+    const component = byId.get(String(item.product));
+    if (!component) continue;
+    const tracking = (component.optionCategories || []).filter((c) => c.tracksInventory);
+    if (!tracking.length) continue;
+    for (const cat of tracking) {
+      const catName = String(cat.name || '').trim().toLowerCase();
+      const match = (item.selectedOptions || []).find(
+        (s) => String(s.category || '').trim().toLowerCase() === catName
+      );
+      if (!match) {
+        throw new ApiError(
+          400,
+          `Select a variation for "${component.name}" (${cat.name}) in this combo`
+        );
+      }
+    }
+  }
+
   const stock = computeComboStock(comboItems, components);
   const images = mergeComboImages(data.images || [], components, comboItems);
   const autoDescription = buildComboShortDescription(components, comboItems);
@@ -207,7 +278,7 @@ export const prepareComboProductData = async (data, productId = null) => {
   };
 };
 
-export const getComboAvailableStock = async (product) => {
+export const getComboAvailableStock = async (product, selectedOptions = []) => {
   if (!product.isHamper || !product.comboItems?.length) {
     return product.stock;
   }
@@ -215,30 +286,65 @@ export const getComboAvailableStock = async (product) => {
   let populated = product;
   const first = product.comboItems[0]?.product;
   if (!first || typeof first !== 'object' || first.stock == null) {
-    populated = await Product.findById(product._id).populate('comboItems.product', 'stock');
+    populated = await Product.findById(product._id).populate('comboItems.product', COMBO_COMPONENT_POPULATE);
   }
 
-  return resolveEffectiveStock(populated);
+  return resolveEffectiveStock(populated, selectedOptions);
 };
 
-export const assertComboStock = async (product, orderQty) => {
-  if (allowsBackorder(product)) return orderQty;
+export const assertComboStock = async (product, orderQty, selectedOptions = []) => {
+  if (effectiveAllowsBackorder(product)) return orderQty;
 
   let populated = product;
   const first = product.comboItems?.[0]?.product;
-  if (product.isHamper && product.comboItems?.length && (!first || typeof first !== 'object' || first.stock == null)) {
-    populated = await Product.findById(product._id).populate('comboItems.product', 'stock');
+  if (
+    product.isHamper
+    && product.comboItems?.length
+    && (!first || typeof first !== 'object' || first.stock == null || first.allowBackorder == null)
+  ) {
+    populated = await Product.findById(product._id).populate('comboItems.product', COMBO_COMPONENT_POPULATE);
   }
 
-  if (populated.isHamper && hasOutOfStockComboComponent(populated)) {
+  if (!populated?.comboItems?.length) {
     throw new ApiError(400, `${product.name} is out of stock`);
   }
 
-  const available = await getComboAvailableStock(populated);
-  if (available < orderQty) {
-    throw new ApiError(400, `Insufficient stock for combo ${product.name}`);
+  for (const item of populated.comboItems) {
+    const component = item.product;
+    if (!component || typeof component !== 'object') {
+      throw new ApiError(400, `${product.name} has an invalid combo item`);
+    }
+
+    if (allowsBackorder(component)) continue;
+
+    const needed = Math.max(1, item.quantity || 1) * orderQty;
+    const componentOpts = item.selectedOptions?.length
+      ? item.selectedOptions
+      : optionsForComboComponent(selectedOptions, component);
+
+    if (productTracksOptionInventory(component)) {
+      const resolved = resolveInventoryOption(component, componentOpts);
+      if (!resolved) {
+        throw new ApiError(
+          400,
+          `Select a stock variation for ${component.name} (in ${product.name})`
+        );
+      }
+      if ((Number(resolved.option.stock) || 0) < needed) {
+        throw new ApiError(
+          400,
+          `Insufficient stock for ${component.name} (${resolved.label}) in ${product.name}`
+        );
+      }
+      continue;
+    }
+
+    if ((Number(component.stock) || 0) < needed) {
+      throw new ApiError(400, `Insufficient stock for ${component.name} in ${product.name}`);
+    }
   }
-  return available;
+
+  return orderQty;
 };
 
 export const deductComboComponentStock = async ({
@@ -246,10 +352,12 @@ export const deductComboComponentStock = async ({
   quantity,
   reference,
   userId = null,
+  selectedOptions = [],
 }) => {
   const populated = product.comboItems?.[0]?.product?.stock != null
+    && product.comboItems?.[0]?.product?.optionCategories != null
     ? product
-    : await Product.findById(product._id).populate('comboItems.product');
+    : await Product.findById(product._id).populate('comboItems.product', COMBO_COMPONENT_POPULATE);
 
   if (!populated?.comboItems?.length) return;
 
@@ -258,6 +366,34 @@ export const deductComboComponentStock = async ({
     if (!component?._id) continue;
 
     const deductQty = (item.quantity || 1) * quantity;
+    const componentOpts = item.selectedOptions?.length
+      ? item.selectedOptions
+      : optionsForComboComponent(selectedOptions, component);
+
+    if (productTracksOptionInventory(component)) {
+      const resolved = resolveInventoryOption(component, componentOpts);
+      if (resolved) {
+        const previousStock = Number(resolved.option.stock) || 0;
+        resolved.option.stock = Math.max(0, previousStock - deductQty);
+        syncProductStockFromOptions(component);
+        await component.save();
+
+        await InventoryLog.create({
+          product: component._id,
+          optionCategory: resolved.categoryName,
+          optionLabel: resolved.label,
+          type: 'out',
+          quantity: deductQty,
+          previousStock,
+          newStock: resolved.option.stock,
+          reason: `Combo sale: ${product.name}`,
+          reference,
+          performedBy: userId,
+        });
+        continue;
+      }
+    }
+
     const previousStock = component.stock;
     component.stock = Math.max(0, previousStock - deductQty);
     await component.save();
@@ -282,7 +418,7 @@ export const syncComboProductsContaining = async (componentIds) => {
   const combos = await Product.find({
     isHamper: true,
     'comboItems.product': { $in: ids },
-  }).populate('comboItems.product');
+  }).populate('comboItems.product', COMBO_COMPONENT_POPULATE);
 
   for (const combo of combos) {
     const components = combo.comboItems.map((i) => i.product).filter(Boolean);
@@ -292,8 +428,17 @@ export const syncComboProductsContaining = async (componentIds) => {
   }
 };
 
-export const restoreComboComponentStock = async ({ product, quantity, reference, userId = null }) => {
-  const populated = await Product.findById(product._id).populate('comboItems.product');
+export const restoreComboComponentStock = async ({
+  product,
+  quantity,
+  reference,
+  userId = null,
+  selectedOptions = [],
+}) => {
+  const populated = await Product.findById(product._id).populate(
+    'comboItems.product',
+    COMBO_COMPONENT_POPULATE
+  );
   if (!populated?.comboItems?.length) return;
 
   for (const item of populated.comboItems) {
@@ -301,6 +446,34 @@ export const restoreComboComponentStock = async ({ product, quantity, reference,
     if (!component?._id) continue;
 
     const restoreQty = (item.quantity || 1) * quantity;
+    const componentOpts = item.selectedOptions?.length
+      ? item.selectedOptions
+      : optionsForComboComponent(selectedOptions, component);
+
+    if (productTracksOptionInventory(component) && componentOpts.length) {
+      const resolved = resolveInventoryOption(component, componentOpts);
+      if (resolved) {
+        const previousStock = Number(resolved.option.stock) || 0;
+        resolved.option.stock = previousStock + restoreQty;
+        syncProductStockFromOptions(component);
+        await component.save();
+
+        await InventoryLog.create({
+          product: component._id,
+          optionCategory: resolved.categoryName,
+          optionLabel: resolved.label,
+          type: 'return',
+          quantity: restoreQty,
+          previousStock,
+          newStock: resolved.option.stock,
+          reason: `Combo return: ${product.name}`,
+          reference,
+          performedBy: userId,
+        });
+        continue;
+      }
+    }
+
     const previousStock = component.stock;
     component.stock = previousStock + restoreQty;
     await component.save();
